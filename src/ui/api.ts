@@ -127,7 +127,9 @@ export interface DerbySetupVM {
 
 export interface HudVM {
   mode: 'campaign' | 'practice' | 'derby';
+  /** "1-3 · Tiro al blanco" — the part before " · " renders as a tag. */
   stageLabel: string;
+  /** "Jonrones|2/5" — label and value separated by "|". */
   goalText: string;
   /** 0..1 */
   progress: number;
@@ -220,7 +222,9 @@ export interface UI {
   showStageIntro(vm: StageIntroVM, h: { onStart(): void; onBack(): void }): void;
   showPractice(vm: PracticeVM, h: { onStart(cfg: PracticeConfig): void; onBack(): void }): void;
   showDerbySetup(vm: DerbySetupVM, h: { onStart(stadium: StadiumId): void; onBack(): void }): void;
+  /** Settings open as an overlay (also above the pause menu); close with closeOverlay(). */
   showSettings(settings: Settings, h: SettingsHandlers): void;
+  closeOverlay(): void;
   showCalibration(h: CalibrationHandlers): void;
   showHUD(vm: HudVM, h: HudHandlers): void;
   updateHUD(vm: HudVM): void;
