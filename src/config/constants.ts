@@ -1,11 +1,14 @@
 /**
  * Physical constants and field geometry. All world units are SI (meters,
- * seconds, kilograms). See docs/CONVENTIONS.md for the coordinate system:
+ * seconds, kilograms). See docs/CONVENTIONS.md for the coordinate system
+ * (right-handed, as three.js):
  *
- *   +X  first-base side (catcher's right when looking at the pitcher)
+ *   +X  third-base side (the catcher's LEFT; screen-left from the batting camera)
  *   +Y  up
  *   +Z  toward center field / the pitcher
  *   origin = back tip of home plate (the apex of the diamond)
+ *
+ * Spray angles are measured from +Z and are positive toward RIGHT field (−X).
  */
 
 export const FT = 0.3048;
@@ -50,7 +53,7 @@ export const RUBBER_Z = 60.5 * FT;
 export const PITCHER_EXTENSION = 6.2 * FT;
 export const RELEASE_Z = RUBBER_Z - PITCHER_EXTENSION;
 export const RELEASE_HEIGHT = 1.78;
-/** Release X magnitude for a right-handed pitcher (negative X = 3B side). */
+/** Release X magnitude; a right-hander releases on the 3B side (+X). */
 export const RELEASE_SIDE = 0.55;
 
 export const BASE_DISTANCE = 90 * FT;
@@ -63,7 +66,7 @@ export const MOUND = {
 /** Foul lines run at ±45° from the +Z axis. */
 export const FOUL_LINE_ANGLE = 45 * DEG;
 
-/** Batter's box centre offset from the plate centre line (absolute X). */
+/** Batter's box centre offset from the plate centre line (|X|; RHB stands at +X). */
 export const BATTERS_BOX_X = 0.95;
 
 export const FIXED_DT = 1 / 240;

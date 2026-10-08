@@ -12,7 +12,7 @@ import type {
 } from '../contracts';
 import { MPH } from '../config/constants';
 import type { Rng } from '../core/rng';
-import { fenceDistance } from './field';
+import { fenceDistance, sprayOf } from './field';
 import { simulateFlight, targetsHit } from './flight';
 import { plateSpeed } from './pitch';
 
@@ -128,7 +128,8 @@ export function evaluateSwing(plan: PitchPlan, swing: SwingInput, ctx: ContactCo
 
   const handSign = swing.batter === 'R' ? 1 : -1;
   // Early (tN < 0) pulls the ball; outside pitches drift to the opposite field.
-  let spray = handSign * tN * 38 + (ball.x / 0.25) * 7 + rng.gaussian() * 2;
+  // RHB stands at +X, so an outside pitch is at −X and goes to RF (+spray).
+  let spray = handSign * tN * 38 - (ball.x / 0.25) * 7 + rng.gaussian() * 2;
   spray = Math.max(-89, Math.min(89, spray));
 
   const evMph = ev / MPH;
@@ -189,7 +190,7 @@ export function classifyInPlay(
   if (la <= 25) return evMph >= 82 ? 'hit' : distance > 45 && distance < 75 ? 'hit' : 'out';
   if (la <= 50) {
     // Bloopers that drop in shallow and balls on the warning track fall in.
-    const spray = Math.atan2(landing.x, landing.z);
+    const spray = sprayOf(landing.x, landing.z);
     const fence = fenceDistance(stadium, spray);
     if (distance > fence - 6) return 'hit';
     if (distance > 42 && distance < 68 && evMph < 88) return 'hit';

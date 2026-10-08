@@ -1,13 +1,12 @@
 import type { BatDef, StadiumId, StageDef, TargetDef } from '../contracts';
-import { fenceDistance, fenceHeight, standHeight } from '../sim/field';
+import { fenceDistance, fenceHeight, polarToXZ, standHeight } from '../sim/field';
 import { DEG, FT } from './constants';
 import { STADIUMS } from './stadiums';
 
-const polar = (sprayDeg: number, r: number, y: number) => ({
-  x: Math.sin(sprayDeg * DEG) * r,
-  y,
-  z: Math.cos(sprayDeg * DEG) * r,
-});
+const polar = (sprayDeg: number, r: number, y: number) => {
+  const p = polarToXZ(sprayDeg * DEG, r);
+  return { x: p.x, y, z: p.z };
+};
 
 /** Ring lying on the outfield grass at a spray angle (deg, + = RF) and distance (ft). */
 function ring(sprayDeg: number, distFt: number, radius: number): TargetDef {

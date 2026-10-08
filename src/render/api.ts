@@ -5,8 +5,9 @@
  *   - src/render/fx/        → createBallView() / createEffects()
  * The game orchestrator (src/game/) only talks to these interfaces.
  *
- * Coordinate system (docs/CONVENTIONS.md): meters; +X = 1B side, +Y up,
- * +Z = toward the pitcher / center field; origin = back tip of home plate.
+ * Coordinate system (docs/CONVENTIONS.md): meters; +X = 3B side (screen-left
+ * from the batting camera), +Y up, +Z = toward the pitcher / center field;
+ * origin = back tip of home plate. Spray angles: use sim/field sprayOf/polarToXZ.
  */
 import type * as THREE from 'three';
 import type {

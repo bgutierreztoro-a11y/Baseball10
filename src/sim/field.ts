@@ -40,9 +40,14 @@ export function fenceHeight(stadium: StadiumDef, sprayRad: number): number {
   return sampleProfile(stadium.fence.heightsFt, sprayRad) * FT;
 }
 
-/** Spray angle (rad) of a ground point; + toward right field. */
+/** Spray angle (rad) of a ground point; + toward right field (−X). */
 export function sprayOf(x: number, z: number): number {
-  return Math.atan2(x, z);
+  return Math.atan2(-x, z);
+}
+
+/** Ground point at a spray angle (rad, + toward RF) and radius. */
+export function polarToXZ(sprayRad: number, r: number): { x: number; z: number } {
+  return { x: -Math.sin(sprayRad) * r, z: Math.cos(sprayRad) * r };
 }
 
 /** Slope of the outfield stands rising behind the wall (physics + visuals). */
@@ -73,7 +78,8 @@ export function fencePolyline(stadium: StadiumDef, segments: number): { x: numbe
   for (let i = 0; i <= segments; i++) {
     const angle = -FOUL_LINE_ANGLE + (2 * FOUL_LINE_ANGLE * i) / segments;
     const r = fenceDistance(stadium, angle);
-    pts.push({ x: Math.sin(angle) * r, z: Math.cos(angle) * r, h: fenceHeight(stadium, angle), angle });
+    const p = polarToXZ(angle, r);
+    pts.push({ x: p.x, z: p.z, h: fenceHeight(stadium, angle), angle });
   }
   return pts;
 }

@@ -29,7 +29,7 @@ export interface PitchRequest {
 }
 
 export function releasePoint(hand: Hand): Vec3 {
-  return { x: hand === 'R' ? -RELEASE_SIDE : RELEASE_SIDE, y: RELEASE_HEIGHT, z: RELEASE_Z };
+  return { x: hand === 'R' ? RELEASE_SIDE : -RELEASE_SIDE, y: RELEASE_HEIGHT, z: RELEASE_Z };
 }
 
 export function planPitch(req: PitchRequest): PitchPlan {
@@ -46,7 +46,8 @@ export function planPitch(req: PitchRequest): PitchPlan {
   const flightTime = (v - Math.sqrt(disc)) / drag;
 
   // Whole-flight break → constant accelerations (d = ½·a·T²).
-  const armSide = req.hand === 'R' ? -1 : 1;
+  // A right-hander's arm side is the 3B side (+X).
+  const armSide = req.hand === 'R' ? 1 : -1;
   const T2 = flightTime * flightTime;
   const ax = (2 * def.hbIn * IN * armSide) / T2;
   const ay = -GRAVITY + (2 * def.ivbIn * IN) / T2;

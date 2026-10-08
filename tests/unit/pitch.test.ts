@@ -36,8 +36,8 @@ describe('pitch model (constant acceleration)', () => {
   it('breaks to the glove side for a RHP slider and mirrors for a LHP', () => {
     const r = planPitch({ type: 'SL', hand: 'R', speedMph: 85, target: { x: 0, y: 0.8 }, airDensity: 1.2 });
     const l = planPitch({ type: 'SL', hand: 'L', speedMph: 85, target: { x: 0, y: 0.8 }, airDensity: 1.2 });
-    // RHP glove side is +X (1B side from the catcher's view).
-    expect(r.a.x).toBeGreaterThan(0);
+    // RHP arm side is the 3B side (+X), so the glove side is −X.
+    expect(r.a.x).toBeLessThan(0);
     expect(l.a.x).toBeCloseTo(-r.a.x, 6);
   });
 

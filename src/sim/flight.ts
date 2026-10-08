@@ -59,7 +59,7 @@ function launchVelocity(p: LaunchParams): Vec3 {
   const la = p.launchAngleDeg * DEG;
   const sp = p.sprayAngleDeg * DEG;
   return {
-    x: p.exitVelocity * Math.cos(la) * Math.sin(sp),
+    x: -p.exitVelocity * Math.cos(la) * Math.sin(sp),
     y: p.exitVelocity * Math.sin(la),
     z: p.exitVelocity * Math.cos(la) * Math.cos(sp),
   };
@@ -72,8 +72,9 @@ function spinVector(p: LaunchParams, v: Vec3): Vec3 {
   const bx = -v.z / h;
   const bz = v.x / h;
   const w = p.spinRpm * RPM_TO_RAD_S;
+  // Positive side spin curves the ball further toward right field (−X).
   const tilt = Math.max(-1, Math.min(1, p.sideSpin)) * 0.3;
-  return { x: bx * w * Math.cos(tilt), y: Math.abs(w) * Math.sin(tilt), z: bz * w * Math.cos(tilt) };
+  return { x: bx * w * Math.cos(tilt), y: -Math.abs(w) * Math.sin(tilt), z: bz * w * Math.cos(tilt) };
 }
 
 function makeDeriv(airDensity: number, spin: Vec3) {
