@@ -771,7 +771,7 @@ class DomUI implements UI {
     const card = h(
       'aside',
       { class: `hitcard panel res-${vm.result}`, 'aria-label': vm.title },
-      h('div', { class: 'title' }, vm.title),
+      h('div', { class: 'hc-title' }, vm.title),
       vm.stats.length ? stats : null,
       chips.childNodes.length ? chips : null,
       vm.coach ? h('div', { class: 'coach' }, vm.coach) : null,

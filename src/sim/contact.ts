@@ -91,8 +91,8 @@ export function classifyQuality(evMph: number, la: number): ContactQuality {
   if (isBarrel(evMph, la)) return 'barrel';
   if (la < 8) return 'topped';
   if (la > 42) return 'under';
-  if (evMph >= 92) return 'solid';
-  if (evMph >= 72) return 'flare';
+  if (evMph >= 85) return 'solid';
+  if (evMph >= 70) return 'flare';
   return 'weak';
 }
 
