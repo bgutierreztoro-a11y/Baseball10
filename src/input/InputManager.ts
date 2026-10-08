@@ -157,7 +157,12 @@ export class InputManager {
   }
 
   private pollPad(menuOnly: boolean): void {
-    const pads = typeof navigator !== 'undefined' && navigator.getGamepads ? navigator.getGamepads() : [];
+    let pads: (Gamepad | null)[] = [];
+    try {
+      pads = typeof navigator !== 'undefined' && navigator.getGamepads ? Array.from(navigator.getGamepads()) : [];
+    } catch {
+      return; // gamepad API blocked by the embedding page's permissions policy
+    }
     const pad = Array.from(pads).find((p): p is Gamepad => !!p);
     if (!pad) return;
     const pressed = pad.buttons.map((b) => b.pressed);

@@ -396,17 +396,21 @@ export class App {
     return { ...st, screen, homeRuns: this.match.session.homeRuns, swings: this.match.session.swings };
   }
 
+  /** Web Share → clipboard → show the text, whichever the browser allows. */
   private async share(text: string): Promise<void> {
     const url = location.href.split('#')[0] ?? '';
+    const full = `${text} ${url}`.trim();
+    // Clipboard first while the click's user activation is still fresh.
     try {
-      if (navigator.share) {
-        await navigator.share({ text, url });
-        return;
-      }
-      await navigator.clipboard.writeText(`${text} ${url}`);
+      await navigator.clipboard.writeText(full);
       this.ui.toast(gameText(this.s.lang).copied);
     } catch {
-      /* user cancelled */
+      this.ui.toast(text);
+    }
+    try {
+      if (navigator.share) await navigator.share({ text, url });
+    } catch {
+      /* blocked or cancelled: the text is already on the clipboard or on screen */
     }
   }
 }
