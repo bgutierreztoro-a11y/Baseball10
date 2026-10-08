@@ -69,6 +69,8 @@ export interface BatterRig {
    * contact pose bend toward it so the bat visibly meets the ball there.
    */
   setAim(x: number, y: number): void;
+  /** Stride/load timed to the incoming pitch (called at release). */
+  prepare(timeToPlate: number): void;
   /**
    * Starts the swing. The bat must reach the contact pose exactly
    * `timeToContact` seconds after this call and finish the follow-through
@@ -105,6 +107,8 @@ export interface CatcherRig {
   setTarget(x: number, y: number): void;
   /** Pop the mitt (ball received). */
   receive(): void;
+  /** 0..1 opacity; ghosted during the pitch so low pitches are never hidden. */
+  setGhost(opacity: number): void;
   reset(): void;
   update(dt: number): void;
 }
@@ -112,6 +116,7 @@ export interface CatcherRig {
 export interface UmpireRig {
   readonly root: THREE.Group;
   callStrike(): void;
+  setGhost(opacity: number): void;
   reset(): void;
   update(dt: number): void;
 }
