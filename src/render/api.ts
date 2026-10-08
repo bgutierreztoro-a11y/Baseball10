@@ -31,10 +31,20 @@ export interface ScoreboardData {
   highlight: boolean;
 }
 
+export interface StadiumAtmosphere {
+  /** UnrealBloom strength suited to the time of day. */
+  bloom: number;
+  exposure: number;
+  night: boolean;
+  /** Fog far distance (cameras should keep their far plane beyond it). */
+  fogFar: number;
+}
+
 export interface StadiumView {
   readonly root: THREE.Group;
   /** Main shadow-casting light (sun or stadium key light). */
   readonly keyLight: THREE.DirectionalLight;
+  readonly atmosphere: StadiumAtmosphere;
   /** Called every frame. `excitement` 0..1 drives crowd motion. */
   update(dt: number, elapsed: number, excitement: number): void;
   setScoreboard(data: ScoreboardData): void;
