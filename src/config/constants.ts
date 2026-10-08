@@ -23,7 +23,7 @@ export const BALL = {
   /** Rendered radius: slightly exaggerated so the ball stays readable at 18 m. */
   visualRadius: 0.052,
   area: Math.PI * 0.0366 * 0.0366,
-  dragCoefficient: 0.33,
+  dragCoefficient: 0.37,
 } as const;
 
 export const PLATE = {

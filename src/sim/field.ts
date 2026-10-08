@@ -45,6 +45,21 @@ export function sprayOf(x: number, z: number): number {
   return Math.atan2(x, z);
 }
 
+/** Slope of the outfield stands rising behind the wall (physics + visuals). */
+export const STAND_RISE = Math.tan(28 * DEG);
+/** Gap between the wall and the first row of seats (m). */
+export const STAND_GAP = 1.5;
+
+/**
+ * Height (m) of the seating surface at radius `r` behind the fence: the
+ * stands start STAND_GAP behind the wall at wall height and rise at 28°.
+ * Home runs come to rest on this surface, so the stadium builder must match it.
+ */
+export function standHeight(stadium: StadiumDef, sprayRad: number, r: number): number {
+  const R = fenceDistance(stadium, sprayRad);
+  return fenceHeight(stadium, sprayRad) + Math.max(0, r - R - STAND_GAP) * STAND_RISE;
+}
+
 export function isFair(x: number, z: number): boolean {
   return z > 0 && Math.abs(sprayOf(x, z)) <= FOUL_LINE_ANGLE + 1e-9;
 }
