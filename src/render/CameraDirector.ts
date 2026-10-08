@@ -113,6 +113,9 @@ export class CameraDirector {
         const b = this.reducedMotion ? 0 : 1;
         this.pos.set(BATTING_POS.x + Math.sin(this.t * 0.6) * 0.012 * b, BATTING_POS.y + Math.sin(this.t * 0.9) * 0.008 * b, BATTING_POS.z);
         this.look.copy(BATTING_LOOK);
+        // On portrait screens tilt further down so the zone sits near the centre.
+        const portrait = Math.min(1, Math.max(0, (1.3 - cam.aspect) / 0.75));
+        this.look.y -= portrait * 2.4;
         this.fov = BATTING_FOV;
         break;
       }
@@ -146,8 +149,13 @@ export class CameraDirector {
       this.shakeAmp *= Math.exp(-dt * 14);
     }
     cam.lookAt(this.look);
-    if (Math.abs(cam.fov - this.fov) > 0.01) {
-      cam.fov = this.fov;
+    // Portrait screens: widen the vertical FOV so a minimum horizontal FOV is kept
+    // (otherwise the batter falls off-screen on phones).
+    const minH = (this.mode === 'batting' ? 40 : this.mode === 'follow' ? 54 : 62) * (Math.PI / 180);
+    const fromH = (2 * Math.atan(Math.tan(minH / 2) / Math.max(0.2, cam.aspect)) * 180) / Math.PI;
+    const fov = Math.max(this.fov, fromH);
+    if (Math.abs(cam.fov - fov) > 0.01) {
+      cam.fov = fov;
       cam.updateProjectionMatrix();
     }
   }

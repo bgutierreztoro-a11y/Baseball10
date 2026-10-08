@@ -14,6 +14,15 @@ const browser = await chromium.launch({
 });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, locale: 'es-ES' });
 const errors = [];
+if (process.env.UNLOCK) {
+  // Seed a save with every stage completed (QA only).
+  await page.addInitScript(() => {
+    const ids = [];
+    for (let c = 1; c <= 5; c++) for (let i = 1; i <= 5; i++) ids.push(`${c}-${i}`);
+    const stages = Object.fromEntries(ids.map((id) => [id, { stars: 1, completed: true, bestLongestFt: 0 }]));
+    localStorage.setItem('jonron.save', JSON.stringify({ version: 1, stages, seenTips: ['first'], settings: { lang: 'es' } }));
+  });
+}
 page.on('pageerror', (e) => errors.push(e.message));
 page.on('console', (m) => m.type() === 'error' && !m.text().includes('404') && errors.push(m.text()));
 const shot = async (name) => { await page.screenshot({ path: `${out}/${name}.png` }); console.log('shot', name); };
@@ -34,10 +43,17 @@ await shot('04-batting');
 
 const swings = Number(swingsArg);
 for (let i = 0; i < swings; i++) {
-  let st = await dbg();
+  // Wait for a pitch whose ideal swing moment is still ahead of us.
+  let st = null;
   const t0 = Date.now();
-  while ((!st || st.phase !== 'windup') && Date.now() - t0 < 20000) { await page.waitForTimeout(30); st = await dbg(); }
-  if (!st || st.phase !== 'windup') { console.log('no windup', st); break; }
+  for (;;) {
+    st = await dbg();
+    const ahead = st && (st.phase === 'windup' || st.phase === 'pitch') ? await page.evaluate((r) => r - performance.now(), st.releaseAtMs + st.flightTime * 1000 - 200) : -1;
+    if (ahead > 60) break;
+    if (Date.now() - t0 > 40000) { console.log('no pitch', JSON.stringify(st)); st = null; break; }
+    await page.waitForTimeout(25);
+  }
+  if (!st) break;
   // Aim slightly under the crossing to lift the ball.
   await page.mouse.move(st.screen.x, st.screen.y + 6);
   const swingTime = kind === 'power' ? 150 : 120;

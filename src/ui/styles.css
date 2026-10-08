@@ -219,6 +219,8 @@ button.chip[aria-pressed='true'] { background: rgba(62, 193, 243, 0.16); border-
 .streak { color: var(--c-warn); }
 .hud-pause { pointer-events: auto; }
 .hud-bottom { position: absolute; left: 50%; bottom: calc(18px + var(--safe-b)); transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 8px; width: min(640px, 92vw); text-align: center; }
+/* Touch: keep hint/pitch label clear of the SWING/POWER buttons on the right. */
+.hud.is-touch .hud-bottom { left: calc(16px + var(--safe-l)); transform: none; width: calc(100% - 170px - var(--safe-l) - var(--safe-r)); align-items: flex-start; text-align: left; }
 .hint { font: 500 14px var(--f-body); color: var(--c-text-dim); background: rgba(5, 9, 18, 0.55); padding: 6px 12px; border-radius: 999px; transition: opacity var(--t-slow) var(--ease); }
 .hint.hide { opacity: 0; }
 .pitch-label { font: 700 15px var(--f-num); letter-spacing: 0.1em; text-transform: uppercase; background: var(--c-panel); border: 1px solid var(--c-line); padding: 5px 12px; border-radius: 999px; }

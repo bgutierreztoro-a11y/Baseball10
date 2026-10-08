@@ -333,9 +333,9 @@ class FX implements Effects {
     if (this.shock.visible) {
       this.shockT += dt;
       const t = this.shockT / 0.35;
-      this.shock.scale.setScalar(0.2 + t * 1.6);
+      this.shock.scale.setScalar(0.2 + t * 1.15);
       this.shock.quaternion.copy(camera.quaternion);
-      (this.shock.material as THREE.MeshBasicMaterial).opacity = Math.max(0, 1 - t);
+      (this.shock.material as THREE.MeshBasicMaterial).opacity = Math.max(0, 0.75 * (1 - t));
       if (t >= 1) this.shock.visible = false;
     }
     for (let i = this.bursts.length - 1; i >= 0; i--) {

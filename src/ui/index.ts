@@ -691,7 +691,7 @@ class DomUI implements UI {
     const pitch = h('div', { class: 'pitch-label', hidden: true }, '');
     const hud = h(
       'div',
-      { class: 'hud' },
+      { class: `hud ${this.touch ? 'is-touch' : ''}` },
       h('div', { class: 'hud-tl' }, h('div', { class: 'hud-chip' }, chipTag, chipText), h('div', { class: 'hud-goal' }, h('div', { class: 'txt' }, goal, goalNum), h('div', { class: 'bar' }, barFill))),
       right,
       h('div', { class: 'hud-bottom' }, pitch, hint),

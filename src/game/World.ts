@@ -58,7 +58,7 @@ export class World {
     const side = hand === 'R' ? 1 : -1;
     this.batter.root.position.set(side * (BATTERS_BOX_X - 0.03), 0, 0.12);
     this.batter.root.rotation.y = -side * (Math.PI / 2);
-    this.umpire.root.position.set(-side * 1.05, 0, -1.75);
+    this.umpire.root.position.set(-side * 1.3, 0, -1.7);
   }
 
   get handedness(): Hand {

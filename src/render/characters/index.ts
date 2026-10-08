@@ -632,7 +632,7 @@ class Catcher implements CatcherRig {
 // ── Umpire ──
 const UMP_POSE = makePose();
 Object.assign(UMP_POSE, { hipsLean: 0.55, spineLean: 0.1, chestLean: 0.0, headPitch: -0.5, footYawL: 0.3, footYawR: -0.3 });
-UMP_POSE.hipsPos.set(0, 0.78, -0.05);
+UMP_POSE.hipsPos.set(0, 0.72, -0.05);
 UMP_POSE.footL.set(0.32, 0, 0.0);
 UMP_POSE.footR.set(-0.32, 0, 0.0);
 UMP_POSE.kneePoleL.set(0.4, 0, 1);
