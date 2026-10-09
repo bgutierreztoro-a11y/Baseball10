@@ -14,8 +14,10 @@
 - [x] **Compatibilidad del guardado:** `SaveData.version = 1`; `migrate()` tolera saves futuros o corruptos sin bloquear el juego
 
 ## Desplegar
-1. Publicar `dist/` en el hosting estático elegido (GitHub Pages, Vercel, Netlify, S3 + CloudFront), con `base: './'`, compatible con cualquier subruta.
-2. Encabezados recomendados: `Cache-Control: public, max-age=31536000, immutable` para `assets/*`; `no-cache` para `index.html`.
+1. **Vercel (hosting elegido):** importar el repo en [vercel.com/new](https://vercel.com/new) como proyecto `jonron`. `vercel.json` fija el framework, la instalación (`npm ci`), el build y la salida `dist/`. La rama de producción es la rama por defecto del repo y cada push despliega solo.
+   - Comprobar en *Settings → Deployment Protection* que **Vercel Authentication** esté en "Standard Protection" (solo *previews*), para que la URL de producción se abra sin cuenta.
+   - Otras opciones válidas: GitHub Pages, Netlify o S3 + CloudFront publicando `dist/`. `base: './'` funciona en cualquier subruta.
+2. Encabezados (ya incluidos en `vercel.json`): `Cache-Control: public, max-age=31536000, immutable` para `assets/*`; `no-cache` para `index.html`.
 3. Prueba de humo en producción (2 minutos):
    - [ ] La pantalla de título carga con el estadio 3D y sin errores en la consola
    - [ ] Campaña → 1-1 → ¡A batear! → un swing muestra la tarjeta de bateo

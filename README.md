@@ -32,6 +32,15 @@ npm run build          # dist/ (hosting estático)
 npm run build:single   # dist-single/index.html (un solo archivo, funciona offline desde file://)
 ```
 
+### Publicar en Vercel (para compartir)
+
+El repo ya incluye `vercel.json` (Vite, `npm ci`, `npm run build`, salida `dist/`, caché inmutable para `assets/*`).
+
+1. Entra en [vercel.com/new](https://vercel.com/new) e importa el repositorio `bgutierreztoro-a11y/Baseball10` (si no aparece, pulsa *Adjust GitHub App Permissions* y dale acceso).
+2. Pon como nombre del proyecto `jonron` y deja la configuración detectada. Pulsa **Deploy**.
+3. Comparte la URL de producción (`https://jonron.vercel.app` o la que asigne Vercel). Es pública: no hace falta tener cuenta en Vercel. Las URL de *preview* sí piden iniciar sesión.
+4. Cada `git push` a la rama de producción vuelve a desplegar solo.
+
 Herramientas de QA visual: `sandbox/stadium.html`, `sandbox/characters.html`, `scripts/shot.mjs` (capturas) y `scripts/play.mjs` (partida guiada que apunta y batea sola).
 
 ## Arquitectura (resumen)
