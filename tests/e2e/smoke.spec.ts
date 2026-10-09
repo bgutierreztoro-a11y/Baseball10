@@ -55,29 +55,39 @@ test('plays a pitch: swing is judged and a hit card is shown', async ({ page }) 
   await page.getByRole('button', { name: /^1-1 Primer contacto$/ }).click();
   await page.getByRole('button', { name: /A batear/ }).click();
 
-  // Wait for a pitch whose ideal swing moment is still ahead.
+  // Aim as soon as the pitch is planned (the ready phase knows the crossing).
   let st: Debug = null;
   await expect
     .poll(
       async () => {
         st = await debug(page);
-        if (!st || (st.phase !== 'windup' && st.phase !== 'pitch')) return -1;
-        return page.evaluate((t) => t - performance.now(), st.releaseAtMs + st.flightTime * 1000 - 200);
+        return st && st.screen && (st.phase === 'ready' || st.phase === 'windup') ? 1 : 0;
       },
       { timeout: 45_000, intervals: [25] },
     )
-    .toBeGreaterThan(60);
+    .toBe(1);
   const s = st as unknown as NonNullable<Debug>;
   if (s.screen) await page.mouse.move(s.screen.x, s.screen.y + 6);
-  await page.evaluate((fire) => {
-    const go = (): void => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', code: 'Space', bubbles: true }));
-      window.dispatchEvent(new KeyboardEvent('keyup', { key: ' ', code: 'Space', bubbles: true }));
-    };
-    const d = fire - performance.now();
-    if (d <= 0) go();
-    else setTimeout(go, d);
-  }, s.releaseAtMs + s.flightTime * 1000 - 120);
+  // Schedule the swing from inside the page: software WebGL runs at a few fps
+  // in CI, too slow for a round trip per decision.
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        const app = (window as unknown as { __jonron: { debug(): { phase: string; releaseAtMs: number; flightTime: number } | null } }).__jonron;
+        const go = (): void => {
+          window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', code: 'Space', bubbles: true }));
+          window.dispatchEvent(new KeyboardEvent('keyup', { key: ' ', code: 'Space', bubbles: true }));
+        };
+        const wait = (): void => {
+          const d = app.debug();
+          if (d && (d.phase === 'windup' || d.phase === 'pitch')) {
+            setTimeout(go, Math.max(0, d.releaseAtMs + d.flightTime * 1000 - 120 - performance.now()));
+            resolve();
+          } else setTimeout(wait, 5);
+        };
+        wait();
+      }),
+  );
 
   await expect.poll(async () => (await debug(page))?.swings ?? 0, { timeout: 30_000 }).toBeGreaterThanOrEqual(1);
   await expect(page.locator('.hitcard')).toBeVisible({ timeout: 30_000 });

@@ -34,6 +34,8 @@ export function defaultSettings(lang: Lang = 'es'): Settings {
     pitchTrail: true,
     showTimingMs: true,
     showPitchType: false,
+    pitchHint: true,
+    aimAssist: true,
   };
 }
 
@@ -80,6 +82,8 @@ export function migrate(raw: unknown, lang: Lang = 'es'): SaveData {
     pitchTrail: bool(s.pitchTrail, d.pitchTrail),
     showTimingMs: bool(s.showTimingMs, d.showTimingMs),
     showPitchType: bool(s.showPitchType, d.showPitchType),
+    pitchHint: bool(s.pitchHint, d.pitchHint),
+    aimAssist: bool(s.aimAssist, d.aimAssist),
   };
 
   const stages: Record<string, StageProgress> = {};

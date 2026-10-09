@@ -65,6 +65,46 @@ export class World {
     return this.hand;
   }
 
+  /**
+   * Compiles the shader variants a pitch needs (ghosted catcher/umpire, ball,
+   * trail, zone overlay) up front. Otherwise the first release frame stalls
+   * on compilation exactly when the player is timing the swing.
+   */
+  warmUp(): void {
+    const roots = [this.batter.root, this.pitcher.root, this.catcher.root, this.umpire.root, this.zone.group];
+    const was = roots.map((o) => o.visible);
+    roots.forEach((o) => (o.visible = true));
+    this.catcher.setGhost(0.28);
+    this.umpire.setGhost(0.28);
+    this.ball.setVisible(true);
+    this.ball.setTrail('pitch');
+    // Two samples so the trail ribbon has geometry to draw.
+    this.ball.setPosition({ x: 0, y: 1.2, z: 10 });
+    this.ball.update(0);
+    this.ball.setPosition({ x: 0, y: 1.1, z: 8 });
+    this.ball.update(0);
+    this.zone.showCrossing(0, 0.8, true);
+    // Draw once, through the same passes as a real frame (the render target's
+    // colour space is part of the shader key), with culling off: some drivers
+    // (and SwiftShader) only finish compiling when a program is first used.
+    const culled: THREE.Object3D[] = [];
+    this.group.traverse((o) => {
+      if (o.frustumCulled) {
+        o.frustumCulled = false;
+        culled.push(o);
+      }
+    });
+    this.renderer.render(0);
+    culled.forEach((o) => (o.frustumCulled = true));
+    this.zone.hideCrossing();
+    this.ball.setTrail('off');
+    this.ball.setVisible(false);
+    this.ball.update(0);
+    this.catcher.setGhost(1);
+    this.umpire.setGhost(1);
+    roots.forEach((o, i) => (o.visible = was[i]!));
+  }
+
   /** Characters + ball visible only while batting (hidden on the title orbit). */
   setPlayersVisible(v: boolean): void {
     for (const o of [this.batter.root, this.pitcher.root, this.catcher.root, this.umpire.root]) o.visible = v;

@@ -48,7 +48,7 @@ Las decisiones con alternativas evaluadas están en `docs/adr/`. Las convencione
 │               │      render/stadium · render/characters · render/fx       │
 │               │      ZoneOverlay · CameraDirector · Renderer (bloom)      │
 │               │                                                           │
-│               ├──► InputManager (ratón · táctil · teclado · mando)        │
+│               ├──► InputManager (mouse · táctil · teclado · mando)        │
 │               ├──► UI (overlay DOM: pantallas, HUD, tarjetas) ◄── VMs     │
 │               ├──► AudioEngine (Web Audio, síntesis procedural)           │
 │               └──► persistence/save (localStorage versionado)             │

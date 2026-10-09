@@ -8,6 +8,7 @@ import { Rng } from '../core/rng';
 import { coachLine, dist, gameText, pitchLine, speed } from '../i18n/game';
 import type { InputManager } from '../input/InputManager';
 import type { CameraDirector } from '../render/CameraDirector';
+import { assistAim, landingHint } from '../sim/assist';
 import { HOME_RUN_UNDERCUT, SWING_PROFILES, evaluateSwing } from '../sim/contact';
 import { choosePitch, type PitchSelectorConfig } from '../sim/pitcher';
 import { planPitch, pitchPosition, timeAtZ } from '../sim/pitch';
@@ -176,7 +177,8 @@ export class Match {
     this.d.camera.playIntro(() => this.enter('ready'), this.mode.kind === 'campaign' ? 2.8 : 1.6);
     if (this.d.firstTime) {
       const t = gameText(s.lang);
-      this.d.ui.showTip(this.d.input.isTouch ? t.tipFirstTouch : t.tipFirst);
+      const pro = s.controlMode === 'pro';
+      this.d.ui.showTip(this.d.input.isTouch ? (pro ? t.tipFirstTouch : t.tipFirstTouchCasual) : pro ? t.tipFirst : t.tipFirstCasual);
       this.tipActive = true;
     }
   }
@@ -233,7 +235,8 @@ export class Match {
     const kind: SwingKind = power || this.powerToggle ? 'power' : 'contact';
     const prof = SWING_PROFILES[kind];
     const contactTime = (effectiveTs - this.releaseAtMs) / 1000 + prof.swingTime;
-    const aim = this.currentAim(true);
+    let aim = this.currentAim(true);
+    if (s.controlMode === 'pro' && s.aimAssist) aim = assistAim(aim, this.plan.plateCross, kind);
     const evaluation = evaluateSwing(this.plan, { kind, contactTime, aim, batter: this.hand }, { stadium: this.stadium, targets: this.targets, rng: this.rng });
     const now = performance.now();
     const contactAtMs = timeStamp + prof.swingTime * 1000;
@@ -288,6 +291,7 @@ export class Match {
         w.catcher.setGhost(1);
         w.umpire.setGhost(1);
         w.fx.clearMarkers();
+        w.zone.hideHint(true);
         this.d.ui.hideHitCard();
         this.d.ui.showPitchLabel(null);
         this.d.input.enabled = true;
@@ -309,6 +313,10 @@ export class Match {
         w.ball.setTrail(s.pitchTrail ? 'pitch' : 'off');
         w.catcher.setGhost(0.28);
         w.umpire.setGhost(0.28);
+        if (s.pitchHint && this.plan) {
+          const hint = landingHint(this.plan.plateCross, this.rng);
+          w.zone.showHint(hint.x, hint.y, hint.radius);
+        }
         if (s.showPitchType && this.plan) this.d.ui.showPitchLabel(pitchLine(this.plan, s.lang, s.units));
         break;
       }
@@ -411,6 +419,7 @@ export class Match {
     w.ball.setSpin({ x: 1, y: 0, z: 0 }, plan.spinRpm / 60);
     if (tau >= plan.flightTime && !this.crossingShown) {
       this.crossingShown = true;
+      w.zone.hideHint();
       w.zone.showCrossing(plan.plateCross.x, plan.plateCross.y, plan.isStrike);
     }
     const catchT = timeAtZ(plan, CATCH_Z);
@@ -443,6 +452,7 @@ export class Match {
     w.fx.contact(at, clamp((evMph - 60) / 55, 0, 1), ball.isBarrel);
     this.d.audio.batCrack(q, clamp((evMph - 60) / 55, 0, 1));
     w.zone.flashContact();
+    w.zone.hideHint();
     if (!s.reducedMotion) this.d.camera.shake(0.02 + q * 0.05);
     this.phase = 'contact';
     this.phaseT = 0;
@@ -620,7 +630,8 @@ export class Match {
     const t = gameText(s.lang);
     const ses = this.session;
     const powerOn = this.d.input.power || this.powerToggle;
-    const hint = this.d.input.isTouch ? t.controlsTouch : s.controlMode === 'pro' ? t.controlsPro : t.controlsCasual;
+    const pro = s.controlMode === 'pro';
+    const hint = this.d.input.isTouch ? (pro ? t.controlsTouch : t.controlsTouchCasual) : pro ? t.controlsPro : t.controlsCasual;
     if (this.mode.kind === 'campaign') {
       const st = this.mode.stage;
       const [cur, target] = ses.progress();

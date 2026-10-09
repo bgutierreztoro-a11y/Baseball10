@@ -277,6 +277,7 @@ export class App {
     window.setTimeout(
       () => {
         const world = this.ensureWorld(def.id);
+        world.warmUp();
         const firstTime = mode.kind === 'campaign' && mode.stage.id === '1-1' && !this.save.seenTips.includes('first');
         if (firstTime) {
           this.save = { ...this.save, seenTips: [...this.save.seenTips, 'first'] };

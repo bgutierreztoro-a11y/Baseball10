@@ -53,7 +53,7 @@ Batear un jonrón es el momento más emocionante del béisbol, pero los juegos q
 **Accesibilidad**
 - Como jugador zurdo, quiero batear a la zurda.
 - Como jugador sensible al movimiento, quiero desactivar la cámara lenta, los temblores y los destellos.
-- Como jugador de teclado o mando, quiero jugar y navegar los menús sin ratón.
+- Como jugador de teclado o mando, quiero jugar y navegar los menús sin mouse.
 
 **Casos límite**
 - Si el navegador bloquea `localStorage`, el juego funciona igual (sin guardar).
@@ -74,16 +74,17 @@ Preparación (tempo del lanzador) → Windup (1,05 s) → Lanzamiento (0,37–0,
 ### 5.2 Controles
 | Entrada | Pro | Casual |
 |---|---|---|
-| Ratón | Mover = apuntar el PCI; clic = swing; clic derecho o Shift = potencia | Clic = swing (el PCI apunta solo, con un pequeño error) |
+| Mouse | Mover = apuntar el PCI; clic = swing; clic derecho o Shift = potencia | Clic = swing (el PCI apunta solo, con un pequeño error) |
 | Teclado | Flechas/WASD = apuntar; Espacio = swing; Shift = potencia; Q = alternar potencia; Esc/P = pausa | Igual, sin necesidad de apuntar |
-| Táctil | Arrastrar = apuntar (relativo); botón BATEAR; botón POTENCIA | Botón BATEAR |
+| Teléfono (táctil) | Deslizar el dedo = apuntar (relativo); botón BATEAR; botón POTENCIA | Botón BATEAR |
 | Mando | Stick izquierdo = apuntar; A = swing; RT = potencia; Start = pausa | — |
 
 ### 5.3 Modelo de contacto: dos habilidades
 1. **CUÁNDO.** Error de timing Δt entre la llegada del bate y la de la bola al plano de contacto. Determina la dirección (temprano = la halas; tarde = al lado contrario) y la potencia. Ventanas: *contacto* perfecto ±12 ms, bien ±30 ms, foul hasta ±95 ms; *potencia* ±9 / ±22 / ±75 ms.
 2. **DÓNDE.** Desfase entre la bola y el centro del PCI. Si la bola queda por encima del centro, el bate le pega por debajo y sale elevada (ángulo de salida = 10° + 62° × desfase normalizado). El desfase horizontal decide si entra en el punto dulce o en la punta/mango del bate.
 3. **Velocidad de salida:** `EV = (0,2·v_lanzamiento + 1,2·v_bate) × factores de calidad`. El swing de contacto (29 m/s) da ~90–97 mph en el centro; el de potencia (34,5 m/s) da ~104–111 mph.
-4. **Sin azar que contradiga el feedback.** El ruido es mínimo (±1,2 % de EV, ±1,5° de LA) y hit/out en juego se decide con reglas fijas tipo Statcast.
+4. **Ayudas de lectura (activadas por defecto, desactivables).** *Zona aproximada de llegada*: un área dorada difusa, con su centro desplazado al azar, que siempre contiene el cruce real y desaparece al llegar la bola. *Imán de bateo* (modo pro): al hacer swing, el PCI se acerca al punto ideal de contacto y los casi-fallos de hasta 1,6 radios se rescatan. Responden a las críticas de The Show (ver 01 · §5.1); el código está en `src/sim/assist.ts`.
+5. **Sin azar que contradiga el feedback.** El ruido es mínimo (±1,2 % de EV, ±1,5° de LA) y hit/out en juego se decide con reglas fijas tipo Statcast.
 
 ### 5.4 Física
 El lanzamiento usa un modelo de aceleración constante (estilo PITCHf/x) y es analítico y exacto. El batazo se integra con RK4 a 240 Hz, con arrastre, sustentación Magnus y la densidad del aire de cada estadio. Está calibrado para que **100 mph a 28° ≈ 406 ft** y **110 mph a 30° ≈ 456 ft**. La altitud (La Cumbre, 1.600 m) añade ≈ 8 %.
@@ -119,7 +120,7 @@ Las estrellas (75 en total) desbloquean bates **cosméticos**: Fresno (0) · Arc
 Hit-stop de 70–100 ms; destello y chispas (onda expansiva dorada en los barrels); temblor de cámara según la calidad; *crack* sintetizado que cambia con la calidad del contacto; cámara de seguimiento; cámara lenta al pasar la cerca; canto de jonrón en español ("¡SE FUE!", "¡ADIÓS, PELOTA!"); fuegos artificiales; marcador de aterrizaje con la distancia; jumbotron; *bat flip*; público que reacciona (rugido, "uuuh", lamento); órgano al empezar la etapa.
 
 ### 5.10 Accesibilidad
-Modo *casual* (solo timing), bateo a la zurda, reducir movimiento (sin cámara lenta, temblores ni destellos; también respeta `prefers-reduced-motion`), estela del lanzamiento, tipo de lanzamiento visible, calibración de latencia, navegación completa por teclado y mando, región `aria-live` que anuncia resultados, contraste AA y objetivos táctiles de 44 px o más.
+Modo *casual* (solo timing), zona aproximada de llegada, imán de bateo, bateo a la zurda, reducir movimiento (sin cámara lenta, temblores ni destellos; también respeta `prefers-reduced-motion`), estela del lanzamiento, tipo de lanzamiento visible, calibración de latencia, navegación completa por teclado y mando, región `aria-live` que anuncia resultados, contraste AA y objetivos táctiles de 44 px o más.
 
 ## 6. Requisitos
 

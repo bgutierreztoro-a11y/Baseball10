@@ -41,6 +41,10 @@ export interface Settings {
   showTimingMs: boolean;
   /** Reveals the pitch type while the ball is in flight (assist). */
   showPitchType: boolean;
+  /** Shows an approximate (jittered) area where the pitch will cross (assist). */
+  pitchHint: boolean;
+  /** Pulls near-miss swings toward the ball in pro mode (assist). */
+  aimAssist: boolean;
 }
 
 export interface QualitySettings {

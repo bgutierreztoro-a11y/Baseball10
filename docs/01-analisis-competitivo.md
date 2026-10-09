@@ -47,7 +47,7 @@ El cuadrante **física realista + jugar al instante en web** está vacío.
 | **Wii Sports** | Wii, 2006/2014 | Movimiento real | 3 entrenamientos que se desbloquean en orden | Ninguna | Intuitivo | Poco contenido |
 | **MLB The Show 25/26** | Consolas | PCI + timing; contacto/normal/potencia | Derby por rondas con reloj; carrera | Premium + Stubs | Profundidad; exit velocity y launch angle tras cada swing | "Perfect-Perfect" que acaba en out; curva dura |
 | **Super Mega Baseball 4** | Consolas/PC, 2023 | Retícula; contacto o potencia cargada | Dificultad "Ego" por disciplina | Premium | Fluido y responsivo | HUD confuso |
-| **Juegos web** | Navegador | Un toque o ratón | Mundos temáticos, dianas | Anuncios | Instantáneos | 2D, sin física, sin feedback |
+| **Juegos web** | Navegador | Un toque o mouse | Mundos temáticos, dianas | Anuncios | Instantáneos | 2D, sin física, sin feedback |
 
 ## 3. Matriz de capacidades
 
@@ -92,6 +92,20 @@ Siendo honestos: perdemos en **volumen de contenido, PvP y licencias**. Ganamos 
 - **MLB HRD (móvil y VR).** Fortalezas: licencia y física creíble. Debilidades: compras dentro del juego y una dificultad baja hasta los niveles Pro.
 - **The Show.** Fortalezas: PCI y feedback del swing. Debilidades: lo complejo que es y los resultados que parecen azar ("perfect-perfect" que acaba en out).
 - **Web casual.** Fortaleza: el acceso inmediato. Debilidad: poca profundidad.
+
+### 5.1 Críticas a The Show sobre cómo se lee el lanzamiento
+
+Son las quejas más repetidas de la comunidad sobre el bateo por zona (PCI) de MLB The Show:
+
+1. **Hay que poner el PCI exactamente sobre la bola, y la bola apenas se lee.** Es pequeña, rápida y rompe tarde. Además, el propio PCI la tapa justo en el momento clave. El jugador nuevo siente que adivina en vez de leer.
+2. **Los casi-fallos parecen azar.** Un swing con buen timing que se queda a milímetros del borde del PCI es un abanicado o un roletazo débil, sin término medio. Junto con el "perfect-perfect" que acaba en out, el resultado parece decidido por un dado.
+3. **La ayuda es de todo o nada.** O juegas con zona (difícil) o con modo direccional/simple, donde el juego apunta por ti. No hay un punto intermedio que enseñe a leer el lanzamiento.
+4. **Las ayudas de lectura son anecdóticas.** *Plate Vision* (PCI más grande) solo la tienen algunos jugadores con atributo alto, y el indicador de dónde cruzó la bola solo aparece cuando ya es tarde.
+
+**Qué hace JONRÓN con esto:**
+- **Zona aproximada de llegada.** Al soltar el lanzamiento aparece un área dorada difusa (radio 15 cm) por donde la bola cruzará *más o menos*. Su centro se desplaza al azar respecto al punto real (σ = 5,5 cm), pero el punto real siempre queda dentro. Orienta la mirada sin regalar la respuesta, y desaparece cuando la bola llega para que el jugador siga leyendo la bola, no el indicador.
+- **Imán de bateo.** Al hacer swing, el PCI se acerca un poco al punto ideal de contacto: un 30 % del desfase dentro del PCI, y los casi-fallos de hasta 1,6 radios se rescatan justo dentro del borde. El imán apunta al punto ideal (algo por debajo de la bola), no al centro exacto, así que el *barrel* y el jonrón siguen dependiendo de leer bien.
+- **Ayudas graduables.** Las dos ayudas se activan o desactivan por separado en Ajustes → Ayudas, además del modo casual (solo timing). Así hay un camino gradual de casual a pro.
 
 ## 6. Oportunidades
 

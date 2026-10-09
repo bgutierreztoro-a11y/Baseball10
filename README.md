@@ -11,12 +11,14 @@
 
 | | Pro | Casual |
 |---|---|---|
-| Apuntar | Ratón / flechas / arrastrar (táctil) / stick | Automático |
+| Apuntar | Mouse / flechas / deslizar el dedo (teléfono) / stick | Automático |
 | Batear | Clic / Espacio / BATEAR / A | Igual |
 | Potencia | Shift / clic derecho / POTENCIA / RT (círculo más pequeño, más distancia) | Igual |
 | Pausa | Esc / P / Start | Igual |
 
 Haz swing **un instante antes** de que la bola llegue (el bate tarda ~0,12 s; 0,15 s en potencia). Pon el círculo **un poco por debajo** de la bola para elevarla. Si conectas **temprano** la halas; si conectas **tarde**, va al lado contrario.
+
+**Ayudas (activadas por defecto, se apagan en Ajustes):** una *zona dorada* muestra más o menos por dónde pasará cada lanzamiento (nunca el punto exacto), y el *imán de bateo* acerca el círculo a la bola cuando fallas por poco.
 
 **Modos:** Campaña (El Solar → Malecón → Metropolitano → La Cumbre → Gran Final), Práctica configurable y Derby (10 outs; un jonrón de 440 ft o más da un out extra).
 
@@ -25,7 +27,7 @@ Haz swing **un instante antes** de que la bola llegue (el bate tarda ~0,12 s; 0,
 ```bash
 npm install
 npm run dev            # http://localhost:5173
-npm test               # 87 tests unitarios y de balance (Vitest)
+npm test               # 91 tests unitarios y de balance (Vitest)
 npm run typecheck      # TypeScript estricto
 npm run e2e            # build + Playwright (WebGL por SwiftShader)
 npm run build          # dist/ (hosting estático)
@@ -69,6 +71,6 @@ game/    App (flujo de pantallas) + Match (máquina de estados del turno al bate
 
 ## Limitaciones conocidas (v0.1)
 - En móvil vertical se juega, pero la experiencia recomendada es en horizontal.
-- El mando se lee por *polling* (precisión de un frame), a diferencia del ratón y el teclado, que usan el timestamp exacto del evento.
+- El mando se lee por *polling* (precisión de un frame), a diferencia del mouse y el teclado, que usan el timestamp exacto del evento.
 - Sin ranking online ni guardado en la nube: el progreso vive en `localStorage` del navegador.
 - Las tipografías se cargan desde Google Fonts; sin conexión se usan las del sistema.

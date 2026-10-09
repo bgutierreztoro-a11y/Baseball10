@@ -547,6 +547,8 @@ class DomUI implements UI {
           toggle(this.t('pitchTrail'), () => s.pitchTrail, (v) => commit({ ...s, pitchTrail: v })),
           toggle(this.t('showTimingMs'), () => s.showTimingMs, (v) => commit({ ...s, showTimingMs: v })),
           toggle(this.t('showPitchType'), () => s.showPitchType, (v) => commit({ ...s, showPitchType: v })),
+          toggle(this.t('pitchHint'), () => s.pitchHint, (v) => commit({ ...s, pitchHint: v })),
+          toggle(this.t('aimAssist'), () => s.aimAssist, (v) => commit({ ...s, aimAssist: v })),
         ),
         h(
           'section',
