@@ -5,9 +5,8 @@ import { PITCHERS, PITCH_TYPES } from '../../src/config/pitches';
 import { STADIUMS } from '../../src/config/stadiums';
 import type { StageDef } from '../../src/contracts';
 import { SWING_PROFILES } from '../../src/sim/contact';
-import { projectedCarry, simulateFlight, targetsHit } from '../../src/sim/flight';
+import { projectedCarry } from '../../src/sim/flight';
 import { planPitch, plateSpeed } from '../../src/sim/pitch';
-import { sprayOf } from '../../src/sim/field';
 
 /** Best possible exit velocity (perfect power swing) against the stage's hardest pitch. */
 function maxEV(stage: StageDef): number {
@@ -55,11 +54,6 @@ describe('campaign content integrity', () => {
     }
   });
 
-  it('target stages define enough targets', () => {
-    for (const s of STAGES.filter((st) => st.goal.type === 'targets')) {
-      expect(s.targets?.length ?? 0).toBeGreaterThanOrEqual(s.goal.type === 'targets' ? s.goal.n : 0);
-    }
-  });
 
   it('bats unlock progressively up to the full star count', () => {
     const req = BATS.map((b) => b.starsRequired);
@@ -83,22 +77,4 @@ describe('campaign balance: every goal and star is physically achievable', () =>
     }
   });
 
-  it.each(STAGES.filter((s) => s.targets).map((s) => [s.id, s] as const))('%s targets are reachable', (_id, stage) => {
-    const stadium = STADIUMS[stage.stadium];
-    const ev = maxEV(stage);
-    const reachable = new Set<number>();
-    for (let evf = 0.6; evf <= 1.0001; evf += 0.05) {
-      for (let la = 5; la <= 45; la += 2) {
-        for (const tg of stage.targets!) {
-          const base = (sprayOf(tg.position.x, tg.position.z) * 180) / Math.PI;
-          for (let spray = base - 3; spray <= base + 3; spray += 1.5) {
-          const r = simulateFlight({ position: { x: 0, y: 0.8, z: 0.43 }, exitVelocity: ev * evf, launchAngleDeg: la, sprayAngleDeg: spray, spinRpm: 500 + 50 * la, sideSpin: spray / 45 }, stadium);
-          for (const i of targetsHit(r.trajectory, stage.targets!, r.firstBounceIndex)) reachable.add(i);
-          }
-        }
-      }
-      if (reachable.size === stage.targets!.length) break;
-    }
-    expect(reachable.size).toBe(stage.targets!.length);
-  });
 });

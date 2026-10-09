@@ -4,9 +4,9 @@
 **Artefactos:** `dist/` (sitio multi-archivo con hashes) y `dist-single/index.html` (un solo archivo, ~222 KB gzip).
 
 ## Antes de desplegar
-- [x] CI en verde: `typecheck`, `test` (99 unit/integración), `build`, `build:single`, `e2e` (5 tests de humo)
+- [x] CI en verde: `typecheck`, `test` (93 unit/integración), `build`, `build:single`, `e2e` (5 tests de humo)
 - [x] `npm audit`: 0 vulnerabilidades
-- [x] Balance de campaña validado por test (objetivos, estrellas y dianas alcanzables)
+- [x] Balance de campaña validado por test (objetivos y estrellas alcanzables)
 - [x] QA visual: 5 estadios, personajes, VFX, flujo completo de etapa (★★★), móvil vertical y horizontal, build de un solo archivo abierto desde `file://`
 - [ ] Revisión del PR aprobada
 - [x] Sin bugs críticos conocidos (ver "Limitaciones conocidas" en el README)

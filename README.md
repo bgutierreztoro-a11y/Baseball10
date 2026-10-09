@@ -30,7 +30,7 @@ Haz swing **un instante antes** de que la bola llegue (el bate tarda ~0,12 s; 0,
 ```bash
 npm install
 npm run dev            # http://localhost:5173
-npm test               # 99 tests unitarios y de balance (Vitest)
+npm test               # 93 tests unitarios y de balance (Vitest)
 npm run typecheck      # TypeScript estricto
 npm run e2e            # build + Playwright (WebGL por SwiftShader)
 npm run build          # dist/ (hosting estático)

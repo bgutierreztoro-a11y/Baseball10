@@ -105,13 +105,13 @@ El lanzamiento usa un modelo de aceleración constante (estilo PITCHf/x) y es an
 
 | Cap. | Estadio | Ambiente / física | Lanzador | Arsenal | Etapas (objetivo) |
 |---|---|---|---|---|---|
-| 1 | **El Solar** | Día, solar de barrio, cercas de 285–315 ft | Tío Ramón (R) | Recta y cambio lentos | Primer contacto (3 hits) · Levántala (1 HR) · Tiro al blanco (2 dianas) · Cambio de ritmo (3 HR) · **Jefe: 5 HR en 60 s** |
-| 2 | **Parque del Malecón** | Atardecer junto al mar; "El Muro" de 34 ft en LF; aire 1,17 | La Brisa (R) | Recta, sinker, cambio | Brisa marina · El Muro (dianas en la pared) · Sinker al suelo · Más allá del agua (410 ft) · **Jefe: 6 HR** |
-| 3 | **Estadio Metropolitano** | Noche con luces y skyline | El Mago (**zurdo**) | Recta, slider, curva, cambio | Bajo las luces · El slider · Racha (3 HR seguidos) · Pantalla gigante · **Jefe: 7 HR en 75 s** |
+| 1 | **El Solar** | Día, solar de barrio, cercas de 285–315 ft | Tío Ramón (R) | Recta y cambio lentos | Primer contacto (3 hits) · Levántala (1 HR) · Al centro (4 hits) · Cambio de ritmo (3 HR) · **Jefe: 5 HR en 60 s** |
+| 2 | **Parque del Malecón** | Atardecer junto al mar; "El Muro" de 34 ft en LF; aire 1,17 | La Brisa (R) | Recta, sinker, cambio | Brisa marina · El Muro (2 HR) · Sinker al suelo · Más allá del agua (410 ft) · **Jefe: 6 HR** |
+| 3 | **Estadio Metropolitano** | Noche con luces y skyline | El Mago (**zurdo**) | Recta, slider, curva, cambio | Bajo las luces · El slider · Racha (3 HR seguidos) · Larga distancia (420 ft) · **Jefe: 7 HR en 75 s** |
 | 4 | **La Cumbre** | Día, 1.600 m, aire 0,98 (la bola vuela más), parque grande | El Cóndor (R) | Recta, cutter, sweeper, splitter | Aire fino (440 ft) · Corte fino · Barrido · Doble racha · **Jefe: 8 HR** |
-| 5 | **Coliseo de la Gran Final** | Noche con fuegos artificiales | El Ciclón (R, 100+ mph) | Arsenal completo | Calentamiento · Velocidad pura · Fuegos artificiales (dianas en la grada) · Sin red (5 seguidos) · **Gran Final: 10 HR en 90 s** |
+| 5 | **Coliseo de la Gran Final** | Noche con fuegos artificiales | El Ciclón (R, 100+ mph) | Arsenal completo | Calentamiento · Velocidad pura · Fuegos artificiales (5 HR) · Sin red (5 seguidos) · **Gran Final: 10 HR en 90 s** |
 
-Un test de balance (`tests/unit/content.test.ts`) verifica que **cada objetivo y cada estrella es físicamente alcanzable** con un swing de potencia perfecto, y que todas las dianas son alcanzables.
+Un test de balance (`tests/unit/content.test.ts`) verifica que **cada objetivo y cada estrella es físicamente alcanzable** con un swing de potencia perfecto.
 
 ### 5.8 Progresión y recompensas
 Las estrellas (75 en total) desbloquean bates **cosméticos**: Fresno (0) · Arce oscuro (8) · Neón (20) · Oro (40) · Cometa (60) · Leyenda (75). Ninguno mejora atributos.

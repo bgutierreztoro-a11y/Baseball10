@@ -1,31 +1,4 @@
-import type { BatDef, StadiumId, StageDef, TargetDef } from '../contracts';
-import { fenceDistance, fenceHeight, polarToXZ, standHeight } from '../sim/field';
-import { DEG, FT } from './constants';
-import { STADIUMS } from './stadiums';
-
-const polar = (sprayDeg: number, r: number, y: number) => {
-  const p = polarToXZ(sprayDeg * DEG, r);
-  return { x: p.x, y, z: p.z };
-};
-
-/** Ring lying on the outfield grass at a spray angle (deg, + = RF) and distance (ft). */
-function ring(sprayDeg: number, distFt: number, radius: number): TargetDef {
-  return { position: polar(sprayDeg, distFt * FT, 0.05), radius, kind: 'ring' };
-}
-
-/** Sign painted on the outfield wall, centred at `heightFrac` of the wall height. */
-function wallSign(stadium: StadiumId, sprayDeg: number, heightFrac: number, radius: number): TargetDef {
-  const def = STADIUMS[stadium];
-  const r = fenceDistance(def, sprayDeg * DEG) - 0.2;
-  return { position: polar(sprayDeg, r, fenceHeight(def, sprayDeg * DEG) * heightFrac), radius, kind: 'billboard' };
-}
-
-/** Billboard standing in the stands, `behindFt` past the wall, floating `aboveSeats` m over the seats. */
-function standSign(stadium: StadiumId, sprayDeg: number, behindFt: number, aboveSeats: number, radius: number): TargetDef {
-  const def = STADIUMS[stadium];
-  const r = fenceDistance(def, sprayDeg * DEG) + behindFt * FT;
-  return { position: polar(sprayDeg, r, standHeight(def, sprayDeg * DEG, r) + aboveSeats), radius, kind: 'billboard' };
-}
+import type { BatDef, StageDef } from '../contracts';
 
 const TIP = {
   timing: {
@@ -90,13 +63,13 @@ export const STAGES: StageDef[] = [
   // ── Chapter 1 · El Solar ──
   { id: '1-1', chapter: 1, index: 1, name: { es: 'Primer contacto', en: 'First Contact' }, stadium: 'solar', pitcher: 'ramon', goal: { type: 'hits', n: 3 }, limit: { type: 'outs', n: 8 }, stars: [{ type: 'outsLeft', n: 4 }, { type: 'noWhiffs' }], arsenal: ['FF'], speedOffsetMph: -4, zoneRate: 0.97, tip: TIP.timing },
   { id: '1-2', chapter: 1, index: 2, name: { es: 'Levántala', en: 'Lift It' }, stadium: 'solar', pitcher: 'ramon', goal: { type: 'homeRuns', n: 1 }, limit: { type: 'outs', n: 6 }, stars: [{ type: 'outsLeft', n: 3 }, { type: 'longestHR', ft: 330 }], arsenal: ['FF'], speedOffsetMph: -2, zoneRate: 0.95, tip: TIP.lift },
-  { id: '1-3', chapter: 1, index: 3, name: { es: 'Tiro al blanco', en: 'Target Practice' }, stadium: 'solar', pitcher: 'ramon', goal: { type: 'targets', n: 2 }, limit: { type: 'outs', n: 8 }, stars: [{ type: 'outsLeft', n: 4 }, { type: 'barrels', n: 2 }], arsenal: ['FF'], zoneRate: 0.92, targets: [ring(-24, 225, 9), ring(0, 250, 9), ring(24, 225, 9)], tip: TIP.direction },
+  { id: '1-3', chapter: 1, index: 3, name: { es: 'Al centro', en: 'Up the Middle' }, stadium: 'solar', pitcher: 'ramon', goal: { type: 'hits', n: 4 }, limit: { type: 'outs', n: 8 }, stars: [{ type: 'outsLeft', n: 4 }, { type: 'barrels', n: 2 }], arsenal: ['FF'], zoneRate: 0.92, tip: TIP.direction },
   { id: '1-4', chapter: 1, index: 4, name: { es: 'Cambio de ritmo', en: 'Change of Pace' }, stadium: 'solar', pitcher: 'ramon', goal: { type: 'homeRuns', n: 3 }, limit: { type: 'outs', n: 7 }, stars: [{ type: 'outsLeft', n: 3 }, { type: 'longestHR', ft: 360 }], tip: TIP.changeup },
   { id: '1-5', chapter: 1, index: 5, name: { es: 'Jefe: Tío Ramón', en: 'Boss: Uncle Ramón' }, stadium: 'solar', pitcher: 'ramon', goal: { type: 'homeRuns', n: 5 }, limit: { type: 'time', seconds: 60 }, stars: [{ type: 'homeRuns', n: 8 }, { type: 'longestHR', ft: 400 }], boss: true, tip: TIP.timed },
 
   // ── Chapter 2 · Malecón ──
   { id: '2-1', chapter: 2, index: 1, name: { es: 'Brisa marina', en: 'Sea Breeze' }, stadium: 'malecon', pitcher: 'brisa', goal: { type: 'homeRuns', n: 2 }, limit: { type: 'outs', n: 7 }, stars: [{ type: 'outsLeft', n: 3 }, { type: 'maxEV', mph: 100 }], arsenal: ['FF'], tip: TIP.power },
-  { id: '2-2', chapter: 2, index: 2, name: { es: 'El Muro', en: 'The Wall' }, stadium: 'malecon', pitcher: 'brisa', goal: { type: 'targets', n: 2 }, limit: { type: 'outs', n: 8 }, stars: [{ type: 'outsLeft', n: 4 }, { type: 'barrels', n: 2 }], arsenal: ['FF', 'CH'], targets: [wallSign('malecon', -41, 0.55, 3.2), wallSign('malecon', -34, 0.55, 3.2), wallSign('malecon', -27, 0.55, 3.2)], tip: TIP.wall },
+  { id: '2-2', chapter: 2, index: 2, name: { es: 'El Muro', en: 'The Wall' }, stadium: 'malecon', pitcher: 'brisa', goal: { type: 'homeRuns', n: 2 }, limit: { type: 'outs', n: 8 }, stars: [{ type: 'outsLeft', n: 4 }, { type: 'barrels', n: 2 }], arsenal: ['FF', 'CH'], tip: TIP.wall },
   { id: '2-3', chapter: 2, index: 3, name: { es: 'Sinker al suelo', en: 'Sinker Ground' }, stadium: 'malecon', pitcher: 'brisa', goal: { type: 'hits', n: 5 }, limit: { type: 'outs', n: 7 }, stars: [{ type: 'outsLeft', n: 3 }, { type: 'noWhiffs' }], arsenal: ['FF', 'SI'], tip: TIP.sinker },
   { id: '2-4', chapter: 2, index: 4, name: { es: 'Más allá del agua', en: 'Beyond the Water' }, stadium: 'malecon', pitcher: 'brisa', goal: { type: 'distance', ft: 410 }, limit: { type: 'outs', n: 7 }, stars: [{ type: 'outsLeft', n: 3 }, { type: 'maxEV', mph: 105 }] },
   { id: '2-5', chapter: 2, index: 5, name: { es: 'Jefe: La Brisa', en: 'Boss: The Breeze' }, stadium: 'malecon', pitcher: 'brisa', goal: { type: 'homeRuns', n: 6 }, limit: { type: 'outs', n: 10 }, stars: [{ type: 'outsLeft', n: 4 }, { type: 'longestHR', ft: 420 }], boss: true },
@@ -105,7 +78,7 @@ export const STAGES: StageDef[] = [
   { id: '3-1', chapter: 3, index: 1, name: { es: 'Bajo las luces', en: 'Under the Lights' }, stadium: 'metro', pitcher: 'mago', goal: { type: 'homeRuns', n: 3 }, limit: { type: 'outs', n: 8 }, stars: [{ type: 'outsLeft', n: 4 }, { type: 'barrels', n: 2 }], arsenal: ['FF', 'CH'], tip: TIP.lefty },
   { id: '3-2', chapter: 3, index: 2, name: { es: 'El slider', en: 'The Slider' }, stadium: 'metro', pitcher: 'mago', goal: { type: 'hits', n: 5 }, limit: { type: 'outs', n: 7 }, stars: [{ type: 'outsLeft', n: 3 }, { type: 'noWhiffs' }], arsenal: ['FF', 'SL'], tip: TIP.slider },
   { id: '3-3', chapter: 3, index: 3, name: { es: 'Racha', en: 'Hot Streak' }, stadium: 'metro', pitcher: 'mago', goal: { type: 'streak', n: 3 }, limit: { type: 'outs', n: 10 }, stars: [{ type: 'outsLeft', n: 4 }, { type: 'longestHR', ft: 410 }], arsenal: ['FF', 'SL'], tip: TIP.streak },
-  { id: '3-4', chapter: 3, index: 4, name: { es: 'Pantalla gigante', en: 'Big Screen' }, stadium: 'metro', pitcher: 'mago', goal: { type: 'targets', n: 2 }, limit: { type: 'outs', n: 10 }, stars: [{ type: 'outsLeft', n: 4 }, { type: 'maxEV', mph: 105 }], targets: [standSign('metro', -24, 30, 4, 5.5), standSign('metro', 0, 20, 3.5, 6.5), standSign('metro', 24, 30, 4, 5.5)] },
+  { id: '3-4', chapter: 3, index: 4, name: { es: 'Larga distancia', en: 'Long Distance' }, stadium: 'metro', pitcher: 'mago', goal: { type: 'distance', ft: 420 }, limit: { type: 'outs', n: 10 }, stars: [{ type: 'outsLeft', n: 4 }, { type: 'maxEV', mph: 105 }] },
   { id: '3-5', chapter: 3, index: 5, name: { es: 'Jefe: El Mago', en: 'Boss: The Wizard' }, stadium: 'metro', pitcher: 'mago', goal: { type: 'homeRuns', n: 7 }, limit: { type: 'time', seconds: 75 }, stars: [{ type: 'homeRuns', n: 10 }, { type: 'longestHR', ft: 430 }], boss: true, tip: TIP.timed },
 
   // ── Chapter 4 · La Cumbre ──
@@ -118,7 +91,7 @@ export const STAGES: StageDef[] = [
   // ── Chapter 5 · Gran Final ──
   { id: '5-1', chapter: 5, index: 1, name: { es: 'Calentamiento', en: 'Warm-up' }, stadium: 'final', pitcher: 'ciclon', goal: { type: 'homeRuns', n: 4 }, limit: { type: 'outs', n: 8 }, stars: [{ type: 'outsLeft', n: 4 }, { type: 'barrels', n: 3 }], arsenal: ['FF', 'SI'], tip: TIP.final },
   { id: '5-2', chapter: 5, index: 2, name: { es: 'Velocidad pura', en: 'Pure Heat' }, stadium: 'final', pitcher: 'ciclon', goal: { type: 'hits', n: 6 }, limit: { type: 'outs', n: 8 }, stars: [{ type: 'outsLeft', n: 3 }, { type: 'maxEV', mph: 109 }], arsenal: ['FF', 'SI'], speedOffsetMph: 2 },
-  { id: '5-3', chapter: 5, index: 3, name: { es: 'Fuegos artificiales', en: 'Fireworks' }, stadium: 'final', pitcher: 'ciclon', goal: { type: 'targets', n: 3 }, limit: { type: 'outs', n: 12 }, stars: [{ type: 'outsLeft', n: 4 }, { type: 'longestHR', ft: 450 }], targets: [standSign('final', -30, 40, 4.5, 5.5), standSign('final', 0, 25, 4, 6), standSign('final', 30, 40, 4.5, 5.5)] },
+  { id: '5-3', chapter: 5, index: 3, name: { es: 'Fuegos artificiales', en: 'Fireworks' }, stadium: 'final', pitcher: 'ciclon', goal: { type: 'homeRuns', n: 5 }, limit: { type: 'outs', n: 12 }, stars: [{ type: 'outsLeft', n: 4 }, { type: 'longestHR', ft: 450 }] },
   { id: '5-4', chapter: 5, index: 4, name: { es: 'Sin red', en: 'No Net' }, stadium: 'final', pitcher: 'ciclon', goal: { type: 'streak', n: 5 }, limit: { type: 'outs', n: 12 }, stars: [{ type: 'outsLeft', n: 5 }, { type: 'barrels', n: 5 }] },
   { id: '5-5', chapter: 5, index: 5, name: { es: 'Gran Final', en: 'Grand Final' }, stadium: 'final', pitcher: 'ciclon', goal: { type: 'homeRuns', n: 10 }, limit: { type: 'time', seconds: 90 }, stars: [{ type: 'homeRuns', n: 14 }, { type: 'longestHR', ft: 450 }], boss: true, tip: TIP.timed },
 ];

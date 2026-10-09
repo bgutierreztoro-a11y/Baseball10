@@ -15,14 +15,14 @@
 | Modelo de lanzamiento | Unit | `tests/unit/pitch.test.ts` | Cruza el objetivo exacto en `flightTime` (8 tipos); velocidad ±4 %; tiempos reales (90 mph ≈ 0,42–0,46 s); quiebres con el signo correcto para diestros y zurdos; zona de strike |
 | Aerodinámica del batazo | Unit | `tests/unit/flight.test.ts` | Calibración Statcast (100 mph a 28° → 390–420 ft; 110 mph a 30° → 440–470 ft); monotonía con la EV; la altitud añade 5–12 %; ángulo óptimo entre 25 y 36°; jonrón, pared, foul y dianas |
 | Modelo de contacto | Unit | `tests/unit/contact.test.ts` | Timing perfecto + punto dulce = barrel y jonrón; potencia > contacto; rangos de EV realistas; fallo por timing o ubicación; temprano tira hacia el lado propio (espejo para zurdos); bola sobre el PCI = elevado; determinismo con semilla; definición Statcast de barrel |
-| Reglas de sesión | Unit | `tests/unit/session.test.ts` | Outs, bolas gratis, strike cantado, bonus de 440 ft, rachas, hits, dianas únicas, reloj, estrellas independientes, distancia |
+| Reglas de sesión | Unit | `tests/unit/session.test.ts` | Outs, bolas gratis, strike cantado, bonus de 440 ft, rachas, hits, reloj, estrellas independientes, distancia |
 | Guardado | Unit | `tests/unit/save.test.ts` | Ida y vuelta; JSON corrupto; valores fuera de rango; sin `localStorage`; desbloqueo lineal; mejores marcas; bates por estrellas |
 | Audio | Unit | `tests/unit/audio.test.ts` | Degrada a no-ops sin Web Audio |
 | **Balance de contenido** | Integración | `tests/unit/content.test.ts` | 25 etapas, ids únicos, 1 jefe por capítulo; referencias válidas; **cada objetivo y cada estrella es alcanzable físicamente**; **todas las dianas son alcanzables** |
 | Juego en navegador | E2E | `tests/e2e/smoke.spec.ts` | Arranca sin errores con WebGL2; campaña lineal; los ajustes persisten; **un swing real se juzga y muestra la tarjeta de bateo**; pausa con Esc |
 | Calidad visual | Manual asistida | `scripts/shot.mjs`, `scripts/play.mjs`, `sandbox/*.html` | Capturas de estadios, personajes y partidas guiadas para revisar el resultado |
 
-Ejemplo de un test de balance (atrapó dos errores reales durante el desarrollo: una estrella imposible en 5-5 y dianas detrás de la grada):
+Ejemplo de un test de balance (atrapó dos errores reales durante el desarrollo: una estrella imposible en 5-5):
 
 ```ts
 it.each(STAGES)('%s', (stage) => {

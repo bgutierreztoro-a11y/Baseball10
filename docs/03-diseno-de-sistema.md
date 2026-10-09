@@ -9,7 +9,7 @@ Las decisiones con alternativas evaluadas están en `docs/adr/`. Las convencione
 
 ### Funcionales
 - Lanzamientos con 8 tipos (FF, SI, FC, SL, ST, CU, CH, FS) y lanzadores diestros o zurdos, con ubicación y comando.
-- Swing de contacto o de potencia con PCI; juicio de **timing** (ms) y de **ubicación**; resultado físico del batazo (EV, LA, spray, spin, trayectoria, HR/hit/out/foul, dianas).
+- Swing de contacto o de potencia con PCI; juicio de **timing** (ms) y de **ubicación**; resultado físico del batazo (EV, LA, spray, spin, trayectoria, HR/hit/out/foul).
 - Campaña lineal (25 etapas, 5 estadios), práctica y derby; reglas de outs, tiempo, rachas, bonus y estrellas.
 - Escena 3D: estadio, 4 personajes animados, bola, VFX, cámara cinematográfica, HUD, menús y audio.
 - Guardado local de progreso y ajustes; calibración de latencia; ES/EN.

@@ -15,7 +15,7 @@ export interface TitleVM {
   totalStars: number;
   maxStars: number;
   derbyBest: string | null;
-  /** Label of the next stage to play, e.g. "1-3 · Tiro al blanco". */
+  /** Label of the next stage to play, e.g. "1-3 · Al centro". */
   continueLabel: string | null;
   /** Currently selected batter, e.g. "El Mati". */
   characterName: string;
@@ -158,7 +158,7 @@ export interface DerbySetupVM {
 
 export interface HudVM {
   mode: 'campaign' | 'practice' | 'derby';
-  /** "1-3 · Tiro al blanco" — the part before " · " renders as a tag. */
+  /** "1-3 · Al centro" — the part before " · " renders as a tag. */
   stageLabel: string;
   /** "Jonrones|2/5" — label and value separated by "|". */
   goalText: string;

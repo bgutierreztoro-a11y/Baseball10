@@ -87,16 +87,6 @@ describe('session rules', () => {
     expect(s.success).toBe(true);
   });
 
-  it('target goal counts unique targets only', () => {
-    const s = new Session(rulesForStage(stageById('1-3')!)); // 2 targets
-    s.record({ kind: 'contact', ball: ball({ outcome: 'out', targetsHit: [1] }) });
-    const before = s.outsLeft;
-    s.record({ kind: 'contact', ball: ball({ outcome: 'out', targetsHit: [1] }) });
-    expect(s.outsLeft).toBe(before - 1);
-    s.record({ kind: 'contact', ball: ball({ outcome: 'out', targetsHit: [0] }) });
-    expect(s.success).toBe(true);
-  });
-
   it('timed rounds run the clock and keep going after the goal', () => {
     const s = new Session(rulesForStage(stageById('1-5')!)); // 5 HR in 60 s
     for (let i = 0; i < 5; i++) s.record(hr());
