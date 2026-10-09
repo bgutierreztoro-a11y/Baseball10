@@ -58,6 +58,99 @@ function makeBat(): { group: THREE.Group; wood: THREE.MeshStandardMaterial; grip
   return { group, wood, grip };
 }
 
+/**
+ * Tapered tube swept along a curve: radius(t) for t∈[0,1] from start to end,
+ * with optional growth-ring ridges. Vertex colours run from `c0` to `c1`.
+ */
+function hornGeometry(curve: THREE.Curve<THREE.Vector3>, radius: (t: number) => number, c0: THREE.Color, c1: THREE.Color, segs = 40, radial = 12, ridges = 0): THREE.BufferGeometry {
+  const frames = curve.computeFrenetFrames(segs, false);
+  const pos: number[] = [];
+  const col: number[] = [];
+  const idx: number[] = [];
+  const p = new THREE.Vector3();
+  const c = new THREE.Color();
+  for (let i = 0; i <= segs; i++) {
+    const t = i / segs;
+    curve.getPointAt(t, p);
+    const ridge = ridges > 0 ? 1 + 0.06 * Math.max(0, Math.sin(t * ridges * Math.PI * 2)) : 1;
+    const r = radius(t) * ridge;
+    c.copy(c0).lerp(c1, t);
+    const shade = ridges > 0 ? 0.92 + 0.08 * Math.cos(t * ridges * Math.PI * 2) : 1;
+    const N = frames.normals[i]!;
+    const B = frames.binormals[i]!;
+    for (let j = 0; j <= radial; j++) {
+      const a = (j / radial) * Math.PI * 2;
+      const cx = Math.cos(a);
+      const sy = Math.sin(a);
+      pos.push(p.x + r * (cx * N.x + sy * B.x), p.y + r * (cx * N.y + sy * B.y), p.z + r * (cx * N.z + sy * B.z));
+      col.push(c.r * shade, c.g * shade, c.b * shade);
+    }
+  }
+  const row = radial + 1;
+  for (let i = 0; i < segs; i++) {
+    for (let j = 0; j < radial; j++) {
+      const a = i * row + j;
+      idx.push(a, a + row, a + 1, a + 1, a + row, a + row + 1);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return g;
+}
+
+/**
+ * Chamo's bat: a giant curved horn. Same length and sweet spot as a wooden
+ * bat along local +Y (knob at 0); the barrel is the wide, cut base of the
+ * horn, the handle its narrow end wrapped in leather.
+ */
+function makeHornBat(): { group: THREE.Group; wood: THREE.MeshStandardMaterial; grip: THREE.MeshStandardMaterial } {
+  const horn = new THREE.MeshStandardMaterial({ color: '#ffffff', vertexColors: true, roughness: 0.32, metalness: 0.05 });
+  const grip = new THREE.MeshStandardMaterial({ color: '#3d2b1f', roughness: 0.8 });
+  // A gentle arc: stays within ~3 cm of the axis at the sweet spot.
+  // Crescent arc through the knob and the sweet spot (both on the swing axis),
+  // so the ball still meets the horn where the contact IK expects it.
+  const curve = new THREE.CatmullRomCurve3([V(0, 0, 0), V(0.05, 0.22, 0.01), V(0.07, 0.43, 0.018), V(0.045, 0.6, 0.012), V(0, SWEET, 0), V(-0.05, BAT_LENGTH + 0.02, -0.01)]);
+  const radius = (t: number): number => 0.016 + 0.05 * Math.pow(t, 1.5) - (t > 0.96 ? 0.014 * ((t - 0.96) / 0.04) : 0);
+  const body = new THREE.Mesh(hornGeometry(curve, radius, new THREE.Color('#2e2018'), new THREE.Color('#f5e8cc'), 52, 16, 12), horn);
+  // Cut end of the horn (the barrel cap) and a leather grip on the handle.
+  const end = curve.getPointAt(1);
+  const cap = new THREE.Mesh(new THREE.CircleGeometry(radius(0.97), 14), new THREE.MeshStandardMaterial({ color: '#c9b48a', roughness: 0.7 }));
+  cap.position.copy(end);
+  cap.lookAt(end.clone().add(curve.getTangentAt(1)));
+  const tape = new THREE.Mesh(new THREE.CylinderGeometry(0.0175, 0.0165, 0.2, 10), grip);
+  tape.position.set(0.006, 0.12, 0);
+  const knob = new THREE.Mesh(new THREE.SphereGeometry(0.02, 10, 6), grip);
+  knob.scale.set(1, 0.6, 1);
+  body.castShadow = true;
+  const group = new THREE.Group();
+  group.add(body, cap, tape, knob);
+  return { group, wood: horn, grip };
+}
+
+/** Villain horns: rise from the temples, sweep back, then curl up and forward. */
+function makeHeadHorns(quality: QualitySettings): THREE.Group {
+  const mat = new THREE.MeshStandardMaterial({ color: '#ffffff', vertexColors: true, roughness: 0.22, metalness: 0.25, emissive: '#2a0f22', emissiveIntensity: 0.6 });
+  const g = new THREE.Group();
+  for (const side of [1, -1]) {
+    const curve = new THREE.CatmullRomCurve3([
+      V(side * 0.09, 0.05, 0.02),
+      V(side * 0.165, 0.11, -0.03),
+      V(side * 0.19, 0.21, -0.1),
+      V(side * 0.165, 0.31, -0.11),
+      V(side * 0.12, 0.38, -0.05),
+      V(side * 0.095, 0.4, 0.02),
+    ]);
+    const geo = hornGeometry(curve, (t) => 0.048 * Math.pow(1 - t, 0.7) + 0.002, new THREE.Color('#5a3a4a'), new THREE.Color('#140d14'), 44, 14, 8);
+    const m = new THREE.Mesh(geo, mat);
+    m.castShadow = quality.shadows;
+    g.add(m);
+  }
+  return g;
+}
+
 interface BatKey {
   pose: HumanoidPose;
   K: THREE.Vector3;
@@ -151,6 +244,7 @@ export class Batter implements BatterRig {
   private readonly h: Humanoid;
   private readonly bat: THREE.Group;
   private readonly batWood: THREE.MeshStandardMaterial;
+  private readonly hornBat: boolean;
   private readonly batGrip: THREE.MeshStandardMaterial;
   private readonly batScale: number;
   private readonly sweet: number;
@@ -215,7 +309,9 @@ export class Batter implements BatterRig {
     this.tuneSkin(this.h.materials.skin!);
     this.root = this.h.root;
     this.addHelmet(look, quality);
-    const bat = makeBat();
+    if (look.horns) this.h.head.add(makeHeadHorns(quality));
+    this.hornBat = look.hornBat;
+    const bat = look.hornBat ? makeHornBat() : makeBat();
     this.bat = bat.group;
     this.bat.scale.setScalar(this.batScale);
     this.batWood = bat.wood;
@@ -280,7 +376,8 @@ export class Batter implements BatterRig {
   }
 
   setBatColors(wood: string, grip: string): void {
-    this.batWood.color.set(wood);
+    // A horn keeps its own colours; only the leather grip follows the bat skin.
+    if (!this.hornBat) this.batWood.color.set(wood);
     this.batGrip.color.set(grip);
   }
 

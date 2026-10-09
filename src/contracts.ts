@@ -330,6 +330,10 @@ export interface BatterLook {
   /** A second pair of arms (decorative; they mirror the batting arms). */
   extraArms: boolean;
   beard: boolean;
+  /** Long curved villain horns on the head (through the helmet). */
+  horns: boolean;
+  /** Bats with a giant horn instead of a wooden bat. */
+  hornBat: boolean;
   jersey: string;
   trim: string;
   number: string;

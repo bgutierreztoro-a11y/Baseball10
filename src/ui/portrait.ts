@@ -76,6 +76,40 @@ function mix(hex: string, to: string, t: number): string {
   return `#${c.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
 }
 
+/** Closed outline of a tapered stroke along a centre line (horns). */
+function taper(center: Pt[], width: (t: number) => number): string {
+  const L: Pt[] = [];
+  const R: Pt[] = [];
+  center.forEach((p, i) => {
+    const a = center[Math.max(0, i - 1)]!;
+    const b = center[Math.min(center.length - 1, i + 1)]!;
+    const dx = b[0] - a[0];
+    const dy = b[1] - a[1];
+    const n = Math.hypot(dx, dy) || 1;
+    const w = width(i / (center.length - 1)) / 2;
+    L.push([p[0] - (dy / n) * w, p[1] + (dx / n) * w]);
+    R.push([p[0] + (dy / n) * w, p[1] - (dx / n) * w]);
+  });
+  return smooth([...L, ...R.reverse()], true);
+}
+
+/** Samples a quadratic/cubic-like curve through control points (Catmull-Rom). */
+function curvePts(ctrl: Pt[], n = 18): Pt[] {
+  const out: Pt[] = [];
+  for (let i = 0; i <= n; i++) {
+    const t = (i / n) * (ctrl.length - 1);
+    const k = Math.min(ctrl.length - 2, Math.floor(t));
+    const f = t - k;
+    const p0 = ctrl[Math.max(0, k - 1)]!;
+    const p1 = ctrl[k]!;
+    const p2 = ctrl[k + 1]!;
+    const p3 = ctrl[Math.min(ctrl.length - 1, k + 2)]!;
+    const cr = (a: number, b: number, c: number, d: number): number => 0.5 * (2 * b + (-a + c) * f + (2 * a - 5 * b + 4 * c - d) * f * f + (-a + 3 * b - 3 * c + d) * f * f * f);
+    out.push([cr(p0[0], p1[0], p2[0], p3[0]), cr(p0[1], p1[1], p2[1], p3[1])]);
+  }
+  return out;
+}
+
 function limb(pts: Pt[], width: number, color: string): SVGPathElement {
   return el('path', {
     d: `M${pts.map((p) => `${r(p[0])} ${r(p[1])}`).join('L')}`,
@@ -273,6 +307,18 @@ function figure(look: BatterLook, cx: number, feet: number, H: number, id: strin
   g.append(el('path', { d: `M${r(cx - headRx * 1.12)} ${r(rim)}C${r(cx - headRx * 1.16)} ${r(hTop - u * 0.02)} ${r(cx + headRx * 1.16)} ${r(hTop - u * 0.02)} ${r(cx + headRx * 1.22)} ${r(rim)}Z`, fill: helmet }));
   g.append(el('path', { d: `M${r(cx - headRx * 0.75)} ${r(headCy - headRy * 0.55)}Q${r(cx - headRx * 0.2)} ${r(hTop + u * 0.06)} ${r(cx + headRx * 0.35)} ${r(hTop + u * 0.1)}`, fill: 'none', stroke: '#ffffff', 'stroke-width': u * 0.07, 'stroke-linecap': 'round', opacity: 0.35 }));
   g.append(el('ellipse', { cx: cx - headRx * 0.05, cy: rim + u * 0.01, rx: headRx * 1.08, ry: u * 0.085, fill: mix(helmet, INK, 0.35) }));
+  if (look.horns) {
+    // Villain horns: out from the helmet sides, up, then curling inward at the tips.
+    for (const sd of [-1, 1]) {
+      const base: Pt = [cx + sd * headRx * 0.95, headCy - headRy * 0.45];
+      const ctrl: Pt[] = [base, [base[0] + sd * u * 0.32, base[1] - u * 0.18], [base[0] + sd * u * 0.48, base[1] - u * 0.62], [base[0] + sd * u * 0.32, base[1] - u * 1.02], [base[0] + sd * u * 0.06, base[1] - u * 1.18]];
+      const c = curvePts(ctrl);
+      g.append(el('path', { d: taper(c, (t) => u * (0.26 * Math.pow(1 - t, 0.75) + 0.015)), fill: '#2a1a26', stroke: '#0d0a0e', 'stroke-width': u * 0.025, 'stroke-linejoin': 'round' }));
+      // Glossy highlight along the outer curve.
+      const hl = c.slice(2, 13).map((p) => [p[0] + sd * u * 0.03, p[1]] as Pt);
+      g.append(el('path', { d: `M${hl.map((p) => `${r(p[0])} ${r(p[1])}`).join('L')}`, fill: 'none', stroke: '#8a6a86', 'stroke-width': u * 0.035, 'stroke-linecap': 'round', opacity: 0.55 }));
+    }
+  }
 
   // ── Bat + arms ──
   const handR: Pt = [cx - sh * 0.32, y(2.75)];
@@ -285,9 +331,34 @@ function figure(look: BatterLook, cx: number, feet: number, H: number, id: strin
   const batPts: Pt[] = [];
   for (const t of [0, 0.45, 0.75, 1]) batPts.push([knob[0] + dir[0] * len * t + nrm[0] * wAt(t), knob[1] + dir[1] * len * t + nrm[1] * wAt(t)]);
   for (const t of [1, 0.75, 0.45, 0]) batPts.push([knob[0] + dir[0] * len * t - nrm[0] * wAt(t), knob[1] + dir[1] * len * t - nrm[1] * wAt(t)]);
-  g.append(el('path', { d: `M${batPts.map((p) => `${r(p[0])} ${r(p[1])}`).join('L')}Z`, fill: WOOD, stroke: WOOD_DARK, 'stroke-width': u * 0.03, 'stroke-linejoin': 'round' }));
-  g.append(el('circle', { cx: tip[0], cy: tip[1], r: wAt(1), fill: WOOD }));
-  g.append(el('circle', { cx: knob[0], cy: knob[1], r: u * 0.09, fill: WOOD_DARK }));
+  if (look.hornBat) {
+    // A giant crescent horn: dark leather-wrapped handle, ivory barrel with growth rings.
+    const ctrl: Pt[] = [0, 0.3, 0.6, 0.85, 1.04].map((t) => {
+      const bow = Math.sin(Math.min(1, t) * Math.PI) * u * 0.42;
+      return [knob[0] + dir[0] * len * t + nrm[0] * bow, knob[1] + dir[1] * len * t + nrm[1] * bow];
+    });
+    const c = curvePts(ctrl, 24);
+    const hw = (t: number): number => u * (0.13 + 0.42 * Math.pow(t, 1.4));
+    g.append(el('path', { d: taper(c, hw), fill: '#efe2c4', stroke: '#8a7350', 'stroke-width': u * 0.03, 'stroke-linejoin': 'round' }));
+    for (const t of [0.45, 0.58, 0.7, 0.82, 0.93]) {
+      const i = Math.round(t * (c.length - 1));
+      const p = c[i]!;
+      const q = c[Math.min(c.length - 1, i + 1)]!;
+      const dx = q[0] - p[0];
+      const dy = q[1] - p[1];
+      const n = Math.hypot(dx, dy) || 1;
+      const w = hw(i / (c.length - 1)) * 0.46;
+      g.append(el('path', { d: `M${r(p[0] - (dy / n) * w)} ${r(p[1] + (dx / n) * w)}L${r(p[0] + (dy / n) * w)} ${r(p[1] - (dx / n) * w)}`, stroke: '#c7b28a', 'stroke-width': u * 0.025, 'stroke-linecap': 'round' }));
+    }
+    const grip = c.slice(0, Math.round(c.length * 0.32));
+    g.append(el('path', { d: taper(grip, (t) => u * (0.15 + 0.06 * t)), fill: '#3a2a20' }));
+    const end = c[c.length - 1]!;
+    g.append(el('ellipse', { cx: end[0], cy: end[1], rx: hw(1) * 0.42, ry: hw(1) * 0.22, fill: '#c9b48a', transform: `rotate(${r((Math.atan2(dir[1], dir[0]) * 180) / Math.PI + 90)} ${r(end[0])} ${r(end[1])})` }));
+  } else {
+    g.append(el('path', { d: `M${batPts.map((p) => `${r(p[0])} ${r(p[1])}`).join('L')}Z`, fill: WOOD, stroke: WOOD_DARK, 'stroke-width': u * 0.03, 'stroke-linejoin': 'round' }));
+    g.append(el('circle', { cx: tip[0], cy: tip[1], r: wAt(1), fill: WOOD }));
+    g.append(el('circle', { cx: knob[0], cy: knob[1], r: u * 0.09, fill: WOOD_DARK }));
+  }
 
   const arm = (shoulder: Pt, elbow: Pt, hand: Pt, gloved: boolean): void => {
     // Biceps bulge for muscular builds.
@@ -367,7 +438,7 @@ function draw(svg: SVGSVGElement, look: BatterLook, aspect: number): void {
     // A regular 1.85 m batter at his feet, for scale.
     const refH = (H * BASE_M) / look.heightM;
     const refX = cx - fig.hipHalf - refH * 0.62;
-    const ref = figure({ ...look, heightM: BASE_M, build: 1, belly: 0, muscle: 0.2, extraArms: false, beard: false, hair: '#2a1b12', skin: '#c68a5c', number: '1' }, refX, GROUND, refH, `${id}r`, false);
+    const ref = figure({ ...look, heightM: BASE_M, build: 1, belly: 0, muscle: 0.2, extraArms: false, beard: false, horns: false, hornBat: false, hair: '#2a1b12', skin: '#c68a5c', number: '1' }, refX, GROUND, refH, `${id}r`, false);
     svg.append(el('ellipse', { cx: refX, cy: GROUND + 0.5, rx: refH * 0.2, ry: 2.2, fill: '#000000', opacity: 0.35 }));
     svg.append(ref.g);
   }
