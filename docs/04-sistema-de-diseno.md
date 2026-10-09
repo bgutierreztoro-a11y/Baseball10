@@ -42,8 +42,8 @@ Escala: display 150/96/64/52/44/40/32 · cuerpo 20/18/16/15/14/13/12. Las etique
 
 ### Movimiento
 - Duraciones: `--t-fast` 160 ms · `--t-med` 240 ms · `--t-slow` 420 ms. Curva: `--ease` = `cubic-bezier(.2,.8,.2,1)`.
-- Animaciones con nombre: `fade-in`, `pop-in` (modales, estrellas), `slide-in` (tarjeta de bateo), `callout` (cantos), `pulse-ring` (etapa siguiente).
-- **Reducir movimiento:** `@media (prefers-reduced-motion)` **o** la clase `.reduced-motion` en `<html>` (ajuste del juego) dejan las animaciones en 1 ms. Los elementos transitorios (cantos, toasts) siguen visibles y los retira el código.
+- Animaciones con nombre: `fade-in`, `pop-in` (modales, estrellas), `slide-in` (tarjeta de bateo), `callout` (cantos), `pulse-ring` (etapa siguiente), `ability-pulse` (habilidad lista), `ability-glow` (habilidad activa).
+- **Reducir movimiento:** `@media (prefers-reduced-motion)` **o** la clase `.reduced-motion` en `<html>` (ajuste del juego) dejan las animaciones en 1 ms. Los elementos transitorios (cantos, toasts) siguen visibles y los retira el código. El pulso y el brillo del botón de habilidad se eliminan del todo, y el carrusel de bateadores se desplaza sin animación.
 
 ## 2. Componentes
 
@@ -84,9 +84,27 @@ SVG de 24 px; `.on` = oro con resplandor. En resultados son de 74 px, aparecen e
 | `.hud-goal` | Debajo | Objetivo y valor + barra de progreso dorada |
 | `.hud-box` | Arriba a la derecha | Racha 🔥, marcador, outs (pelotas, `+N` en verde para bonus), reloj (naranja en ≤ 10 s) |
 | `.hint` · `.pitch-label` | Abajo al centro | Controles (se ocultan a los 6 s) · tipo de lanzamiento |
-| `.touch` | Abajo a la derecha (táctil) | BATEAR (104 px) + POTENCIA (interruptor) |
+| `.touch` | Abajo a la derecha (táctil) | BATEAR (104 px) + POTENCIA (interruptor) + habilidad (si la hay) |
+| `.ability-btn` | Bajo el objetivo (escritorio) · sobre POTENCIA (táctil) | Habilidad especial del bateador (ver abajo) |
 
 **Regla de oro:** el **centro de la pantalla (zona de strike) nunca se tapa**.
+
+### Botón de habilidad (`.ability-btn`)
+Habilidad especial del bateador (p. ej. «Peak máximo» de El Moro). Solo aparece si `HudVM.ability` no es `null`.
+
+| Variante | Dónde | Forma |
+|---|---|---|
+| Píldora (escritorio) | En `.hud-tl`, bajo `.hud-goal` | Icono de rayo + etiqueta + estado + tecla `<kbd>E</kbd>` |
+| Losa `.is-touch` | En `.touch`: encima de POTENCIA en horizontal; a su izquierda en vertical (≤ 720 px) | 104 px de ancho, icono arriba, etiqueta y estado centrados |
+
+| Estado | Visual | Comportamiento |
+|---|---|---|
+| `is-ready` | Borde oro, degradado oro→marino, estado «Disponible» en oro, pulso `ability-pulse` (1,8 s) | Clic o toque → `onAbility()`; tras un clic con ratón pierde el foco para que Espacio no lo repita |
+| `is-active` | Relleno oro, texto `#1b1300`, halo `ability-glow`, estado «Quedan N» | `aria-disabled="true"`; se anuncia «¡Peak máximo! N lanzamientos» por `aria-live` |
+| `is-used` | Marino apagado, texto `--c-text-faint`, etiqueta tachada, estado «Sin usos» | `aria-disabled="true"`, `cursor: not-allowed` |
+
+**Accesibilidad:** es un `<button>` real de al menos 44 px de alto. Su `aria-label` cambia con el estado: «Activar Peak máximo (tecla E)», «Peak máximo en marcha: quedan 2 lanzamientos», «Peak máximo: sin usos en este partido». El estado nunca depende solo del color: siempre lleva texto.
+**Sin solapes:** en vertical, POTENCIA y la habilidad comparten fila sobre BATEAR, y `.coach-tip` sube a `bottom: 214px` (clase `.is-touch-ui` en la raíz) para no taparlas. La tarjeta de bateo, arriba, termina antes de esa fila.
 
 ### Tarjeta de bateo (`.hitcard`)
 Abajo a la izquierda en escritorio y franja superior en móvil vertical. Lleva un borde izquierdo del color del resultado (`res-*`), título (Bebas), una cuadrícula de 4 estadísticas (Salida, Ángulo, Distancia, Vuelo), chips de timing y calidad, la línea de coach en cursiva y el lanzamiento. Se anuncia por `aria-live`.
@@ -96,6 +114,46 @@ Texto gigante en el tercio superior. Variantes: `homeRun` (oro con resplandor), 
 
 ### Burbuja del coach (`.coach-tip`) y toast (`.toast`)
 La burbuja lleva el icono del silbato (26 px) y se puede cerrar. El toast es una píldora inferior de 2,6 s con `role="status"`.
+
+### Menú principal: entrada «Bateadores»
+Un `.btn` más del menú (`.btn-batters`) entre Derby y Ajustes. A la derecha lleva una píldora oro (`.batter-now`) con el casco y el nombre del bateador elegido; un texto oculto («Bateador:») completa el nombre accesible: «Bateadores, Bateador: El Mati». En pantallas horizontales bajas (≤ 520 px de alto) la portada pasa a dos columnas: marca a la izquierda y menú a la derecha.
+
+### Selección de bateador (`.chars`, `.roster`, `.bcard`)
+**Problema:** elegir entre personajes con alturas y físicos muy distintos (de 1,85 m a 7,80 m) y entender sus estadísticas y su habilidad en un vistazo.
+
+| Pieza | Contenido |
+|---|---|
+| `.topbar` | Atrás (48 px), eyebrow «Elige tu bateador» y título «Bateadores» |
+| `.bcard-art` | Retrato procedural (ver abajo) + insignia `.bcard-height` (Estatura) + insignia oro «✓ Elegido» si está elegido. Línea inferior de 4 px en el color del ribete (`--accent`) |
+| `.bcard-head` | Nombre (Bebas 40) y apodo (Barlow Condensed, mayúsculas, `--c-text-dim`) |
+| `.bstats` | `<dl>` en rejilla: etiqueta · barra oro (`value` 0–1, marca de base al 50 %) · detalle. Detalle verde si empieza por «+», naranja si empieza por «−», gris si es «Base» |
+| `.bability` | Solo si hay habilidad: caja oro translúcida con rayo, «Habilidad especial», nombre y descripción |
+| `.bcard-bio` | Biografía en `--c-text-dim` |
+| `.bpick` | «Elegir» (secundario) o «✓ Elegido» (oro, `aria-pressed="true"`). Nunca rojo: con cuatro tarjetas habría cuatro CTA primarios |
+
+| Tamaño | Disposición |
+|---|---|
+| ≥ 1000 × 600 | Rejilla `auto-fit, minmax(230px, 1fr)`; el cuerpo de la tarjeta se desplaza si no cabe |
+| Móvil vertical | Carrusel con `scroll-snap` (tarjeta de `min(340px, 84vw)`, centrada) + puntos indicadores decorativos |
+| Horizontal bajo (≤ 520 px de alto) | Carrusel de tarjetas horizontales (`min(560px, 76vw)`): retrato al 40 % a la izquierda y detalles a la derecha; cabecera compacta en una línea |
+
+**Estados de la tarjeta:** hover (borde más claro y −3 px en escritorio) · `:focus-within` (borde `--c-info`) · `.is-selected` (borde oro de 2 px + halo oro suave). El relleno extra del carrusel, compensado con márgenes negativos, evita que el halo se recorte.
+**Teclado y mando:** foco inicial en el botón del bateador elegido; ← / → saltan entre tarjetas y las centran; Tab recorre cada tarjeta en orden (cuerpo desplazable → botón); Escape vuelve. Tras elegir, el juego vuelve a llamar a `showCharacters` y la UI conserva el desplazamiento y el foco, y anuncia «Chamo sale a batear».
+**Lector de pantalla:** `<ul aria-label="Bateadores">` de `<li aria-labelledby>`; cada cuerpo es un `role="group"` con el nombre; una línea oculta da «Bateador 2 de 4. Estatura: 1,93 m» (la insignia visual es `aria-hidden` para no leerla dos veces). Botones: «Elegir a El Mati» / «El Mati, elegido».
+
+### Retrato procedural (`ui/portrait.ts`)
+Ilustración plana en SVG generada **solo** desde `BatterLook`, con el mismo lenguaje que la UI: cielo marino, halo radial del color del ribete, dos haces de luz, el dorsal gigante al 7 % y el césped al pie.
+
+| Dato | Cómo se dibuja |
+|---|---|
+| `heightM` | Altura relativa a 1,85 m. Si no cabe (gigante), se recorta a la altura de la nariz por el borde superior y aparece un bateador normal de 1,85 m a sus pies, a escala |
+| `build`, `belly` | Ancho de hombros, cintura y cadera; con `belly` > 0,3, una barriga que cuelga sobre el cinturón |
+| `muscle` | Espalda en V, cuello ancho, brazos gruesos con bíceps y pectorales marcados |
+| `extraArms` | Dos brazos más: el par superior agarra el bate y el inferior va en jarras |
+| `skin`, `hair`, `beard` | Hex exactos; pelo bajo el casco (más largo atrás); barba con boca visible. Los ojos llevan blanco para que se lean en cualquier tono de piel |
+| `jersey`, `trim`, `number` | Camiseta y pantalón; ribete en casco, cuello, tapeta, mangas, rayas y medias; número en el pecho y de fondo |
+
+El encuadre se adapta a la caja: un `ResizeObserver` redibuja con la proporción real para que nadie quede cortado salvo el gigante. El SVG es `aria-hidden`: la tarjeta ya dice todo en texto.
 
 ## 3. Auditoría (8-oct-2026)
 
@@ -122,6 +180,17 @@ La burbuja lleva el icono del silbato (26 px) y se puede cerrar. El toast es una
 2. Sustituir los `style=""` en línea de los modales y las tarjetas de derby por modificadores (`.modal--wide`, `.modal--narrow`).
 3. Llevar los colores del SVG del logotipo a `currentColor` para soportar temas.
 
+### Revisión de accesibilidad: bateadores y habilidad (9-oct-2026)
+| # | Hallazgo | Criterio | Estado |
+|---|---|---|---|
+| 1 | El cuerpo desplazable de la tarjeta entraba en el orden de tabulación sin nombre ni foco visible | 4.1.2 · 2.4.7 | ✅ `role="group"` + `aria-labelledby` + anillo `--c-info` interior |
+| 2 | La estatura se leía dos veces (insignia + texto oculto) | 1.3.1 | ✅ Insignia `aria-hidden` |
+| 3 | El carrusel y las flechas usaban desplazamiento suave aun con «reducir movimiento» | 2.3.3 | ✅ `scroll-behavior: auto` y `behavior: 'auto'` |
+| 4 | Pulso y halo de la habilidad | 2.3.3 | ✅ Sin animación con reducir movimiento |
+| 5 | En vertical, la habilidad quedaba bajo la tarjeta de bateo y el consejo del coach | 1.4.10 | ✅ Fila POTENCIA + habilidad y coach más arriba |
+
+Contraste medido sobre la tarjeta (`#101d36`): texto atenuado 9,2:1 · verde 7,0:1 · naranja 7,3:1 · oro 10,9:1 · tiza 14,9:1 · `#1b1300` sobre oro ≈ 12:1. Objetivos táctiles: 48 px (Atrás, Elegir) y ≥ 44 px (habilidad).
+
 ## 4. Do's y don'ts
 | ✅ Hacer | ❌ No hacer |
 |---|---|
@@ -130,3 +199,5 @@ La burbuja lleva el icono del silbato (26 px) y se puede cerrar. El toast es una
 | Cifras en `--f-num` con `tabular-nums` | Números con fuente proporcional en el HUD (bailan) |
 | Respetar el centro libre durante el juego | Poner tarjetas o toasts sobre la zona de strike |
 | Textos de la UI en `ui/strings.ts`; textos de juego en `i18n/game.ts` | Cadenas sueltas en los componentes |
+| Dibujar personajes desde `BatterLook` (`ui/portrait.ts`) | Ramas por `id` o imágenes sueltas por personaje |
+| Un solo estado «Elegido» en oro; «Elegir» en secundario | Cuatro botones rojos en la pantalla de bateadores |

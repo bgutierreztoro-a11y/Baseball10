@@ -1,4 +1,4 @@
-import type { BattedBall, Hand, PitchPlan, PitchTypeId, PitcherDef, Settings, StadiumDef, StageDef, SwingEvaluation, SwingKind, TargetDef, Vec3 } from '../contracts';
+import type { BattedBall, CharacterDef, Hand, PitchPlan, PitchTypeId, PitcherDef, Settings, StadiumDef, StageDef, SwingEvaluation, SwingKind, SwingMods, TargetDef, Vec3 } from '../contracts';
 import type { AudioEngine } from '../audio/api';
 import { FT, MPH, STRIKE_ZONE } from '../config/constants';
 import { PITCHERS } from '../config/pitches';
@@ -8,8 +8,9 @@ import { Rng } from '../core/rng';
 import { coachLine, dist, gameText, pitchLine, speed } from '../i18n/game';
 import type { InputManager } from '../input/InputManager';
 import type { CameraDirector } from '../render/CameraDirector';
+import { combineMods } from '../config/characters';
 import { assistAim, landingHint } from '../sim/assist';
-import { HOME_RUN_UNDERCUT, SWING_PROFILES, evaluateSwing } from '../sim/contact';
+import { HOME_RUN_UNDERCUT, SWING_PROFILES, evaluateSwing, swingProfile } from '../sim/contact';
 import { choosePitch, type PitchSelectorConfig } from '../sim/pitcher';
 import { planPitch, pitchPosition, timeAtZ } from '../sim/pitch';
 import { DERBY_RULES, PRACTICE_RULES, Session, rulesForStage, type PitchResult, type SessionEvent } from '../sim/session';
@@ -48,6 +49,8 @@ export interface MatchDeps {
   onFinished(summary: MatchSummary): void;
   onPause(): void;
   firstTime: boolean;
+  /** The selected batter (stats + ability). */
+  character: CharacterDef;
 }
 
 type Phase = 'intro' | 'ready' | 'windup' | 'pitch' | 'contact' | 'flight' | 'result' | 'ended';
@@ -111,6 +114,9 @@ export class Match {
   private catcherTarget = { x: 0, y: STRIKE_ZONE.centerY };
   private pendingEvents: SessionEvent[] = [];
   private powerToggle = false;
+  /** Ability activations left this match, and pitches left while active. */
+  private abilityUses = 0;
+  private abilityLeft = 0;
 
   constructor(mode: MatchMode, deps: MatchDeps, seed: number) {
     this.mode = mode;
@@ -146,7 +152,34 @@ export class Match {
     w.umpire.reset();
     w.catcher.setGhost(1);
     w.umpire.setGhost(1);
+    w.batter.setPeak(false);
+    this.abilityUses = deps.character.ability?.uses ?? 0;
     this.updateScoreboard(null);
+  }
+
+  /** Character multipliers, boosted while the ability is active. */
+  private get mods(): SwingMods {
+    const c = this.d.character;
+    return this.abilityLeft > 0 && c.ability ? combineMods(c.mods, c.ability.mods) : c.mods;
+  }
+
+  /** El Moro's peak: boosts the next few pitches, limited uses per match. */
+  activateAbility(): void {
+    const ab = this.d.character.ability;
+    if (!ab || this.paused || this.abilityUses <= 0 || this.abilityLeft > 0) return;
+    if (this.phase === 'ended' || this.phase === 'flight' || this.phase === 'contact' || this.swing) return;
+    this.abilityUses--;
+    this.abilityLeft = ab.pitches;
+    const s = this.d.settings();
+    const t = gameText(s.lang);
+    const w = this.d.world;
+    w.batter.setPeak(true);
+    this.d.audio.crowdReaction('roar');
+    this.excitement = 1;
+    const cheer = this.rng.pick(t.fanCheers);
+    this.d.ui.showCallout(t.peakOn, 'bonus', `${t.fanName}: «${cheer}»`);
+    w.stadium.setScoreboard({ title: t.fanBoard, line1: cheer.toUpperCase(), line2: ab.name[s.lang].toUpperCase(), big: 'PEAK', highlight: true });
+    this.d.ui.updateHUD(this.hudVM());
   }
 
   get hand(): Hand {
@@ -167,6 +200,7 @@ export class Match {
     this.d.ui.showHUD(this.hudVM(), {
       onPause: () => this.d.onPause(),
       onSwing: (ts) => this.d.input.touchSwing(ts),
+      onAbility: () => this.activateAbility(),
       onPowerToggle: (on) => {
         this.powerToggle = on;
         this.d.input.powerLatched = on;
@@ -233,11 +267,12 @@ export class Match {
     // Presses well before the release are ignored (no accidental outs).
     if (effectiveTs < this.releaseAtMs - 100) return;
     const kind: SwingKind = power || this.powerToggle ? 'power' : 'contact';
-    const prof = SWING_PROFILES[kind];
+    const mods = this.mods;
+    const prof = swingProfile(kind, mods);
     const contactTime = (effectiveTs - this.releaseAtMs) / 1000 + prof.swingTime;
     let aim = this.currentAim(true);
-    if (s.controlMode === 'pro' && s.aimAssist) aim = assistAim(aim, this.plan.plateCross, kind);
-    const evaluation = evaluateSwing(this.plan, { kind, contactTime, aim, batter: this.hand }, { stadium: this.stadium, targets: this.targets, rng: this.rng });
+    if (s.controlMode === 'pro' && s.aimAssist) aim = assistAim(aim, this.plan.plateCross, kind, mods);
+    const evaluation = evaluateSwing(this.plan, { kind, contactTime, aim, batter: this.hand, mods }, { stadium: this.stadium, targets: this.targets, rng: this.rng });
     const now = performance.now();
     const contactAtMs = timeStamp + prof.swingTime * 1000;
     const tau = Math.max(0, (now - this.releaseAtMs) / 1000);
@@ -257,7 +292,7 @@ export class Match {
     const s = this.d.settings();
     const inAim = this.d.input.aim;
     if (s.controlMode === 'pro' || !this.plan) return { x: inAim.x, y: inAim.y };
-    const prof = SWING_PROFILES[this.d.input.power || this.powerToggle ? 'power' : 'contact'];
+    const prof = swingProfile(this.d.input.power || this.powerToggle ? 'power' : 'contact', this.mods);
     const target = {
       x: clamp(this.plan.plateCross.x, -STRIKE_ZONE.halfWidth - 0.04, STRIKE_ZONE.halfWidth + 0.04),
       y: clamp(this.plan.plateCross.y, STRIKE_ZONE.bottom - 0.05, STRIKE_ZONE.top + 0.05) - HOME_RUN_UNDERCUT * prof.pciHalfHeight,
@@ -334,6 +369,8 @@ export class Match {
       w.zone.setAim(aim.x, aim.y);
       if (!this.swing) w.batter.setAim(aim.x, aim.y);
       w.zone.setPower(this.d.input.power || this.powerToggle);
+      const m = this.mods;
+      w.zone.setPciScale(m.pci.contact, m.pci.power);
       w.zone.setVisible(true, this.phase !== 'intro');
     }
     if (this.session.timed && (this.phase === 'ready' || this.phase === 'windup' || this.phase === 'pitch')) {
@@ -577,6 +614,10 @@ export class Match {
     const events = alreadyRecorded ? this.pendingEvents : this.session.record(result);
     this.pendingEvents = [];
     this.pitchCount++;
+    if (this.abilityLeft > 0 && --this.abilityLeft === 0) {
+      this.d.world.batter.setPeak(false);
+      window.setTimeout(() => this.d.ui.showCallout(gameText(this.d.settings().lang).peakOff, 'info'), 1300);
+    }
     this.d.ui.showHitCard(this.hitCardVM(result, evaluation));
     this.handleEvents(events);
     this.updateScoreboard(result);
@@ -632,6 +673,15 @@ export class Match {
     const powerOn = this.d.input.power || this.powerToggle;
     const pro = s.controlMode === 'pro';
     const hint = this.d.input.isTouch ? (pro ? t.controlsTouch : t.controlsTouchCasual) : pro ? t.controlsPro : t.controlsCasual;
+    const ab = this.d.character.ability;
+    const ability: HudVM['ability'] = ab
+      ? {
+          label: ab.name[s.lang],
+          state: this.abilityLeft > 0 ? 'active' : this.abilityUses > 0 ? 'ready' : 'used',
+          pitchesLeft: this.abilityLeft > 0 ? this.abilityLeft : null,
+          keyHint: 'E',
+        }
+      : null;
     if (this.mode.kind === 'campaign') {
       const st = this.mode.stage;
       const [cur, target] = ses.progress();
@@ -649,6 +699,7 @@ export class Match {
         score: ses.timed ? `HR ${ses.homeRuns}` : null,
         powerOn,
         controlHint: hint,
+        ability,
       };
     }
     if (this.mode.kind === 'derby') {
@@ -663,6 +714,7 @@ export class Match {
         score: ses.longestHRft > 0 ? dist(ses.longestHRft * FT, s.units) : null,
         powerOn,
         controlHint: hint,
+        ability,
       };
     }
     return {
@@ -676,6 +728,7 @@ export class Match {
       score: null,
       powerOn,
       controlHint: hint,
+      ability,
     };
   }
 

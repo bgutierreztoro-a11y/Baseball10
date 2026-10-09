@@ -11,6 +11,7 @@
  */
 import type * as THREE from 'three';
 import type {
+  BatterLook,
   CharacterLook,
   Hand,
   QualitySettings,
@@ -62,6 +63,11 @@ export type CreateStadium = (scene: THREE.Scene, def: StadiumDef, quality: Quali
 
 export interface BatterRig {
   readonly root: THREE.Group;
+  /**
+   * Distance (m) from the plate centre line to where the root should stand
+   * (|x|; sign by handedness). Wide and giant batters stand farther out.
+   */
+  readonly stanceOffsetX: number;
   setHandedness(hand: Hand): void;
   setBatColors(wood: string, grip: string): void;
   /**
@@ -86,6 +92,15 @@ export interface BatterRig {
   update(dt: number): void;
   /** World position of the bat's sweet spot (for contact particles). */
   getBatSweetSpot(target: THREE.Vector3): THREE.Vector3;
+  /** Golden "peak" aura on/off (fades). Costs nothing while off. */
+  setPeak(on: boolean): void;
+  /**
+   * Shows the aura at full strength immediately (true) or returns to the
+   * animated state (false). Used by shader warm-up only.
+   */
+  forcePeakVisible(v: boolean): void;
+  /** Detaches from the scene and frees GPU resources. */
+  dispose(): void;
 }
 
 export interface PitcherRig {
@@ -122,7 +137,7 @@ export interface UmpireRig {
 }
 
 export interface CharacterFactory {
-  createBatter(quality: QualitySettings): BatterRig;
+  createBatter(quality: QualitySettings, look: BatterLook): BatterRig;
   createPitcher(quality: QualitySettings): PitcherRig;
   createCatcher(quality: QualitySettings): CatcherRig;
   createUmpire(quality: QualitySettings): UmpireRig;

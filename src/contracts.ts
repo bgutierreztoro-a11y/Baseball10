@@ -287,6 +287,7 @@ export interface SaveData {
   stats: LifetimeStats;
   derbyBest: number;
   selectedBat: string;
+  selectedCharacter: CharacterId;
   seenTips: string[];
 }
 
@@ -299,4 +300,60 @@ export interface BatDef {
   wood: string;
   grip: string;
   trail: string;
+}
+
+// ───────────────────────────── Playable characters ─────────────────────────────
+
+export type CharacterId = 'moro' | 'mati' | 'arturek' | 'chamo';
+
+/** Multipliers applied to a swing profile (1 = base batter). */
+export interface SwingMods {
+  /** PCI size (both axes) for each swing kind. */
+  pci: Record<SwingKind, number>;
+  /** Bat speed for each swing kind (drives exit velocity). */
+  bat: Record<SwingKind, number>;
+}
+
+/** Visual build of a batter; consumed by the character renderer. */
+export interface BatterLook {
+  skin: string;
+  /** Hair colour, or null for none visible under the helmet. */
+  hair: string | null;
+  /** Standing height in metres (base model ≈ 1.85 m). */
+  heightM: number;
+  /** Torso/hip width multiplier (1 = base). */
+  build: number;
+  /** Belly size 0..1 (0 = flat). */
+  belly: number;
+  /** Muscle definition 0..1: broader shoulders, bigger arms, narrower waist. */
+  muscle: number;
+  /** A second pair of arms (decorative; they mirror the batting arms). */
+  extraArms: boolean;
+  beard: boolean;
+  jersey: string;
+  trim: string;
+  number: string;
+}
+
+export interface CharacterAbility {
+  /** Activated by the player (key E, touch button). */
+  kind: 'peak';
+  name: LocalizedText;
+  description: LocalizedText;
+  /** Pitches the boost lasts once activated. */
+  pitches: number;
+  /** Activations per match. */
+  uses: number;
+  mods: SwingMods;
+}
+
+export interface CharacterDef {
+  id: CharacterId;
+  name: string;
+  /** Short tagline, e.g. "El Gigante de Bratislava". */
+  title: LocalizedText;
+  bio: LocalizedText;
+  look: BatterLook;
+  mods: SwingMods;
+  ability: CharacterAbility | null;
 }

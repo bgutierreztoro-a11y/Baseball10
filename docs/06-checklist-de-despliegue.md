@@ -4,7 +4,7 @@
 **Artefactos:** `dist/` (sitio multi-archivo con hashes) y `dist-single/index.html` (un solo archivo, ~222 KB gzip).
 
 ## Antes de desplegar
-- [x] CI en verde: `typecheck`, `test` (91 unit/integración), `build`, `build:single`, `e2e` (5 tests de humo)
+- [x] CI en verde: `typecheck`, `test` (99 unit/integración), `build`, `build:single`, `e2e` (5 tests de humo)
 - [x] `npm audit`: 0 vulnerabilidades
 - [x] Balance de campaña validado por test (objetivos, estrellas y dianas alcanzables)
 - [x] QA visual: 5 estadios, personajes, VFX, flujo completo de etapa (★★★), móvil vertical y horizontal, build de un solo archivo abierto desde `file://`

@@ -1,10 +1,11 @@
 import './styles.css';
-import type { Lang, PitchTypeId, Settings, StadiumId } from '../contracts';
+import type { CharacterId, Lang, PitchTypeId, Settings, StadiumId } from '../contracts';
 import type {
   CalibrationHandlers,
   CalloutStyle,
   CampaignHandlers,
   CampaignVM,
+  CharactersVM,
   CreateUI,
   DerbySetupVM,
   HitCardVM,
@@ -22,6 +23,7 @@ import type {
   UI,
 } from './api';
 import { STRINGS, fmt, type StringKey } from './strings';
+import { batterPortrait } from './portrait';
 
 /**
  * DOM overlay UI (vanilla TS). Every node is built with textContent — no
@@ -78,6 +80,11 @@ const whistleIcon = (): SVGSVGElement => svg('0 0 24 24', '', [{ d: 'M3 10a6 6 0
 const crownIcon = (): SVGSVGElement => svg('0 0 24 24', 'star on', [{ d: 'M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z' }]);
 const pauseIcon = (): SVGSVGElement => svg('0 0 24 24', '', [{ d: 'M7 5h4v14H7zM13 5h4v14h-4z' }]);
 const backIcon = (): SVGSVGElement => svg('0 0 24 24', '', [{ d: 'M15 5l-7 7 7 7', fill: 'none', stroke: 'currentColor', sw: 2.5 }]);
+const checkIcon = (): SVGSVGElement => svg('0 0 24 24', 'ico', [{ d: 'M5 12.5l4.5 4.5L19 7.5', fill: 'none', stroke: 'currentColor', sw: 3 }]);
+/** Lightning bolt: special ability. */
+const boltIcon = (cls = 'ico'): SVGSVGElement => svg('0 0 24 24', cls, [{ d: 'M13.5 2L4 13.5h6.5L9 22l10-12.5h-6.6z' }]);
+/** Batting helmet: the batter / roster. */
+const helmetIcon = (): SVGSVGElement => svg('0 0 24 24', 'ico', [{ d: 'M3 15.5C3 9.7 7 5.5 12.3 5.5c4.6 0 8.2 3.3 8.7 8H23v2.5H13.8v3.5H9.5C5.9 19.5 3 17.9 3 15.5zm9.5-.5a2.3 2.3 0 100-4.6 2.3 2.3 0 000 4.6z' }]);
 
 /** Baseball icon with red stitches (brand mark). */
 function ballIcon(): SVGSVGElement {
@@ -127,12 +134,14 @@ class DomUI implements UI {
     hint: HTMLElement;
     pitch: HTMLElement;
     power: HTMLButtonElement | null;
+    ability: HTMLButtonElement;
     onPause: () => void;
     last: HudVM | null;
   } | null = null;
   private hitCard: HTMLElement | null = null;
   private tipEl: HTMLElement | null = null;
   private hintTimer = 0;
+  private pickedId: CharacterId | null = null;
 
   constructor(mount: HTMLElement, lang: Lang) {
     this.root = mount;
@@ -158,6 +167,11 @@ class DomUI implements UI {
     return values ? fmt(s, values) : s;
   }
 
+  /** True when the OS or the game setting asks for reduced motion. */
+  private calm(): boolean {
+    return document.documentElement.classList.contains('reduced-motion') || (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false);
+  }
+
   private announce(text: string): void {
     this.live.textContent = '';
     window.setTimeout(() => (this.live.textContent = text), 30);
@@ -177,6 +191,7 @@ class DomUI implements UI {
 
   setTouchMode(touch: boolean): void {
     this.touch = touch;
+    this.root.classList.toggle('is-touch-ui', touch);
   }
 
   private setScreen(el: HTMLElement | null, esc: (() => void) | null = null): void {
@@ -212,6 +227,12 @@ class DomUI implements UI {
       h('button', { class: `btn btn-lg ${vm.continueLabel ? '' : 'btn-primary'}`, onclick: this.click(hd.onCampaign) }, h('span', null, this.t('campaign')), h('small', null, this.t('campaignDesc'))),
       h('button', { class: 'btn', onclick: this.click(hd.onPractice) }, h('span', null, this.t('practice')), h('small', null, this.t('practiceDesc'))),
       h('button', { class: 'btn', onclick: this.click(hd.onDerby) }, h('span', null, this.t('derby')), h('small', null, this.t('derbyDesc'))),
+      h(
+        'button',
+        { class: 'btn btn-batters', onclick: this.click(hd.onCharacters) },
+        h('span', null, this.t('batters')),
+        h('small', { class: 'batter-now' }, helmetIcon(), h('span', { class: 'sr-only' }, `${this.t('currentBatter')}: `), vm.characterName),
+      ),
       h('button', { class: 'btn btn-ghost', onclick: this.click(hd.onSettings) }, h('span', null, this.t('settings'))),
     );
     const meta = h(
@@ -309,6 +330,160 @@ class DomUI implements UI {
         if (!this.touch) f.focus({ preventScroll: true });
       }, 60);
     }
+  }
+
+  // ── Batter select ──
+  showCharacters(vm: CharactersVM, hd: { onSelect(id: CharacterId): void; onBack(): void }): void {
+    // The game re-calls this after onSelect: keep scroll position and focus.
+    const prevRoster = this.screenLayer.querySelector<HTMLElement>('.roster');
+    const prevScroll = prevRoster ? { left: prevRoster.scrollLeft, top: prevRoster.scrollTop } : null;
+    const active = document.activeElement as HTMLElement | null;
+    const prevFocusId = prevRoster && active && prevRoster.contains(active) ? active.closest<HTMLElement>('.bcard')?.dataset.id ?? null : null;
+    const prevPicked = this.pickedId;
+    this.clear();
+
+    const n = vm.items.length;
+    const roster = h('ul', { class: 'roster', 'aria-label': this.t('batters') });
+    const dots = h('div', { class: 'roster-dots', 'aria-hidden': 'true' });
+    let focusBtn: HTMLButtonElement | null = null;
+    let selectedCard: HTMLElement | null = null;
+    vm.items.forEach((c, i) => {
+      const nameId = `bcard-${c.id}-name`;
+      const stats = h('dl', { class: 'bstats' });
+      for (const st of c.stats) {
+        const v = Math.max(0, Math.min(1, st.value));
+        const tone = /^\s*\+/.test(st.detail) ? 'up' : /^\s*[−-]/.test(st.detail) ? 'down' : 'base';
+        stats.append(
+          h(
+            'div',
+            { class: 'bstat' },
+            h('dt', null, st.label),
+            h('dd', null, h('span', { class: 'bbar', 'aria-hidden': 'true' }, h('i', { style: `width:${Math.round(v * 100)}%` })), h('span', { class: `bdetail tone-${tone}` }, st.detail)),
+          ),
+        );
+      }
+      const btn = h(
+        'button',
+        {
+          class: `btn bpick ${c.selected ? 'is-picked' : ''}`,
+          'aria-pressed': c.selected ? 'true' : 'false',
+          'aria-label': c.selected ? this.t('pickedAria', { name: c.name }) : this.t('pickAria', { name: c.name }),
+          'data-autofocus': c.selected,
+          onclick: this.click(() => {
+            if (!c.selected) hd.onSelect(c.id);
+          }),
+        },
+        c.selected ? checkIcon() : null,
+        c.selected ? this.t('picked') : this.t('pick'),
+      );
+      if (c.id === prevFocusId) focusBtn = btn;
+      const art = h(
+        'div',
+        { class: 'bcard-art' },
+        batterPortrait(c.look),
+        // Read once, after the name (sr-only line in the body).
+        h('span', { class: 'bcard-height', 'aria-hidden': 'true' }, h('small', null, this.t('height')), h('b', null, c.height)),
+        c.selected ? h('span', { class: 'bcard-badge', 'aria-hidden': 'true' }, checkIcon(), this.t('picked')) : null,
+      );
+      const card = h(
+        'li',
+        {
+          class: `bcard ${c.selected ? 'is-selected' : ''}`,
+          'data-id': c.id,
+          style: `--accent:${c.look.trim}`,
+          'aria-labelledby': nameId,
+        },
+        art,
+        h(
+          'div',
+          { class: 'bcard-main' },
+          h(
+            'div',
+            // Scrollable when space is short: browsers make it a tab stop, so give it a name.
+            { class: 'bcard-body', role: 'group', 'aria-labelledby': nameId },
+            h('header', { class: 'bcard-head' }, h('h3', { id: nameId }, c.name), h('p', null, c.title)),
+            h('span', { class: 'sr-only' }, `${this.t('rosterPos', { i: i + 1, n })}. ${this.t('height')}: ${c.height}`),
+            stats,
+            c.ability
+              ? h(
+                  'section',
+                  { class: 'bability', 'aria-label': this.t('ability') },
+                  boltIcon('ico bability-ico'),
+                  h('div', null, h('div', { class: 'eyebrow' }, this.t('ability')), h('div', { class: 'bability-name' }, c.ability.name), h('p', null, c.ability.description)),
+                )
+              : null,
+            h('p', { class: 'bcard-bio' }, c.bio),
+          ),
+          h('div', { class: 'bcard-foot' }, btn),
+        ),
+      );
+      if (c.selected) selectedCard = card;
+      roster.append(card);
+      dots.append(h('i', { class: c.selected ? 'on' : '' }));
+    });
+
+    const buttons = (): HTMLButtonElement[] => Array.from(roster.querySelectorAll<HTMLButtonElement>('.bpick'));
+    // ←/→ (and gamepad d-pad mapped to arrows) hop between cards.
+    roster.addEventListener('keydown', (e) => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      const list = buttons();
+      const idx = list.findIndex((b) => b === document.activeElement || b.closest('.bcard')!.contains(document.activeElement));
+      if (idx < 0) return;
+      const next = list[Math.max(0, Math.min(list.length - 1, idx + (e.key === 'ArrowRight' ? 1 : -1)))]!;
+      e.preventDefault();
+      e.stopPropagation();
+      next.focus({ preventScroll: true });
+      next.closest('.bcard')!.scrollIntoView({ block: 'nearest', inline: 'center', behavior: this.calm() ? 'auto' : 'smooth' });
+    });
+    // Keep the card that receives focus in view (Tab / gamepad).
+    roster.addEventListener('focusin', (e) => {
+      const card = (e.target as HTMLElement).closest<HTMLElement>('.bcard');
+      if (card && roster.scrollWidth > roster.clientWidth + 4) card.scrollIntoView({ block: 'nearest', inline: 'center' });
+    });
+    const syncDots = (): void => {
+      const cards = Array.from(roster.children) as HTMLElement[];
+      const mid = roster.scrollLeft + roster.clientWidth / 2;
+      let best = 0;
+      cards.forEach((c, i) => {
+        if (Math.abs(c.offsetLeft + c.offsetWidth / 2 - mid) < Math.abs(cards[best]!.offsetLeft + cards[best]!.offsetWidth / 2 - mid)) best = i;
+      });
+      Array.from(dots.children).forEach((d, i) => d.classList.toggle('on', i === best));
+    };
+    roster.addEventListener('scroll', syncDots, { passive: true });
+
+    const screen = h(
+      'section',
+      { class: 'screen scrim chars', 'aria-labelledby': 'chars-title' },
+      h(
+        'div',
+        { class: 'col' },
+        h(
+          'div',
+          { class: 'topbar' },
+          h('button', { class: 'btn btn-icon', 'aria-label': this.t('back'), onclick: this.click(hd.onBack) }, backIcon()),
+          h('div', { class: 'topbar-title' }, h('div', { class: 'eyebrow' }, this.t('chooseBatter')), h('h2', { id: 'chars-title' }, this.t('batters'))),
+        ),
+        roster,
+        dots,
+      ),
+    );
+    this.setScreen(screen, hd.onBack);
+
+    if (prevScroll) {
+      roster.scrollLeft = prevScroll.left;
+      roster.scrollTop = prevScroll.top;
+    } else if (selectedCard) {
+      const sc = selectedCard as HTMLElement;
+      roster.scrollLeft = Math.max(0, sc.offsetLeft - (roster.clientWidth - sc.offsetWidth) / 2);
+    }
+    syncDots();
+    if (focusBtn) {
+      const fb = focusBtn as HTMLButtonElement;
+      window.setTimeout(() => fb.focus({ preventScroll: true }), 0);
+    }
+    const picked = vm.items.find((c) => c.selected);
+    this.pickedId = picked?.id ?? null;
+    if (picked && prevPicked && prevRoster && prevPicked !== picked.id) this.announce(this.t('batterPicked', { name: picked.name }));
   }
 
   // ── Stage intro ──
@@ -698,6 +873,7 @@ class DomUI implements UI {
       right,
       h('div', { class: 'hud-bottom' }, pitch, hint),
     );
+    const ability = this.abilityButton(hd);
     let power: HTMLButtonElement | null = null;
     if (this.touch) {
       power = h('button', { class: 'power-btn', 'aria-pressed': vm.powerOn ? 'true' : 'false', 'aria-label': this.t('powerAria') }, this.t('power'));
@@ -714,10 +890,12 @@ class DomUI implements UI {
         navigator.vibrate?.(10);
         hd.onSwing(e.timeStamp);
       });
-      hud.append(h('div', { class: 'touch' }, power, swing));
+      hud.append(h('div', { class: 'touch' }, ability, power, swing));
+    } else {
+      hud.querySelector('.hud-tl')!.append(ability);
     }
     this.hudLayer.append(hud);
-    this.hud = { chipTag, chipText, goal, goalNum, bar: barFill, right, hint, pitch, power, onPause: hd.onPause, last: null };
+    this.hud = { chipTag, chipText, goal, goalNum, bar: barFill, right, hint, pitch, power, ability, onPause: hd.onPause, last: null };
     this.updateHUD(vm);
     window.clearTimeout(this.hintTimer);
     this.hintTimer = window.setTimeout(() => hint.classList.add('hide'), 6000);
@@ -728,7 +906,8 @@ class DomUI implements UI {
     if (!hud) return;
     const prev = hud.last;
     if (prev && JSON.stringify(prev) === JSON.stringify(vm)) return;
-    hud.last = { ...vm, outs: vm.outs ? { ...vm.outs } : null };
+    hud.last = { ...vm, outs: vm.outs ? { ...vm.outs } : null, ability: vm.ability ? { ...vm.ability } : null };
+    this.updateAbility(hud.ability, vm.ability, prev?.ability ?? null);
     const [tag, ...rest] = vm.stageLabel.split(' · ');
     hud.chipTag.textContent = tag ?? '';
     hud.chipText.textContent = rest.join(' · ');
@@ -760,6 +939,51 @@ class DomUI implements UI {
     }
     right.push(h('button', { class: 'btn btn-icon hud-pause', 'aria-label': this.t('pause'), onclick: this.click(hud.onPause) }, pauseIcon()));
     hud.right.replaceChildren(...right);
+  }
+
+  /** Special-ability button: gold pill under the goal (desktop) or above POWER (touch). */
+  private abilityButton(hd: HudHandlers): HTMLButtonElement {
+    const btn = h(
+      'button',
+      { class: `ability-btn ${this.touch ? 'is-touch' : ''}`, type: 'button', hidden: true },
+      h('span', { class: 'ab-ico' }, boltIcon()),
+      h('span', { class: 'ab-text' }, h('span', { class: 'ab-label' }, ''), h('span', { class: 'ab-state' }, '')),
+      this.touch ? null : h('kbd', { class: 'ab-key' }, ''),
+    );
+    const fire = (e: Event): void => {
+      e.stopPropagation();
+      if (btn.dataset.state !== 'ready') return;
+      hd.onAbility();
+      // Drop focus so Space (swing) can't re-trigger the button.
+      if ((e as PointerEvent).pointerType || (e as MouseEvent).detail > 0) btn.blur();
+    };
+    btn.addEventListener('click', fire);
+    return btn;
+  }
+
+  private updateAbility(btn: HTMLButtonElement, ab: HudVM['ability'], prev: HudVM['ability']): void {
+    btn.hidden = !ab;
+    btn.parentElement?.classList.toggle('has-ability', !!ab);
+    if (!ab) return;
+    const left = ab.pitchesLeft ?? 0;
+    btn.dataset.state = ab.state;
+    btn.className = `ability-btn is-${ab.state} ${this.touch ? 'is-touch' : ''}`;
+    btn.setAttribute('aria-disabled', ab.state === 'ready' ? 'false' : 'true');
+    btn.querySelector('.ab-label')!.textContent = ab.label;
+    btn.querySelector('.ab-state')!.textContent = ab.state === 'ready' ? this.t('abilityReady') : ab.state === 'active' ? this.t('abilityLeft', { n: left }) : this.t('abilityUsed');
+    const key = btn.querySelector('.ab-key');
+    if (key) key.textContent = ab.keyHint;
+    btn.setAttribute(
+      'aria-label',
+      ab.state === 'ready'
+        ? this.touch
+          ? this.t('abilityReadyAriaTouch', { name: ab.label })
+          : this.t('abilityReadyAria', { name: ab.label, key: ab.keyHint })
+        : ab.state === 'active'
+          ? this.t('abilityActiveAria', { name: ab.label, n: left })
+          : this.t('abilityUsedAria', { name: ab.label }),
+    );
+    if (prev && prev.state !== 'active' && ab.state === 'active') this.announce(this.t('abilityOn', { name: ab.label, n: left }));
   }
 
   showHitCard(vm: HitCardVM): void {

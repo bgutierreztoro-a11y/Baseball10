@@ -4,7 +4,7 @@
  * already-localized dynamic text; the UI owns only its static chrome strings
  * (buttons, headings, settings labels) in src/ui/strings.ts.
  */
-import type { Hand, Lang, PitchTypeId, Settings, StadiumId, TimeOfDay } from '../contracts';
+import type { BatterLook, CharacterId, Hand, Lang, PitchTypeId, Settings, StadiumId, TimeOfDay } from '../contracts';
 
 export interface StatVM {
   label: string;
@@ -17,6 +17,8 @@ export interface TitleVM {
   derbyBest: string | null;
   /** Label of the next stage to play, e.g. "1-3 · Tiro al blanco". */
   continueLabel: string | null;
+  /** Currently selected batter, e.g. "El Mati". */
+  characterName: string;
 }
 
 export interface TitleHandlers {
@@ -25,6 +27,35 @@ export interface TitleHandlers {
   onPractice(): void;
   onDerby(): void;
   onSettings(): void;
+  /** Opens the batter select screen. */
+  onCharacters(): void;
+}
+
+/** One stat bar on a character card; value is 0..1 relative to the roster. */
+export interface CharacterStatVM {
+  label: string;
+  /** 0..1 (0.5 ≈ base batter). */
+  value: number;
+  /** Short qualitative text, e.g. "+35 %" or "Base". */
+  detail: string;
+}
+
+export interface CharacterCardVM {
+  id: CharacterId;
+  name: string;
+  /** Tagline, e.g. "El Gigante de Bratislava". */
+  title: string;
+  bio: string;
+  /** e.g. "7,80 m". */
+  height: string;
+  look: BatterLook;
+  stats: CharacterStatVM[];
+  ability: { name: string; description: string } | null;
+  selected: boolean;
+}
+
+export interface CharactersVM {
+  items: CharacterCardVM[];
 }
 
 export interface StageNodeVM {
@@ -139,6 +170,15 @@ export interface HudVM {
   score: string | null;
   powerOn: boolean;
   controlHint: string | null;
+  /** Special ability button (El Moro's peak); null when the batter has none. */
+  ability: {
+    label: string;
+    state: 'ready' | 'active' | 'used';
+    /** Pitches left while active. */
+    pitchesLeft: number | null;
+    /** Key/tap hint, e.g. "E". */
+    keyHint: string;
+  } | null;
 }
 
 export interface HudHandlers {
@@ -146,6 +186,8 @@ export interface HudHandlers {
   /** Touch swing button. `timeStamp` = the PointerEvent's timeStamp. */
   onSwing(timeStamp: number): void;
   onPowerToggle(on: boolean): void;
+  /** Activates the batter's special ability (touch/click on the HUD button). */
+  onAbility(): void;
 }
 
 export type HitResultKind = 'homeRun' | 'hit' | 'out' | 'foul' | 'whiff' | 'calledStrike' | 'ball';
@@ -224,6 +266,8 @@ export interface UI {
   showDerbySetup(vm: DerbySetupVM, h: { onStart(stadium: StadiumId): void; onBack(): void }): void;
   /** Settings open as an overlay (also above the pause menu); close with closeOverlay(). */
   showSettings(settings: Settings, h: SettingsHandlers): void;
+  /** Batter select: roster cards with portrait, stats and ability. */
+  showCharacters(vm: CharactersVM, h: { onSelect(id: CharacterId): void; onBack(): void }): void;
   closeOverlay(): void;
   showCalibration(h: CalibrationHandlers): void;
   showHUD(vm: HudVM, h: HudHandlers): void;

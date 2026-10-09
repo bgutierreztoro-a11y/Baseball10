@@ -196,6 +196,12 @@ export class ZoneOverlay {
     this.pci.position.set(x, y, 0);
   }
 
+  /** Character/ability PCI size multipliers. */
+  setPciScale(contact: number, power: number): void {
+    this.pciContact.scale.setScalar(contact);
+    this.pciPower.scale.setScalar(power);
+  }
+
   setPower(on: boolean): void {
     this.power = on;
     this.pciContact.visible = !on;

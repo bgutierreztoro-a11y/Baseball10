@@ -32,6 +32,9 @@ const es = {
   settings: 'Ajustes',
   derbyBest: 'Récord Derby',
   mainMenu: 'Menú principal',
+  batters: 'Bateadores',
+  battersDesc: 'Elige con quién sales a batear',
+  currentBatter: 'Bateador',
 
   // Campaign
   chapter: 'Capítulo',
@@ -47,6 +50,19 @@ const es = {
   batInUse: 'En uso',
   batEquip: 'Equipar',
   batNeeds: 'Necesitas {n} estrellas',
+
+  // Batter select
+  chooseBatter: 'Elige tu bateador',
+  pick: 'Elegir',
+  picked: 'Elegido',
+  pickAria: 'Elegir a {name}',
+  pickedAria: '{name}, elegido',
+  height: 'Estatura',
+  ability: 'Habilidad especial',
+  rosterPos: 'Bateador {i} de {n}',
+  rosterHint: 'Desliza para ver más',
+  batterPicked: '{name} sale a batear',
+  forScale: 'A escala',
 
   // Stage intro
   stage: 'Etapa',
@@ -164,6 +180,14 @@ const es = {
   coach: 'Coach',
   dismissTip: 'Cerrar consejo',
   timing: 'Timing',
+  abilityReady: 'Disponible',
+  abilityLeft: 'Quedan {n}',
+  abilityUsed: 'Sin usos',
+  abilityReadyAria: 'Activar {name} (tecla {key})',
+  abilityReadyAriaTouch: 'Activar {name}',
+  abilityActiveAria: '{name} en marcha: quedan {n} lanzamientos',
+  abilityUsedAria: '{name}: sin usos en este partido',
+  abilityOn: '¡{name}! {n} lanzamientos',
 
   // Pause
   pauseTitle: 'Pausa',
@@ -207,6 +231,9 @@ const en: Strings = {
   settings: 'Settings',
   derbyBest: 'Derby best',
   mainMenu: 'Main menu',
+  batters: 'Batters',
+  battersDesc: 'Choose who steps up to the plate',
+  currentBatter: 'Batter',
 
   chapter: 'Chapter',
   boss: 'Boss',
@@ -221,6 +248,18 @@ const en: Strings = {
   batInUse: 'Equipped',
   batEquip: 'Equip',
   batNeeds: 'Requires {n} stars',
+
+  chooseBatter: 'Pick your batter',
+  pick: 'Pick',
+  picked: 'Picked',
+  pickAria: 'Pick {name}',
+  pickedAria: '{name}, picked',
+  height: 'Height',
+  ability: 'Special ability',
+  rosterPos: 'Batter {i} of {n}',
+  rosterHint: 'Swipe for more',
+  batterPicked: '{name} steps up to the plate',
+  forScale: 'For scale',
 
   stage: 'Stage',
   bossStage: 'Boss fight',
@@ -332,6 +371,14 @@ const en: Strings = {
   coach: 'Coach',
   dismissTip: 'Dismiss tip',
   timing: 'Timing',
+  abilityReady: 'Ready',
+  abilityLeft: '{n} left',
+  abilityUsed: 'Used up',
+  abilityReadyAria: 'Activate {name} (key {key})',
+  abilityReadyAriaTouch: 'Activate {name}',
+  abilityActiveAria: '{name} active: {n} pitches left',
+  abilityUsedAria: '{name}: used up this match',
+  abilityOn: '{name}! {n} pitches',
 
   pauseTitle: 'Paused',
   resume: 'Resume',

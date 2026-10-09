@@ -3,6 +3,7 @@ import type { SaveData, Settings, StadiumId, StageDef } from '../contracts';
 import { createAudioEngine } from '../audio/AudioEngine';
 import type { AudioEngine } from '../audio/api';
 import { BATS, STAGES, stageById } from '../config/campaign';
+import { characterById } from '../config/characters';
 import { STADIUMS, STADIUM_ORDER } from '../config/stadiums';
 import { gameText } from '../i18n/game';
 import { InputManager } from '../input/InputManager';
@@ -12,7 +13,7 @@ import { Renderer, detectTier } from '../render/Renderer';
 import { createUI } from '../ui';
 import type { PracticeConfig, UI } from '../ui/api';
 import { Match, stadiumFor, type MatchMode, type MatchSummary } from './Match';
-import { campaignVM, derbySetupVM, practiceVM, resultsVM, stageIntroVM, titleVM } from './viewModels';
+import { campaignVM, charactersVM, derbySetupVM, practiceVM, resultsVM, stageIntroVM, titleVM } from './viewModels';
 import { World } from './World';
 
 /**
@@ -54,6 +55,7 @@ export class App {
       onSwing: (ts, power) => this.match?.onSwing(ts, power),
       onPause: () => this.togglePause(),
       onConfirm: () => this.match?.confirm(),
+      onAbility: () => this.match?.activateAbility(),
     });
     this.applySettings(s, true);
 
@@ -113,9 +115,10 @@ export class App {
     if (this.world && this.world.def.id === id && this.world.quality.tier === this.renderer.quality.tier) return this.world;
     this.world?.dispose();
     this.world = new World(this.renderer, STADIUMS[id]);
-    this.world.setHandedness(this.s.handedness);
     const bat = BATS.find((b) => b.id === this.save.selectedBat) ?? BATS[0]!;
     this.world.batter.setBatColors(bat.wood, bat.grip);
+    this.world.setCharacter(characterById(this.save.selectedCharacter));
+    this.world.setHandedness(this.s.handedness);
     return this.world;
   }
 
@@ -216,6 +219,21 @@ export class App {
       onPractice: () => this.showPractice(),
       onDerby: () => this.showDerby(),
       onSettings: () => this.openSettings(() => this.showTitle()),
+      onCharacters: () => this.showCharacters(),
+    });
+  }
+
+  private showCharacters(): void {
+    this.endMatch();
+    this.ui.showCharacters(charactersVM(this.save, this.s), {
+      onSelect: (id) => {
+        this.audio.uiClick();
+        this.save = { ...this.save, selectedCharacter: id };
+        this.persist();
+        this.world?.setCharacter(characterById(id));
+        this.showCharacters();
+      },
+      onBack: () => this.showTitle(),
     });
   }
 
@@ -296,6 +314,7 @@ export class App {
             onFinished: (summary) => this.onMatchFinished(summary),
             onPause: () => this.togglePause(),
             firstTime,
+            character: characterById(this.save.selectedCharacter),
           },
           (Date.now() ^ (Math.random() * 1e9)) >>> 0,
         );

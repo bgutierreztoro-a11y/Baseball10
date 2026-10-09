@@ -12,6 +12,8 @@ export interface InputCallbacks {
   onPause(): void;
   /** Any confirm action (skip cinematic / continue). */
   onConfirm(): void;
+  /** Batter's special ability (key E / gamepad Y). */
+  onAbility(): void;
 }
 
 const AIM_X = 0.62;
@@ -132,6 +134,8 @@ export class InputManager {
       this.cb.onPause();
     } else if (k === 'q') {
       this.powerLatched = !this.powerLatched;
+    } else if (k === 'e') {
+      this.cb.onAbility();
     }
   }
 
@@ -174,6 +178,7 @@ export class InputManager {
       if (edge(0) || edge(7)) this.cb.onSwing(performance.now(), edge(7) || this.power);
     } else if (edge(0)) this.cb.onConfirm();
     if (edge(9)) this.cb.onPause();
+    if (!menuOnly && edge(3)) this.cb.onAbility();
     this.padPrev = pressed;
   }
 

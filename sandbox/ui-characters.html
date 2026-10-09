@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+    <title>UI sandbox · Bateadores</title>
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet" />
+    <style>
+      /* Fake night ballpark behind the overlay. */
+      #scene { background: radial-gradient(80% 60% at 50% 30%, #2b4a7a, #0b1426 70%), linear-gradient(0deg, #1f5a35 0 30%, transparent 30%); background-blend-mode: normal; }
+      #scene::after { content: ''; }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div id="scene" style="position:absolute;inset:0;background:linear-gradient(180deg,#0e1f3d 0%,#1d3a66 45%,#2a6b3c 46%,#1d5230 100%)"></div>
+      <div id="ui"></div>
+    </div>
+    <script type="module" src="./ui-characters.ts"></script>
+  </body>
+</html>

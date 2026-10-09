@@ -122,6 +122,18 @@ Hit-stop de 70–100 ms; destello y chispas (onda expansiva dorada en los barrel
 ### 5.10 Accesibilidad
 Modo *casual* (solo timing), zona aproximada de llegada, imán de bateo, bateo a la zurda, reducir movimiento (sin cámara lenta, temblores ni destellos; también respeta `prefers-reduced-motion`), estela del lanzamiento, tipo de lanzamiento visible, calibración de latencia, navegación completa por teclado y mando, región `aria-live` que anuncia resultados, contraste AA y objetivos táctiles de 44 px o más.
 
+### 5.11 Bateadores jugables
+Cada bateador cambia el tamaño del PCI y la velocidad del bate (multiplicadores en `src/config/characters.ts`, aplicados por `swingProfile()` en `src/sim/contact.ts`). Se eligen en el menú **Bateadores** y la elección se guarda.
+
+| Bateador | Inspiración | Aspecto | Contacto | Poder | Rasgo |
+|---|---|---|---|---|---|
+| **El Moro** | — | Modelo base, 1,85 m | Base | Base | **Peak máximo** (tecla E, botón PEAK o Y en el mando): durante 3 lanzamientos, PCI ×1,4 y bate ×1,1. Una vez por partido. Su novia virtual «iluvkiwiss» lo anima desde el marcador (es Ramiro haciéndole *catfish*, pero él no lo sabe). |
+| **El Mati** | David "Big Papi" Ortiz | Enorme, 1,93 m | PCI base, bate +4 % | Bate +7 %, PCI +8 % | El más equilibrado. Su tamaño tapa mucha más pantalla. |
+| **Arturek** | — | Gigante eslovaco rubio de 7,8 m con cuatro brazos | PCI +35 % | PCI +35 % | Alcanza casi todo; potencia media. |
+| **Chamo** | Barry Bonds | 1,88 m, musculoso | PCI −22 %, bate −5 % | Bate +14 % | El swing de poder más fuerte; poco contacto. |
+
+Swing de potencia perfecto en el Metropolitano (92 mph): Moro 434 ft (460 con peak), Mati 462, Arturek ≈ 420, Chamo 494.
+
 ## 6. Requisitos
 
 ### P0 — imprescindibles (implementados)

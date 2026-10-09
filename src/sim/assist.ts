@@ -1,6 +1,6 @@
-import type { SwingKind } from '../contracts';
+import type { SwingKind, SwingMods } from '../contracts';
 import type { Rng } from '../core/rng';
-import { IDEAL_UNDERCUT, SWING_PROFILES } from './contact';
+import { IDEAL_UNDERCUT, swingProfile } from './contact';
 
 /**
  * Batting assists that answer the most common complaint about zone hitting
@@ -55,8 +55,8 @@ export const AIM_ASSIST = {
  * contact point (slightly under the ball), never the exact centre, so a
  * barrel still requires a good read.
  */
-export function assistAim(aim: { x: number; y: number }, cross: { x: number; y: number }, kind: SwingKind): { x: number; y: number } {
-  const p = SWING_PROFILES[kind];
+export function assistAim(aim: { x: number; y: number }, cross: { x: number; y: number }, kind: SwingKind, mods?: SwingMods): { x: number; y: number } {
+  const p = swingProfile(kind, mods);
   const ideal = { x: cross.x, y: cross.y - IDEAL_UNDERCUT * p.pciHalfHeight };
   const nx = (ideal.x - aim.x) / p.pciHalfWidth;
   const ny = (ideal.y - aim.y) / p.pciHalfHeight;

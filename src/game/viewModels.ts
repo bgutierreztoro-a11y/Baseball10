@@ -1,12 +1,13 @@
-import type { SaveData, Settings, StageDef } from '../contracts';
+import type { CharacterDef, SaveData, Settings, StageDef } from '../contracts';
 import { BATS, MAX_STARS, STAGES } from '../config/campaign';
+import { CHARACTERS, characterById } from '../config/characters';
 import { FT, MPH } from '../config/constants';
 import { PITCHERS, PITCH_TYPES } from '../config/pitches';
 import { STADIUMS, STADIUM_ORDER } from '../config/stadiums';
 import { controlsText, dist, distFt, gameText, goalText, limitText, speedMph, starText } from '../i18n/game';
 import { isBatUnlocked, isStageUnlocked, nextStageId, totalStars } from '../persistence/save';
 import type { Session } from '../sim/session';
-import type { CampaignVM, DerbySetupVM, PracticeVM, ResultsVM, StageIntroVM, TitleVM } from '../ui/api';
+import type { CampaignVM, CharacterStatVM, CharactersVM, DerbySetupVM, PracticeVM, ResultsVM, StageIntroVM, TitleVM } from '../ui/api';
 import type { MatchMode } from './Match';
 
 /** Pure builders from game state to UI view-models (localized strings). */
@@ -27,7 +28,46 @@ export function titleVM(save: SaveData, s: Settings): TitleVM {
     maxStars: MAX_STARS,
     derbyBest: save.derbyBest > 0 ? `${save.derbyBest} HR` : null,
     continueLabel: started ? `${st.id} · ${st.name[s.lang]}` : null,
+    characterName: characterById(save.selectedCharacter).name,
   };
+}
+
+/** Bar value for a multiplier: 0.5 = base batter, ±35 % spans most of the bar. */
+function statBar(label: string, m: number, lang: Settings['lang']): CharacterStatVM {
+  const pct = Math.round((m - 1) * 100);
+  const detail = pct === 0 ? (lang === 'es' ? 'Base' : 'Base') : `${pct > 0 ? '+' : '−'}${Math.abs(pct)} %`;
+  return { label, value: Math.max(0.06, Math.min(1, 0.5 + (m - 1) * 1.4)), detail };
+}
+
+function characterStats(c: CharacterDef, lang: Settings['lang']): CharacterStatVM[] {
+  const { pci, bat } = c.mods;
+  const es = lang === 'es';
+  // Contact = how forgiving + how hard the contact swing is; power = the power swing's bat speed.
+  const contact = pci.contact * Math.sqrt(bat.contact);
+  const power = bat.power * Math.pow(pci.power, 0.25);
+  const reach = (pci.contact + pci.power) / 2;
+  return [statBar(es ? 'Contacto' : 'Contact', contact, lang), statBar(es ? 'Poder' : 'Power', power, lang), statBar(es ? 'Alcance del círculo' : 'Circle reach', reach, lang)];
+}
+
+export function charactersVM(save: SaveData, s: Settings): CharactersVM {
+  return {
+    items: CHARACTERS.map((c) => ({
+      id: c.id,
+      name: c.name,
+      title: c.title[s.lang],
+      bio: c.bio[s.lang],
+      height: s.units === 'metric' || s.lang === 'es' ? `${c.look.heightM.toLocaleString(s.lang, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} m` : feetInches(c.look.heightM),
+      look: c.look,
+      stats: characterStats(c, s.lang),
+      ability: c.ability ? { name: c.ability.name[s.lang], description: c.ability.description[s.lang] } : null,
+      selected: save.selectedCharacter === c.id,
+    })),
+  };
+}
+
+function feetInches(m: number): string {
+  const inches = Math.round(m / 0.0254);
+  return `${Math.floor(inches / 12)}′${inches % 12}″`;
 }
 
 export function campaignVM(save: SaveData, s: Settings, focusStageId?: string): CampaignVM {

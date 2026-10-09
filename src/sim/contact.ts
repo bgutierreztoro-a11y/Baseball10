@@ -6,6 +6,7 @@ import type {
   StadiumDef,
   SwingEvaluation,
   SwingKind,
+  SwingMods,
   TargetDef,
   TimingLabel,
   Vec2,
@@ -63,6 +64,16 @@ export interface SwingInput {
   /** PCI centre on the contact plane (world X/Y). */
   aim: Vec2;
   batter: Hand;
+  /** Character/ability multipliers (defaults to the base batter). */
+  mods?: SwingMods;
+}
+
+/** The swing profile after character/ability multipliers. */
+export function swingProfile(kind: SwingKind, mods?: SwingMods): SwingProfile {
+  const p = SWING_PROFILES[kind];
+  if (!mods) return p;
+  const k = mods.pci[kind];
+  return { ...p, pciHalfWidth: p.pciHalfWidth * k, pciHalfHeight: p.pciHalfHeight * k, batSpeed: p.batSpeed * mods.bat[kind] };
 }
 
 export interface ContactContext {
@@ -97,7 +108,7 @@ export function classifyQuality(evMph: number, la: number): ContactQuality {
 }
 
 export function evaluateSwing(plan: PitchPlan, swing: SwingInput, ctx: ContactContext): SwingEvaluation {
-  const profile = SWING_PROFILES[swing.kind];
+  const profile = swingProfile(swing.kind, swing.mods);
   const dt = swing.contactTime - plan.flightTime;
   const ms = dt * 1000;
   const label = timingLabel(ms, profile);

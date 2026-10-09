@@ -15,10 +15,13 @@
 | Batear | Clic / Espacio / BATEAR / A | Igual |
 | Potencia | Shift / clic derecho / POTENCIA / RT (círculo más pequeño, más distancia) | Igual |
 | Pausa | Esc / P / Start | Igual |
+| Peak (El Moro) | E / botón PEAK / Y | Igual |
 
 Haz swing **un instante antes** de que la bola llegue (el bate tarda ~0,12 s; 0,15 s en potencia). Pon el círculo **un poco por debajo** de la bola para elevarla. Si conectas **temprano** la halas; si conectas **tarde**, va al lado contrario.
 
 **Ayudas (activadas por defecto, se apagan en Ajustes):** una *zona dorada* muestra más o menos por dónde pasará cada lanzamiento (nunca el punto exacto), y el *imán de bateo* acerca el círculo a la bola cuando fallas por poco.
+
+**Bateadores:** El Moro (base, con su *peak máximo* en la tecla E), El Mati (enorme y equilibrado), Arturek (gigante de 7,8 m con cuatro brazos y un círculo enorme) y Chamo (el que más pega, con poco contacto). Se eligen en el menú **Bateadores**.
 
 **Modos:** Campaña (El Solar → Malecón → Metropolitano → La Cumbre → Gran Final), Práctica configurable y Derby (10 outs; un jonrón de 440 ft o más da un out extra).
 
@@ -27,7 +30,7 @@ Haz swing **un instante antes** de que la bola llegue (el bate tarda ~0,12 s; 0,
 ```bash
 npm install
 npm run dev            # http://localhost:5173
-npm test               # 91 tests unitarios y de balance (Vitest)
+npm test               # 99 tests unitarios y de balance (Vitest)
 npm run typecheck      # TypeScript estricto
 npm run e2e            # build + Playwright (WebGL por SwiftShader)
 npm run build          # dist/ (hosting estático)

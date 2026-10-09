@@ -1,5 +1,6 @@
-import type { Lang, SaveData, Settings, StageProgress } from '../contracts';
+import type { CharacterId, Lang, SaveData, Settings, StageProgress } from '../contracts';
 import { BATS, STAGES } from '../config/campaign';
+import { CHARACTERS, DEFAULT_CHARACTER } from '../config/characters';
 
 /**
  * Local-first persistence (docs/adr/ADR-007-local-persistence.md).
@@ -47,6 +48,7 @@ export function defaultSave(lang: Lang = 'es'): SaveData {
     stats: { swings: 0, homeRuns: 0, barrels: 0, longestHRft: 0, maxEVmph: 0 },
     derbyBest: 0,
     selectedBat: BATS[0]!.id,
+    selectedCharacter: DEFAULT_CHARACTER,
     seenTips: [],
   };
 }
@@ -115,6 +117,7 @@ export function migrate(raw: unknown, lang: Lang = 'es'): SaveData {
     },
     derbyBest: num(raw.derbyBest, 0, 0),
     selectedBat: selected,
+    selectedCharacter: CHARACTERS.some((c) => c.id === raw.selectedCharacter) ? (raw.selectedCharacter as CharacterId) : base.selectedCharacter,
     seenTips: Array.isArray(raw.seenTips) ? raw.seenTips.filter((x): x is string => typeof x === 'string') : [],
   };
 }
