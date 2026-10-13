@@ -314,6 +314,16 @@ export interface SwingMods {
   bat: Record<SwingKind, number>;
 }
 
+/** Batter ratings on a 0..25 scale (10 = base batter). */
+export interface BatterRatings {
+  /** Reads the pitch early: bigger PCI for both swings. */
+  vision: number;
+  /** Contact swing: bigger PCI and a bit more bat speed. */
+  contact: number;
+  /** Power swing bat speed. */
+  power: number;
+}
+
 /** Visual build of a batter; consumed by the character renderer. */
 export interface BatterLook {
   skin: string;
@@ -358,6 +368,8 @@ export interface CharacterDef {
   title: LocalizedText;
   bio: LocalizedText;
   look: BatterLook;
+  ratings: BatterRatings;
+  /** Derived from `ratings` (see modsFromRatings). */
   mods: SwingMods;
   ability: CharacterAbility | null;
 }

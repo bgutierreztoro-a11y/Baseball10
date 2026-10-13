@@ -34,10 +34,12 @@ export interface TitleHandlers {
 /** One stat bar on a character card; value is 0..1 relative to the roster. */
 export interface CharacterStatVM {
   label: string;
-  /** 0..1 (0.5 ≈ base batter). */
+  /** 0..1 bar fill. */
   value: number;
-  /** Short qualitative text, e.g. "+35 %" or "Base". */
+  /** Short text next to the bar, e.g. the rating "20". */
   detail: string;
+  /** Colour of the detail compared with the base batter. */
+  tone: 'up' | 'down' | 'base';
 }
 
 export interface CharacterCardVM {

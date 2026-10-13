@@ -221,6 +221,18 @@ function figure(look: BatterLook, cx: number, feet: number, H: number, id: strin
       shade.append(el('path', { d: `M${r(cx + s * u * 0.08)} ${r(y(2.45))}Q${r(cx + s * sh * 0.45)} ${r(y(2.6))} ${r(cx + s * sh * 0.78)} ${r(y(2.0))}`, fill: 'none', stroke: jerseyShade, 'stroke-width': u * 0.07, 'stroke-linecap': 'round' }));
     }
   }
+  if (m > 0.85) {
+    // Shredded: the six-pack shows through a tight jersey (3 rows of 2 pads).
+    const padW = u * 0.13;
+    const padH = u * 0.24;
+    for (let row = 0; row < 3; row++) {
+      for (const s of [-1, 1]) {
+        const px = cx + s * (u * 0.035 + padW / 2);
+        const py = y(2.72 + row * 0.3);
+        shade.append(el('rect', { x: px - padW / 2, y: py, width: padW, height: padH, rx: padW * 0.45, fill: jerseyShade, 'fill-opacity': 0.35, stroke: mix(jersey, INK, 0.35), 'stroke-width': u * 0.045 }));
+      }
+    }
+  }
   g.append(shade);
   // Placket + buttons.
   g.append(el('path', { d: `M${r(cx)} ${r(y(1.55))}L${r(cx)} ${r(beltY)}`, stroke: trim, 'stroke-width': Math.max(1, u * 0.05), fill: 'none' }));
@@ -371,6 +383,12 @@ function figure(look: BatterLook, cx: number, feet: number, H: number, id: strin
     // Short sleeve with a trim band.
     const sl = lerp(shoulder, elbow, 0.44);
     g.append(limb([shoulder, sl], armW * 1.16, jersey));
+    if (m > 0.85) {
+      // Biceps stretching the sleeve, with a crease under the bulge.
+      const bc = lerp(shoulder, elbow, 0.3);
+      g.append(el('ellipse', { cx: bc[0], cy: bc[1], rx: armW * 0.7, ry: armW * 0.66, fill: jersey }));
+      g.append(el('path', { d: `M${r(bc[0] - armW * 0.5)} ${r(bc[1] + armW * 0.25)}Q${r(bc[0])} ${r(bc[1] + armW * 0.6)} ${r(bc[0] + armW * 0.5)} ${r(bc[1] + armW * 0.25)}`, fill: 'none', stroke: jerseyShade, 'stroke-width': u * 0.04, 'stroke-linecap': 'round' }));
+    }
     const band = limb([lerp(shoulder, elbow, 0.37), sl], armW * 1.18, trim);
     band.setAttribute('stroke-linecap', 'butt');
     g.append(band);

@@ -352,13 +352,12 @@ class DomUI implements UI {
       const stats = h('dl', { class: 'bstats' });
       for (const st of c.stats) {
         const v = Math.max(0, Math.min(1, st.value));
-        const tone = /^\s*\+/.test(st.detail) ? 'up' : /^\s*[−-]/.test(st.detail) ? 'down' : 'base';
         stats.append(
           h(
             'div',
             { class: 'bstat' },
             h('dt', null, st.label),
-            h('dd', null, h('span', { class: 'bbar', 'aria-hidden': 'true' }, h('i', { style: `width:${Math.round(v * 100)}%` })), h('span', { class: `bdetail tone-${tone}` }, st.detail)),
+            h('dd', null, h('span', { class: 'bbar', 'aria-hidden': 'true' }, h('i', { style: `width:${Math.round(v * 100)}%` })), h('span', { class: `bdetail tone-${st.tone}` }, st.detail)),
           ),
         );
       }

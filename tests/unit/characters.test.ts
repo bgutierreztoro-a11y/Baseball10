@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MPH } from '../../src/config/constants';
-import { BASE_MODS, CHARACTERS, characterById, combineMods } from '../../src/config/characters';
+import { BASE_MODS, CHARACTERS, characterById, combineMods, modsFromRatings } from '../../src/config/characters';
 import { Rng } from '../../src/core/rng';
 import { defaultSave, migrate } from '../../src/persistence/save';
 import { evaluateSwing, swingProfile, SWING_PROFILES } from '../../src/sim/contact';
@@ -22,7 +22,7 @@ describe('characters', () => {
   it('has the four batters with valid looks and unique ids', () => {
     expect(CHARACTERS.map((c) => c.id).sort()).toEqual(['arturek', 'chamo', 'mati', 'moro']);
     expect(characterById('arturek').look.heightM).toBeGreaterThan(7.5);
-    expect(characterById('chamo').look.heightM).toBeCloseTo(1.88);
+    expect(characterById('chamo').look.heightM).toBeCloseTo(1.9);
     expect(characterById('nope').id).toBe('moro');
   });
 
@@ -31,25 +31,36 @@ describe('characters', () => {
     expect(CHARACTERS.filter((c) => c.ability).map((c) => c.id)).toEqual(['moro']);
   });
 
+  it('uses the requested ratings and derives the mods from them', () => {
+    expect(characterById('arturek').ratings).toEqual({ vision: 20, contact: 5, power: 2 });
+    expect(characterById('chamo').ratings).toEqual({ vision: 10, contact: 5, power: 24 });
+    for (const c of CHARACTERS) expect(c.mods).toEqual(modsFromRatings(c.ratings));
+  });
+
   it('swingProfile scales the PCI and bat speed', () => {
-    const p = swingProfile('contact', mods('arturek'));
-    expect(p.pciHalfWidth).toBeCloseTo(SWING_PROFILES.contact.pciHalfWidth * 1.35);
+    const p = swingProfile('power', mods('arturek'));
+    expect(p.pciHalfWidth).toBeCloseTo(SWING_PROFILES.power.pciHalfWidth * 1.35);
+    expect(p.batSpeed).toBeLessThan(SWING_PROFILES.power.batSpeed);
     expect(swingProfile('power', mods('chamo')).batSpeed).toBeGreaterThan(SWING_PROFILES.power.batSpeed);
   });
 
-  it('Arturek reaches pitches the base batter misses, with both swings', () => {
+  it('Arturek reaches pitches the base batter misses, with both swings, but hits softest', () => {
     for (const kind of ['contact', 'power'] as const) {
-      expect(hit(BASE_MODS, kind, 1.2).kind).toBe('whiff');
-      expect(hit(mods('arturek'), kind, 1.2).kind).toBe('contact');
+      expect(hit(BASE_MODS, kind, 1.1).kind).toBe('whiff');
+      expect(hit(mods('arturek'), kind, 1.1).kind).toBe('contact');
     }
+    const power = CHARACTERS.map((c) => [c.id, ev(hit(c.mods, 'power'))] as const).sort((a, b) => a[1] - b[1]);
+    expect(power[0]![0]).toBe('arturek');
   });
 
-  it('Chamo has the strongest power swing but the smallest contact circle', () => {
+  it('Chamo has the strongest power swing, a base circle and a weaker contact swing', () => {
     const power = CHARACTERS.map((c) => [c.id, ev(hit(c.mods, 'power'))] as const).sort((a, b) => b[1] - a[1]);
     expect(power[0]![0]).toBe('chamo');
     expect(ev(hit(mods('chamo'), 'power'))).toBeGreaterThan(ev(hit(BASE_MODS, 'power')) * 1.08);
-    expect(hit(BASE_MODS, 'contact', 0.85).kind).toBe('contact');
-    expect(hit(mods('chamo'), 'contact', 0.85).kind).toBe('whiff');
+    expect(mods('chamo').pci.power).toBe(1);
+    expect(mods('chamo').pci.contact).toBeLessThan(1);
+    expect(mods('chamo').pci.contact).toBeGreaterThan(0.85);
+    expect(ev(hit(mods('chamo'), 'contact'))).toBeLessThan(ev(hit(BASE_MODS, 'contact')));
   });
 
   it('El Mati is more balanced than Chamo: more power than base, better contact than Chamo', () => {

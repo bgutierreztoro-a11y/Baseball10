@@ -320,6 +320,26 @@ export class Humanoid {
       traps.position.set(0, 0.2, -0.025);
       this.chest.add(traps);
     }
+    if (mus > 0.85) {
+      // Shredded: pecs and a six-pack pushing through the jersey.
+      const pad = geo(`abpad${S}`, () => new THREE.SphereGeometry(0.03, S, S / 2));
+      const absZ = 0.145 * 0.78 * waistD - 0.012;
+      for (let row = 0; row < 3; row++) {
+        for (const side of [-1, 1]) {
+          const p = mesh(pad, M.jersey!);
+          p.scale.set(1.0 * waistW, 0.72, 0.55);
+          p.position.set(side * 0.034 * waistW, 0.11 - row * 0.045, absZ);
+          this.spine.add(p);
+        }
+      }
+      const pec = geo(`pec${S}`, () => new THREE.SphereGeometry(0.07, S, S / 2));
+      for (const side of [-1, 1]) {
+        const p = mesh(pec, M.jersey!);
+        p.scale.set(1.25, 0.8, 0.5);
+        p.position.set(side * 0.07 * chestW, 0.08, 0.17 * 0.74 * chestD - 0.012);
+        this.chest.add(p);
+      }
+    }
     const piping = mesh(geo('piping', () => new THREE.BoxGeometry(0.02, 0.4, 0.02)), M.trim!);
     piping.position.set(0, -0.05, 0.128);
     this.chest.add(piping);
@@ -402,6 +422,13 @@ export class Humanoid {
       const sleeve = mesh(geo(`slv${S}`, () => new THREE.CylinderGeometry(0.07, 0.066, 0.13, S)), M.jersey!);
       sleeve.position.y = 0.06;
       arm.upper.add(sleeve);
+      if (mus > 0.85) {
+        // Biceps bulging under the sleeve and the undershirt.
+        const bi = mesh(geo(`bicep${S}`, () => new THREE.SphereGeometry(0.068, S, S / 2)), M.jersey!);
+        bi.scale.set(1.08, 1.5, 1.08);
+        bi.position.y = 0.03;
+        arm.upper.add(bi);
+      }
     }
     const shoe = (): THREE.Mesh => mesh(footG, M.shoes!);
     this.legL = limb(M.pants!, M.pants!, new THREE.Mesh(), THIGH, SHIN, thighG, shinG, thighT, shinT);
