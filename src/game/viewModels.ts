@@ -1,6 +1,6 @@
 import type { CharacterDef, SaveData, Settings, StageDef } from '../contracts';
 import { BATS, MAX_STARS, STAGES } from '../config/campaign';
-import { CHARACTERS, characterById } from '../config/characters';
+import { BASE_RATING, CHARACTERS, characterById } from '../config/characters';
 import { FT, MPH } from '../config/constants';
 import { PITCHERS, PITCH_TYPES } from '../config/pitches';
 import { STADIUMS, STADIUM_ORDER } from '../config/stadiums';
@@ -32,21 +32,16 @@ export function titleVM(save: SaveData, s: Settings): TitleVM {
   };
 }
 
-/** Bar value for a multiplier: 0.5 = base batter, ±35 % spans most of the bar. */
-function statBar(label: string, m: number, lang: Settings['lang']): CharacterStatVM {
-  const pct = Math.round((m - 1) * 100);
-  const detail = pct === 0 ? (lang === 'es' ? 'Base' : 'Base') : `${pct > 0 ? '+' : '−'}${Math.abs(pct)} %`;
-  return { label, value: Math.max(0.06, Math.min(1, 0.5 + (m - 1) * 1.4)), detail };
+/** Bar for a 0..25 rating: the base batter (10) sits at the bar's midpoint tick; the detail shows the number. */
+function statBar(label: string, rating: number): CharacterStatVM {
+  const tone = rating > BASE_RATING ? 'up' : rating < BASE_RATING ? 'down' : 'base';
+  return { label, value: Math.max(0.04, Math.min(1, rating / (2 * BASE_RATING))), detail: String(rating), tone };
 }
 
 function characterStats(c: CharacterDef, lang: Settings['lang']): CharacterStatVM[] {
-  const { pci, bat } = c.mods;
+  const { vision, contact, power } = c.ratings;
   const es = lang === 'es';
-  // Contact = how forgiving + how hard the contact swing is; power = the power swing's bat speed.
-  const contact = pci.contact * Math.sqrt(bat.contact);
-  const power = bat.power * Math.pow(pci.power, 0.25);
-  const reach = (pci.contact + pci.power) / 2;
-  return [statBar(es ? 'Contacto' : 'Contact', contact, lang), statBar(es ? 'Poder' : 'Power', power, lang), statBar(es ? 'Alcance del círculo' : 'Circle reach', reach, lang)];
+  return [statBar(es ? 'Visión' : 'Vision', vision), statBar(es ? 'Contacto' : 'Contact', contact), statBar(es ? 'Poder' : 'Power', power)];
 }
 
 export function charactersVM(save: SaveData, s: Settings): CharactersVM {

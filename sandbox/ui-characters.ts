@@ -14,7 +14,7 @@ ui.setTouchMode(touch);
 const log = (...a: unknown[]): void => console.log('[ui]', ...a);
 (window as unknown as { __ui: typeof ui }).__ui = ui;
 
-const pct = (k: number): string => (Math.abs(k - 1) < 0.005 ? (lang === 'es' ? 'Base' : 'Base') : `${k > 1 ? '+' : '−'}${Math.round(Math.abs(k - 1) * 100)} %`);
+const stat = (label: string, r: number) => ({ label, value: Math.max(0.04, Math.min(1, r / 20)), detail: String(r), tone: r > 10 ? ('up' as const) : r < 10 ? ('down' as const) : ('base' as const) });
 const fmtH = (m: number): string => (lang === 'es' ? `${m.toFixed(2).replace('.', ',')} m` : `${m.toFixed(2)} m`);
 let selected = (q.get('sel') ?? 'moro') as CharacterId;
 
@@ -28,9 +28,9 @@ function vm(): CharactersVM {
       height: fmtH(c.look.heightM),
       look: c.look,
       stats: [
-        { label: lang === 'es' ? 'Contacto' : 'Contact', value: Math.min(1, 0.5 * c.mods.pci.contact), detail: pct(c.mods.pci.contact) },
-        { label: lang === 'es' ? 'Poder' : 'Power', value: Math.min(1, 0.5 * c.mods.bat.power * (c.mods.pci.power) ** 0.3), detail: pct(c.mods.bat.power) },
-        { label: lang === 'es' ? 'Alcance del círculo' : 'Circle reach', value: Math.min(1, 0.5 * c.mods.pci.power), detail: pct(c.mods.pci.power) },
+        stat(lang === 'es' ? 'Visión' : 'Vision', c.ratings.vision),
+        stat(lang === 'es' ? 'Contacto' : 'Contact', c.ratings.contact),
+        stat(lang === 'es' ? 'Poder' : 'Power', c.ratings.power),
       ],
       ability: c.ability ? { name: c.ability.name[lang], description: c.ability.description[lang] } : null,
       selected: c.id === selected,

@@ -1,4 +1,4 @@
-import type { CharacterDef, CharacterId, SwingMods } from '../contracts';
+import type { BatterRatings, CharacterDef, CharacterId, SwingMods } from '../contracts';
 
 const mods = (contactPci: number, powerPci: number, contactBat: number, powerBat: number): SwingMods => ({
   pci: { contact: contactPci, power: powerPci },
@@ -7,14 +7,34 @@ const mods = (contactPci: number, powerPci: number, contactBat: number, powerBat
 
 export const BASE_MODS: SwingMods = mods(1, 1, 1, 1);
 
+/** Rating of the base batter in every category. */
+export const BASE_RATING = 10;
+
 /**
- * Playable batters. Stats are multipliers on the base swing profiles:
+ * Turns the 0..25 ratings into swing multipliers (10 = base batter):
+ * - vision → PCI size for both swings (+3.5 % per point);
+ * - contact → contact-swing PCI (+2 % per point) and bat speed (+1 % per point);
+ * - power → power-swing bat speed (+1 % per point).
+ */
+export function modsFromRatings(r: BatterRatings): SwingMods {
+  const vision = 1 + 0.035 * (r.vision - BASE_RATING);
+  const contact = r.contact - BASE_RATING;
+  return mods(vision * (1 + 0.02 * contact), vision, 1 + 0.01 * contact, 1 + 0.01 * (r.power - BASE_RATING));
+}
+
+const rated = (vision: number, contact: number, power: number) => {
+  const ratings = { vision, contact, power };
+  return { ratings, mods: modsFromRatings(ratings) };
+};
+
+/**
+ * Playable batters. Ratings (0..25, 10 = base) drive the swing multipliers:
  * PCI size (how forgiving the aim is) and bat speed (exit velocity).
  * Balance intent:
  * - El Moro: the base model, plus a once-per-match "peak" boost.
  * - El Mati: all-rounder with a bit more pop; his size blocks more of the view.
- * - Arturek: huge reach → much bigger PCI for both swings, average power.
- * - Chamo: the strongest power swing, but a small contact PCI.
+ * - Arturek: huge vision → much bigger PCI for both swings, but almost no power.
+ * - Chamo: the strongest power swing, average vision, below-average contact.
  */
 export const CHARACTERS: readonly CharacterDef[] = [
   {
@@ -26,6 +46,7 @@ export const CHARACTERS: readonly CharacterDef[] = [
       en: 'A perfectly ordinary hitter… until his online girlfriend, "iluvkiwiss", cheers from the stands. He has no idea that behind iluvkiwiss’s profile is a guy named Ramiro.',
     },
     look: { skin: '#b07a4f', hair: '#1c130d', heightM: 1.85, build: 1, belly: 0, muscle: 0.2, extraArms: false, beard: true, horns: false, hornBat: false, jersey: '#f4f1e8', trim: '#d7263d', number: '7' },
+    ratings: { vision: BASE_RATING, contact: BASE_RATING, power: BASE_RATING },
     mods: BASE_MODS,
     ability: {
       kind: 'peak',
@@ -48,7 +69,7 @@ export const CHARACTERS: readonly CharacterDef[] = [
       en: 'Inspired by David "Big Papi" Ortiz. Huge, calm and always dangerous: hits well for contact and power. He fills so much of the batter’s box that he blocks a good part of the view.',
     },
     look: { skin: '#3a2318', hair: null, heightM: 1.93, build: 1.95, belly: 1, muscle: 0.3, extraArms: false, beard: true, horns: false, hornBat: false, jersey: '#f4f1e8', trim: '#2563c9', number: '34' },
-    mods: mods(1.0, 1.08, 1.04, 1.07),
+    ...rated(10, 14, 17),
     ability: null,
   },
   {
@@ -56,11 +77,11 @@ export const CHARACTERS: readonly CharacterDef[] = [
     name: 'Arturek',
     title: { es: 'El Gigante de Bratislava', en: 'The Giant of Bratislava' },
     bio: {
-      es: 'Rubio, eslovaco y de casi 8 metros. Con sus cuatro brazos alcanza casi cualquier lanzamiento: su círculo es mucho más grande, tanto de contacto como de poder.',
-      en: 'Blond, Slovak and almost 8 metres tall. With four arms he reaches almost any pitch: his circle is much bigger for both contact and power swings.',
+      es: 'Rubio, eslovaco y de casi 8 metros. Desde allá arriba lo ve todo y con sus cuatro brazos alcanza casi cualquier lanzamiento: su círculo es mucho más grande. Eso sí, le pega flojito.',
+      en: 'Blond, Slovak and almost 8 metres tall. From up there he sees everything, and with four arms he reaches almost any pitch: his circle is much bigger. He just doesn’t hit it very hard.',
     },
     look: { skin: '#f1d2bd', hair: '#f2d16b', heightM: 7.8, build: 1, belly: 0, muscle: 0.2, extraArms: true, beard: false, horns: false, hornBat: false, jersey: '#f4f1e8', trim: '#2fa36b', number: '99' },
-    mods: mods(1.35, 1.35, 1.0, 1.0),
+    ...rated(20, 5, 2),
     ability: null,
   },
   {
@@ -68,11 +89,11 @@ export const CHARACTERS: readonly CharacterDef[] = [
     name: 'Chamo',
     title: { es: 'El Roto', en: 'The Shredded' },
     bio: {
-      es: 'Inspirado en Barry Bonds. 1,88 m de puro músculo y un par de cuernos de villano. No usa bate de madera: le pega a la pelota con un cuerno gigante. Su swing de poder es el más fuerte del juego, pero su círculo de contacto es pequeño.',
-      en: 'Inspired by Barry Bonds. 1.88 m of pure muscle and a pair of villain horns. He doesn’t use a wooden bat: he hits the ball with a giant horn. The strongest power swing in the game, but a small contact circle.',
+      es: '1,90 m, marcado de pies a cabeza: el six-pack y los bíceps se le notan a través de la camiseta. Tiene un par de cuernos de villano y no usa bate de madera: le pega a la pelota con un cuerno gigante. Su swing está inspirado en el de Barry Bonds y es el más potente del juego, aunque su contacto es flojo.',
+      en: '1.90 m and shredded head to toe: his six-pack and biceps show through the jersey. He has a pair of villain horns and doesn’t use a wooden bat: he hits the ball with a giant horn. His swing is modelled on Barry Bonds’s and is the most powerful in the game, though his contact is weak.',
     },
-    look: { skin: '#5a3825', hair: null, heightM: 1.88, build: 1.12, belly: 0, muscle: 1, extraArms: false, beard: false, horns: true, hornBat: true, jersey: '#f4f1e8', trim: '#f28c28', number: '25' },
-    mods: mods(0.78, 1.0, 0.95, 1.14),
+    look: { skin: '#f0cdb4', hair: null, heightM: 1.9, build: 1.12, belly: 0, muscle: 1, extraArms: false, beard: false, horns: true, hornBat: true, jersey: '#f4f1e8', trim: '#f28c28', number: '25' },
+    ...rated(10, 5, 24),
     ability: null,
   },
 ];
