@@ -141,7 +141,7 @@ export class Match {
       this.targets = [];
     }
     const w = deps.world;
-    w.pitcher.setLook({ ...this.pitcherDef.look, ...deps.character.pitcherKit }, this.selector.hand ?? this.pitcherDef.hand);
+    w.setPitcherLook(this.pitcherDef.look, this.selector.hand ?? this.pitcherDef.hand);
     w.setHandedness(deps.settings().handedness);
     w.stadium.setTargets(this.targets);
     w.fx.clearMarkers();

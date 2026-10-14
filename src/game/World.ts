@@ -1,9 +1,9 @@
 import * as THREE from 'three';
-import type { CharacterDef, CharacterId, Hand, QualitySettings, StadiumDef } from '../contracts';
+import type { CharacterDef, CharacterId, CharacterLook, Hand, QualitySettings, StadiumDef } from '../contracts';
 import { MOUND, RUBBER_Z } from '../config/constants';
 import { characterById, DEFAULT_CHARACTER } from '../config/characters';
 import type { BallView, BatterRig, CatcherRig, Effects, PitcherRig, StadiumView, UmpireRig } from '../render/api';
-import { characters } from '../render/characters';
+import { characters, DEFAULT_PITCHER_LOOK } from '../render/characters';
 import { createBallView, createEffects } from '../render/fx';
 import type { Renderer } from '../render/Renderer';
 import { createStadium } from '../render/stadium';
@@ -29,6 +29,8 @@ export class World {
   private batterRig: BatterRig;
   private characterId: CharacterId = DEFAULT_CHARACTER;
   private batColors: [string, string] | null = null;
+  /** Look the pitcher has without the batter's `pitcherKit` (re-dressed whenever the batter changes). */
+  private pitcherBase: { look: CharacterLook; hand: Hand } = { look: DEFAULT_PITCHER_LOOK, hand: 'R' };
   private playersVisible = true;
 
   constructor(renderer: Renderer, def: StadiumDef) {
@@ -72,6 +74,7 @@ export class World {
   setCharacter(def: CharacterDef): void {
     if (def.id === this.characterId) return;
     this.characterId = def.id;
+    this.dressPitcher();
     const old = this.batterRig;
     old.dispose();
     const rig = this.adopt(characters.createBatter(this.quality, def.look));
@@ -80,6 +83,17 @@ export class World {
     this.group.add(rig.root);
     if (this.batColors) rig.setBatColors(this.batColors[0], this.batColors[1]);
     this.setHandedness(this.hand);
+  }
+
+  /** Sets the pitcher's own look; the current batter's `pitcherKit` (e.g. Chamo's Southampton shirt) is layered on top. */
+  setPitcherLook(look: CharacterLook, hand: Hand): void {
+    this.pitcherBase = { look, hand };
+    this.dressPitcher();
+  }
+
+  private dressPitcher(): void {
+    const { look, hand } = this.pitcherBase;
+    this.pitcher.setLook({ ...look, ...characterById(this.characterId).pitcherKit }, hand);
   }
 
   /** Bat colours for the current and any future batter rig. */
