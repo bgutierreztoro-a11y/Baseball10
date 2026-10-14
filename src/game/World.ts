@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import type { CharacterDef, CharacterId, Hand, QualitySettings, StadiumDef } from '../contracts';
+import type { CharacterDef, CharacterId, CharacterLook, Hand, QualitySettings, StadiumDef } from '../contracts';
 import { MOUND, RUBBER_Z } from '../config/constants';
 import { characterById, DEFAULT_CHARACTER } from '../config/characters';
 import type { BallView, BatterRig, CatcherRig, Effects, PitcherRig, StadiumView, UmpireRig } from '../render/api';
-import { characters } from '../render/characters';
-import { createBallView, createEffects } from '../render/fx';
+import { characters, DEFAULT_PITCHER_LOOK } from '../render/characters';
+import { createBallView, createEffects, PitcherBadge } from '../render/fx';
 import type { Renderer } from '../render/Renderer';
 import { createStadium } from '../render/stadium';
 import { ZoneOverlay } from '../render/ZoneOverlay';
@@ -29,7 +29,11 @@ export class World {
   private batterRig: BatterRig;
   private characterId: CharacterId = DEFAULT_CHARACTER;
   private batColors: [string, string] | null = null;
+  /** Look the pitcher has without the batter's `pitcherKit` (re-dressed whenever the batter changes). */
+  private pitcherBase: { look: CharacterLook; hand: Hand } = { look: DEFAULT_PITCHER_LOOK, hand: 'R' };
   private playersVisible = true;
+  private matchActive = false;
+  private readonly pitcherBadge = new PitcherBadge();
 
   constructor(renderer: Renderer, def: StadiumDef) {
     this.renderer = renderer;
@@ -49,7 +53,8 @@ export class World {
     this.ball = createBallView(this.quality);
     this.fx = createEffects(this.quality);
     this.zone = new ZoneOverlay();
-    this.group.add(this.batter.root, this.pitcher.root, this.catcher.root, this.umpire.root, this.ball.root, this.fx.root, this.zone.group);
+    this.pitcherBadge.setAnchor(0, MOUND.height, RUBBER_Z);
+    this.group.add(this.pitcherBadge.root, this.batter.root, this.pitcher.root, this.catcher.root, this.umpire.root, this.ball.root, this.fx.root, this.zone.group);
     scene.add(this.group);
     this.setHandedness('R');
     this.ball.setVisible(false);
@@ -72,6 +77,8 @@ export class World {
   setCharacter(def: CharacterDef): void {
     if (def.id === this.characterId) return;
     this.characterId = def.id;
+    this.dressPitcher();
+    this.syncPitcherBadge();
     const old = this.batterRig;
     old.dispose();
     const rig = this.adopt(characters.createBatter(this.quality, def.look));
@@ -80,6 +87,27 @@ export class World {
     this.group.add(rig.root);
     if (this.batColors) rig.setBatColors(this.batColors[0], this.batColors[1]);
     this.setHandedness(this.hand);
+  }
+
+  /** Sets the pitcher's own look; the current batter's `pitcherKit` (e.g. Chamo's Southampton shirt) is layered on top. */
+  setPitcherLook(look: CharacterLook, hand: Hand): void {
+    this.pitcherBase = { look, hand };
+    this.dressPitcher();
+  }
+
+  /** The crest over the pitcher shows only while a match is on and the batter has one. */
+  setMatchActive(v: boolean): void {
+    this.matchActive = v;
+    this.syncPitcherBadge();
+  }
+
+  private syncPitcherBadge(): void {
+    this.pitcherBadge.setVisible(this.matchActive && this.playersVisible && !!characterById(this.characterId).pitcherBadge);
+  }
+
+  private dressPitcher(): void {
+    const { look, hand } = this.pitcherBase;
+    this.pitcher.setLook({ ...look, ...characterById(this.characterId).pitcherKit }, hand);
   }
 
   /** Bat colours for the current and any future batter rig. */
@@ -117,7 +145,7 @@ export class World {
    * on compilation exactly when the player is timing the swing.
    */
   warmUp(): void {
-    const roots = [this.batter.root, this.pitcher.root, this.catcher.root, this.umpire.root, this.zone.group];
+    const roots = [this.batter.root, this.pitcher.root, this.catcher.root, this.umpire.root, this.zone.group, this.pitcherBadge.root];
     const was = roots.map((o) => o.visible);
     roots.forEach((o) => (o.visible = true));
     this.catcher.setGhost(0.28);
@@ -159,6 +187,7 @@ export class World {
     this.playersVisible = v;
     for (const o of [this.batter.root, this.pitcher.root, this.catcher.root, this.umpire.root]) o.visible = v;
     this.zone.group.visible = v;
+    this.syncPitcherBadge();
   }
 
   update(dt: number, elapsed: number, excitement: number, camera: THREE.Camera): void {
@@ -170,12 +199,14 @@ export class World {
     this.ball.update(dt);
     this.fx.update(dt, camera);
     this.zone.update(dt);
+    this.pitcherBadge.update(elapsed);
   }
 
   dispose(): void {
     this.renderer.scene.remove(this.group);
     this.stadium.dispose();
     this.zone.dispose();
+    this.pitcherBadge.dispose();
     this.group.traverse((o) => {
       if (o instanceof THREE.Mesh || o instanceof THREE.Points || o instanceof THREE.Sprite) {
         o.geometry?.dispose();

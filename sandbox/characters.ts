@@ -77,7 +77,7 @@ r.scene.add(pitcher.root);
 if (view !== 'lineup') r.scene.add(catcher.root, ump.root);
 pitcher.root.position.set(0, MOUND.height, RUBBER_Z);
 pitcher.root.rotation.y = Math.PI;
-pitcher.setLook(PITCHERS.mago!.look, (q.get('phand') ?? 'R') as Hand);
+pitcher.setLook({ ...PITCHERS.mago!.look, ...characterById(q.get('char') ?? 'moro').pitcherKit }, (q.get('phand') ?? 'R') as Hand);
 catcher.root.position.set(0, 0, -0.95);
 ump.root.position.set(hand === 'R' ? -1.3 : 1.3, 0, -1.7);
 catcher.setTarget(aimX, aimY);

@@ -89,6 +89,9 @@ PITCH_READY.kneePoleR.set(-0.2, 0, 1);
 
 type PitcherState = 'set' | 'delivery';
 
+/** Look of the pitcher before any match has set one (title / character screens). */
+export const DEFAULT_PITCHER_LOOK: CharacterLook = { skin: '#c68c5a', jersey: '#ffffff', jerseyTrim: '#d7263d', pants: '#dddddd', cap: '#d7263d', build: 1 };
+
 class Pitcher implements PitcherRig {
   readonly root: THREE.Group;
   private h: Humanoid;
@@ -105,7 +108,7 @@ class Pitcher implements PitcherRig {
   constructor(quality: QualitySettings) {
     this.quality = quality;
     this.root = new THREE.Group();
-    this.h = this.build({ skin: '#c68c5a', jersey: '#ffffff', jerseyTrim: '#d7263d', pants: '#dddddd', cap: '#d7263d', build: 1 }, 'R');
+    this.h = this.build(DEFAULT_PITCHER_LOOK, 'R');
     this.ball = this.makeBall();
     this.glove = this.makeGlove();
     this.attach();
@@ -113,7 +116,7 @@ class Pitcher implements PitcherRig {
 
   private build(look: CharacterLook, hand: Hand): Humanoid {
     const h = new Humanoid(
-      { skin: look.skin, jersey: look.jersey, trim: look.jerseyTrim, sleeve: look.cap, pants: look.pants, socks: look.cap, shoes: '#111216', hat: look.cap, build: look.build, number: '' },
+      { skin: look.skin, jersey: look.jersey, trim: look.jerseyTrim, sleeve: look.cap, pants: look.pants, socks: look.socks ?? look.cap, jerseyStripe: look.jerseyStripe, shoes: '#111216', hat: look.cap, build: look.build, number: '' },
       this.quality,
     );
     const capMat = h.materials.hat!;
