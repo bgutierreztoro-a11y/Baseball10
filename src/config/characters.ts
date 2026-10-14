@@ -95,6 +95,8 @@ export const CHARACTERS: readonly CharacterDef[] = [
     look: { skin: '#f0cdb4', hair: null, heightM: 1.9, build: 1.12, belly: 0, muscle: 1, extraArms: false, beard: false, horns: true, hornBat: true, jersey: '#f4f1e8', trim: '#f28c28', number: '25' },
     ...rated(10, 5, 24),
     ability: null,
+    // The pitcher facing Chamo wears a Southampton FC home kit (red/white stripes, black shorts).
+    pitcherKit: { jersey: '#d71920', jerseyStripe: '#ffffff', jerseyTrim: '#111111', pants: '#141414', cap: '#d71920', socks: '#ffffff' },
   },
 ];
 

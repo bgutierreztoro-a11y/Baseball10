@@ -137,6 +137,10 @@ export interface CharacterLook {
   cap: string;
   /** 0.9..1.15 */
   build: number;
+  /** Second jersey colour: turns the jersey into vertical stripes (jersey / this). */
+  jerseyStripe?: string;
+  /** Sock colour; defaults to the cap colour. */
+  socks?: string;
 }
 
 export interface PitcherDef {
@@ -372,4 +376,6 @@ export interface CharacterDef {
   /** Derived from `ratings` (see modsFromRatings). */
   mods: SwingMods;
   ability: CharacterAbility | null;
+  /** Overrides applied to the pitcher's look while this character is at the plate. */
+  pitcherKit?: Partial<CharacterLook>;
 }

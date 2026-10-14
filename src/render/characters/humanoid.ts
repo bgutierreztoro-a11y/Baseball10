@@ -25,6 +25,8 @@ export interface Outfit {
   build?: number;
   /** Number printed on the back of the jersey. */
   number?: string;
+  /** Second jersey colour: vertical stripes alternating `jersey` / `jerseyStripe`. */
+  jerseyStripe?: string;
 }
 
 /**
@@ -223,7 +225,7 @@ export class Humanoid {
     const mat = (color: string, rough = 0.7): THREE.MeshStandardMaterial => new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: 0 });
     this.materials = {
       skin: mat(outfit.skin, 0.6),
-      jersey: mat(outfit.jersey, 0.75),
+      jersey: outfit.jerseyStripe ? stripedMat(outfit.jersey, outfit.jerseyStripe, 0.75) : mat(outfit.jersey, 0.75),
       trim: mat(outfit.trim, 0.6),
       sleeve: mat(outfit.sleeve, 0.7),
       pants: mat(outfit.pants, 0.8),
@@ -684,6 +686,24 @@ function placeSegment(m: THREE.Object3D, from: THREE.Vector3, to: THREE.Vector3,
   segDir.subVectors(to, from).normalize();
   q.setFromUnitVectors(UP, segDir);
   m.quaternion.copy(q);
+}
+
+/** Jersey material with vertical stripes (u wraps around every torso/sleeve primitive). */
+function stripedMat(a: string, b: string, rough: number): THREE.MeshStandardMaterial {
+  const c = document.createElement('canvas');
+  c.width = 128;
+  c.height = 4;
+  const ctx = c.getContext('2d')!;
+  ctx.fillStyle = a;
+  ctx.fillRect(0, 0, 64, 4);
+  ctx.fillStyle = b;
+  ctx.fillRect(64, 0, 64, 4);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = THREE.RepeatWrapping;
+  t.repeat.set(5, 1);
+  t.magFilter = THREE.NearestFilter;
+  return new THREE.MeshStandardMaterial({ color: '#ffffff', map: t, roughness: rough, metalness: 0 });
 }
 
 function numberTexture(text: string, color: string): THREE.CanvasTexture {

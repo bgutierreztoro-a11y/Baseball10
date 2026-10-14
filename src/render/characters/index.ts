@@ -113,7 +113,7 @@ class Pitcher implements PitcherRig {
 
   private build(look: CharacterLook, hand: Hand): Humanoid {
     const h = new Humanoid(
-      { skin: look.skin, jersey: look.jersey, trim: look.jerseyTrim, sleeve: look.cap, pants: look.pants, socks: look.cap, shoes: '#111216', hat: look.cap, build: look.build, number: '' },
+      { skin: look.skin, jersey: look.jersey, trim: look.jerseyTrim, sleeve: look.cap, pants: look.pants, socks: look.socks ?? look.cap, jerseyStripe: look.jerseyStripe, shoes: '#111216', hat: look.cap, build: look.build, number: '' },
       this.quality,
     );
     const capMat = h.materials.hat!;
