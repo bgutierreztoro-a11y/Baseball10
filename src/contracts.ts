@@ -378,4 +378,6 @@ export interface CharacterDef {
   ability: CharacterAbility | null;
   /** Overrides applied to the pitcher's look while this character is at the plate. */
   pitcherKit?: Partial<CharacterLook>;
+  /** A club crest hovers over the pitcher (bobbing like a little cloud) during matches. */
+  pitcherBadge?: boolean;
 }

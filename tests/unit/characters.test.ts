@@ -29,6 +29,8 @@ describe('characters', () => {
   it('only Chamo makes the pitcher wear the Southampton striped kit', () => {
     expect(CHARACTERS.filter((c) => c.pitcherKit).map((c) => c.id)).toEqual(['chamo']);
     expect(characterById('chamo').pitcherKit).toMatchObject({ jersey: '#d71920', jerseyStripe: '#ffffff' });
+    // The crest hovering over that pitcher is Chamo's only too.
+    expect(CHARACTERS.filter((c) => c.pitcherBadge).map((c) => c.id)).toEqual(['chamo']);
   });
 
   it('El Moro is the base model and only he has an ability', () => {

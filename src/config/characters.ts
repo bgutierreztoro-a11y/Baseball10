@@ -97,6 +97,7 @@ export const CHARACTERS: readonly CharacterDef[] = [
     ability: null,
     // The pitcher facing Chamo wears a Southampton FC home kit (red/white stripes, black shorts).
     pitcherKit: { jersey: '#d71920', jerseyStripe: '#ffffff', jerseyTrim: '#111111', pants: '#141414', cap: '#d71920', socks: '#ffffff' },
+    pitcherBadge: true,
   },
 ];
 

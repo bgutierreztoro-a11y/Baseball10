@@ -146,6 +146,7 @@ export class Match {
     w.stadium.setTargets(this.targets);
     w.fx.clearMarkers();
     w.setPlayersVisible(true);
+    w.setMatchActive(true);
     w.ball.setVisible(false);
     w.batter.reset();
     w.catcher.reset();
@@ -248,6 +249,7 @@ export class Match {
   }
 
   dispose(): void {
+    this.d.world.setMatchActive(false);
     this.d.input.enabled = false;
     this.d.ui.showTip(null);
   }
