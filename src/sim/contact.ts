@@ -143,25 +143,32 @@ export function evaluateSwing(plan: PitchPlan, swing: SwingInput, ctx: ContactCo
   let spray = handSign * tN * 38 - (ball.x / 0.25) * 7 + rng.gaussian() * 2;
   spray = Math.max(-89, Math.min(89, spray));
 
+  return { kind: 'contact', timingMs: ms, timing: label, ball: launchBall(ball, ev, la, spray, ctx) };
+}
+
+/** Flies a batted ball from `at` and classifies it (shared by every swing model). */
+function launchBall(at: { x: number; y: number; z: number }, ev: number, la: number, spray: number, ctx: ContactContext): BattedBall {
   const evMph = ev / MPH;
   const spinRpm = la >= 0 ? Math.min(3000, 500 + 50 * la) : Math.max(-1800, -300 + 40 * la);
   const quality = classifyQuality(evMph, la);
+  // Past the foul lines the ball is pure sidespin; behind the plate it barely curves.
+  const sideSpin = Math.max(-1, Math.min(1, (Math.abs(spray) > 90 ? Math.sign(spray) * (180 - Math.abs(spray)) : spray) / 45));
 
   const flight = simulateFlight(
     {
-      position: { x: ball.x, y: ball.y, z: ball.z },
+      position: { x: at.x, y: at.y, z: at.z },
       exitVelocity: ev,
       launchAngleDeg: la,
       sprayAngleDeg: spray,
       spinRpm,
-      sideSpin: Math.max(-1, Math.min(1, spray / 45)),
+      sideSpin,
     },
     ctx.stadium,
   );
 
   const outcome = flight.outcome === 'inPlay' ? classifyInPlay(evMph, la, flight.hitWall, flight.distance, ctx.stadium, flight.landing) : flight.outcome;
 
-  const batted: BattedBall = {
+  return {
     exitVelocity: ev,
     launchAngleDeg: la,
     sprayAngleDeg: spray,
@@ -179,8 +186,38 @@ export function evaluateSwing(plan: PitchPlan, swing: SwingInput, ctx: ContactCo
     trajectory: flight.trajectory,
     targetsHit: outcome === 'foul' ? [] : targetsHit(flight.trajectory, ctx.targets, flight.firstBounceIndex),
   };
+}
 
-  return { kind: 'contact', timingMs: ms, timing: label, ball: batted };
+/** Exit velocity of a maximum-power wild swing (m/s, ≈ 120 mph). */
+export const WILD_MAX_EV = 120 * MPH;
+
+/**
+ * Chimon's racket: whatever the timing or aim, a ball he touches leaves at
+ * maximum power. With probability `homeRunChance` it is a no-doubt home run;
+ * otherwise it flies off in any foul direction — down the lines, straight up
+ * or backwards over the screen — so it can never score. Whiffs are untouched.
+ */
+export function wildSwing(evaluation: SwingEvaluation, plan: PitchPlan, ctx: ContactContext, homeRunChance: number): SwingEvaluation {
+  if (evaluation.kind !== 'contact') return evaluation;
+  const rng = ctx.rng;
+  const at = plan.plateCross;
+  if (rng.next() < homeRunChance) {
+    // Dead-centre, perfect launch; more speed only if a deep park keeps it in.
+    const spray = rng.range(-28, 28);
+    let ball = launchBall(at, WILD_MAX_EV * rng.range(0.98, 1.02), rng.range(25, 31), spray, ctx);
+    for (let k = 1.05; ball.outcome !== 'homeRun' && k < 1.5; k += 0.05) ball = launchBall(at, WILD_MAX_EV * k, 29, spray * 0.5, ctx);
+    return { ...evaluation, ball };
+  }
+  // Any foul direction: past either line (|spray| > 45°) all the way round to
+  // straight back (180°), at any launch angle from a chopper to a sky-high pop.
+  for (let i = 0; i < 12; i++) {
+    const side = rng.next() < 0.5 ? -1 : 1;
+    const spray = side * rng.range(58, 180);
+    const ball = launchBall(at, WILD_MAX_EV * rng.range(0.95, 1.03), rng.range(-12, 78), spray, ctx);
+    if (ball.outcome === 'foul') return { ...evaluation, ball };
+  }
+  // Fallback that is always foul: straight back over the screen.
+  return { ...evaluation, ball: launchBall(at, WILD_MAX_EV, 40, 180, ctx) };
 }
 
 /**

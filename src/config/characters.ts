@@ -35,6 +35,9 @@ const rated = (vision: number, contact: number, power: number) => {
  * - El Mati: all-rounder with a bit more pop; his size blocks more of the view.
  * - Arturek: huge vision → much bigger PCI for both swings, but almost no power.
  * - Chamo: the strongest power swing, average vision, below-average contact.
+ * - Chimon: a monkey with a tennis racket — the big string bed is easy to hit
+ *   with, but every ball he touches leaves at max power: 30 % home runs, 70 %
+ *   wild fouls in any direction (wildSwing). Whiffs make him angry (temper).
  */
 export const CHARACTERS: readonly CharacterDef[] = [
   {
@@ -98,6 +101,29 @@ export const CHARACTERS: readonly CharacterDef[] = [
     // The pitcher facing Chamo wears a Southampton FC home kit (red/white stripes, black shorts).
     pitcherKit: { jersey: '#d71920', jerseyStripe: '#ffffff', jerseyTrim: '#111111', pants: '#141414', cap: '#d71920', socks: '#ffffff' },
     pitcherBadge: true,
+  },
+  {
+    id: 'chimon',
+    name: 'Chimon',
+    title: { es: 'El Mono Tenista', en: 'The Tennis Monkey' },
+    bio: {
+      es: 'Un mono que se coló en el estadio con su raqueta de tenis y se niega a soltarla. Con esa cabeza de cuerdas le pega a casi todo y siempre con toda su fuerza… pero sin ninguna dirección. Si falla muchas veces seguidas se enoja y se pone rojo como un tomate. Cuando él batea, el lanzador es un pollo.',
+      en: 'A monkey who snuck into the ballpark with his tennis racket and refuses to let go of it. With that string bed he hits almost anything, always as hard as he can… but with no direction at all. Miss too many in a row and he gets angry and turns red as a tomato. When he bats, the pitcher is a chicken.',
+    },
+    look: { skin: '#7a4a2a', hair: null, heightM: 1.6, build: 1, belly: 0.25, muscle: 0.3, extraArms: false, beard: false, horns: false, hornBat: false, monkey: true, racket: true, jersey: '#fdfcf7', trim: '#c9d82b', number: '1' },
+    ...rated(15, 12, 25),
+    ability: null,
+    trait: {
+      name: { es: 'Raquetazo salvaje', en: 'Wild Racket' },
+      description: {
+        es: 'Cada pelota que toca sale a máxima potencia: 30 % jonrón seguro y 70 % foul hacia cualquier lado, hasta hacia atrás (nunca puntúa). Si abanica 3 veces seguidas se enoja y se pone rojo.',
+        en: 'Every ball he touches leaves at max power: 30 % a sure home run, 70 % a foul in any direction, even backwards (never scores). Whiff 3 times in a row and he gets angry and turns red.',
+      },
+    },
+    wildSwing: { homeRunChance: 0.3 },
+    temper: { whiffs: 3 },
+    // When Chimon bats, the pitcher is a chicken.
+    pitcherKit: { skin: '#fbf7ec', jersey: '#fbf7ec', jerseyTrim: '#e8c547', pants: '#fbf7ec', cap: '#d9262c', socks: '#f2a516', shoes: '#f2a516', chicken: true },
   },
 ];
 

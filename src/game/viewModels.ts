@@ -54,7 +54,7 @@ export function charactersVM(save: SaveData, s: Settings): CharactersVM {
       height: s.units === 'metric' || s.lang === 'es' ? `${c.look.heightM.toLocaleString(s.lang, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} m` : feetInches(c.look.heightM),
       look: c.look,
       stats: characterStats(c, s.lang),
-      ability: c.ability ? { name: c.ability.name[s.lang], description: c.ability.description[s.lang] } : null,
+      ability: c.ability ? { name: c.ability.name[s.lang], description: c.ability.description[s.lang] } : c.trait ? { name: c.trait.name[s.lang], description: c.trait.description[s.lang] } : null,
       selected: save.selectedCharacter === c.id,
     })),
   };

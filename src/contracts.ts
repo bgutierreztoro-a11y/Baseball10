@@ -141,6 +141,10 @@ export interface CharacterLook {
   jerseyStripe?: string;
   /** Sock colour; defaults to the cap colour. */
   socks?: string;
+  /** Shoe colour (dark cleats by default). */
+  shoes?: string;
+  /** A chicken instead of a person: beak, red comb and wattle, tail feathers and wings. */
+  chicken?: boolean;
 }
 
 export interface PitcherDef {
@@ -308,7 +312,7 @@ export interface BatDef {
 
 // ───────────────────────────── Playable characters ─────────────────────────────
 
-export type CharacterId = 'moro' | 'mati' | 'arturek' | 'chamo';
+export type CharacterId = 'moro' | 'mati' | 'arturek' | 'chamo' | 'chimon';
 
 /** Multipliers applied to a swing profile (1 = base batter). */
 export interface SwingMods {
@@ -348,6 +352,10 @@ export interface BatterLook {
   horns: boolean;
   /** Bats with a giant horn instead of a wooden bat. */
   hornBat: boolean;
+  /** A monkey instead of a person: fur, muzzle, big ears, tail and a sweatband instead of a helmet. */
+  monkey?: boolean;
+  /** Bats with a tennis racket instead of a wooden bat. */
+  racket?: boolean;
   jersey: string;
   trim: string;
   number: string;
@@ -380,4 +388,14 @@ export interface CharacterDef {
   pitcherKit?: Partial<CharacterLook>;
   /** A club crest hovers over the pitcher (bobbing like a little cloud) during matches. */
   pitcherBadge?: boolean;
+  /** Passive trait shown on the batter card (characters without an activated ability). */
+  trait?: { name: LocalizedText; description: LocalizedText };
+  /**
+   * Every ball he connects with leaves at maximum power: `homeRunChance` of
+   * them are guaranteed home runs, the rest fly off in any foul direction
+   * (even backwards) and never score.
+   */
+  wildSwing?: { homeRunChance: number };
+  /** Gets angry (turns red) after this many whiffs in a row; contact calms him down. */
+  temper?: { whiffs: number };
 }

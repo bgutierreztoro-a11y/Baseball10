@@ -1,10 +1,10 @@
 // Visual QA for characters.
-//   ?char=moro|mati|arturek|chamo (batter)   &peak=1 (golden aura)   &live=1 (interactive panel)
+//   ?char=moro|mati|arturek|chamo|chimon (batter)   &peak=1 (golden aura)   &angry=1 (red tint)   &live=1 (interactive panel)
 //   &view=batting (game camera)|side|front|pitcher|closeup|back|profile|rear|face|lineup  (&zoom=, &ly= for profile/rear)
 //   &zone=1 (strike-zone outline)  &marker=0 (hide aim/sweet-spot markers)  &debug=1 (log arm IK overreach per step)
 //   &pose=stance|load|mid|contact|follow|celebrate|whiff|delivery|release|follow2|strike
 //   &aimX=0&aimY=0.8&hand=R|L&kind=contact|power
-// view=lineup shows all four batters side by side, each at its own plate (seen from the mound side).
+// view=lineup shows every batter side by side, each at its own plate (seen from the mound side).
 import * as THREE from 'three';
 import { STADIUMS } from '../src/config/stadiums';
 import { PITCHERS } from '../src/config/pitches';
@@ -53,6 +53,7 @@ function addBatter(def: CharacterDef, origin: THREE.Vector3): Slot {
   r.scene.add(s.rig.root);
   place(s);
   if (peak) s.rig.setPeak(true);
+  if (q.get('angry') === '1') s.rig.setAngry(true);
   slots.push(s);
   return s;
 }
@@ -176,7 +177,7 @@ if (pose === 'strike') {
   ump.callStrike();
   step(0.5);
 }
-if (peak) step(0.6);
+if (peak || q.get('angry') === '1') step(1.2);
 
 const log = document.getElementById('log')!;
 function report(): void {

@@ -10,7 +10,7 @@ import type { InputManager } from '../input/InputManager';
 import type { CameraDirector } from '../render/CameraDirector';
 import { combineMods } from '../config/characters';
 import { assistAim, landingHint } from '../sim/assist';
-import { HOME_RUN_UNDERCUT, SWING_PROFILES, evaluateSwing, swingProfile } from '../sim/contact';
+import { HOME_RUN_UNDERCUT, SWING_PROFILES, evaluateSwing, swingProfile, wildSwing } from '../sim/contact';
 import { choosePitch, type PitchSelectorConfig } from '../sim/pitcher';
 import { planPitch, pitchPosition, timeAtZ } from '../sim/pitch';
 import { DERBY_RULES, PRACTICE_RULES, Session, rulesForStage, type PitchResult, type SessionEvent } from '../sim/session';
@@ -117,6 +117,9 @@ export class Match {
   /** Ability activations left this match, and pitches left while active. */
   private abilityUses = 0;
   private abilityLeft = 0;
+  /** Whiffs in a row (Chimon's temper), and whether he is currently angry. */
+  private whiffStreak = 0;
+  private angry = false;
 
   constructor(mode: MatchMode, deps: MatchDeps, seed: number) {
     this.mode = mode;
@@ -154,6 +157,7 @@ export class Match {
     w.catcher.setGhost(1);
     w.umpire.setGhost(1);
     w.batter.setPeak(false);
+    w.batter.setAngry(false);
     this.abilityUses = deps.character.ability?.uses ?? 0;
     this.updateScoreboard(null);
   }
@@ -274,7 +278,10 @@ export class Match {
     const contactTime = (effectiveTs - this.releaseAtMs) / 1000 + prof.swingTime;
     let aim = this.currentAim(true);
     if (s.controlMode === 'pro' && s.aimAssist) aim = assistAim(aim, this.plan.plateCross, kind, mods);
-    const evaluation = evaluateSwing(this.plan, { kind, contactTime, aim, batter: this.hand, mods }, { stadium: this.stadium, targets: this.targets, rng: this.rng });
+    const ctx = { stadium: this.stadium, targets: this.targets, rng: this.rng };
+    let evaluation = evaluateSwing(this.plan, { kind, contactTime, aim, batter: this.hand, mods }, ctx);
+    const wild = this.d.character.wildSwing;
+    if (wild) evaluation = wildSwing(evaluation, this.plan, ctx, wild.homeRunChance);
     const now = performance.now();
     const contactAtMs = timeStamp + prof.swingTime * 1000;
     const tau = Math.max(0, (now - this.releaseAtMs) / 1000);
@@ -621,12 +628,36 @@ export class Match {
       window.setTimeout(() => this.d.ui.showCallout(gameText(this.d.settings().lang).peakOff, 'info'), 1300);
     }
     this.d.ui.showHitCard(this.hitCardVM(result, evaluation));
+    this.updateTemper(result);
     this.handleEvents(events);
     this.updateScoreboard(result);
     this.phase = 'result';
     this.phaseT = 0;
     this.resultDuration = result.kind === 'contact' ? 2.0 : result.kind === 'ball' ? 1.1 : 1.5;
     if (result.kind === 'whiff' || result.kind === 'calledStrike') this.d.audio.crowdReaction('groan');
+  }
+
+  /** Chimon gets angry (red) after too many whiffs in a row; any contact calms him down. */
+  private updateTemper(result: PitchResult): void {
+    const temper = this.d.character.temper;
+    if (!temper) return;
+    const t = gameText(this.d.settings().lang);
+    if (result.kind === 'whiff') {
+      this.whiffStreak++;
+      if (!this.angry && this.whiffStreak >= temper.whiffs) {
+        this.angry = true;
+        this.d.world.batter.setAngry(true);
+        this.d.audio.crowdReaction('ooh');
+        window.setTimeout(() => this.d.ui.showCallout(t.angryOn, 'warning', t.angrySub), 700);
+      }
+    } else if (result.kind === 'contact') {
+      this.whiffStreak = 0;
+      if (this.angry) {
+        this.angry = false;
+        this.d.world.batter.setAngry(false);
+        window.setTimeout(() => this.d.ui.showCallout(t.calmDown, 'info'), 1300);
+      }
+    }
   }
 
   private handleEvents(events: SessionEvent[]): void {
@@ -752,6 +783,7 @@ export class Match {
     const b = result.ball;
     const d = b.outcome === 'homeRun' ? b.projectedDistance : b.distance;
     const badges: string[] = [];
+    const wild = !!this.d.character.wildSwing;
     if (b.targetsHit.length) badges.push(t.target);
     return {
       result: b.outcome,
@@ -764,7 +796,7 @@ export class Match {
       ],
       timing,
       quality: { label: t.quality[b.quality], tone: b.isBarrel ? 'barrel' : b.quality === 'solid' ? 'solid' : 'weak' },
-      coach: ev ? coachLine(ev, plan, s.lang, this.hand) : null,
+      coach: wild ? (b.outcome === 'homeRun' ? t.wildHomeRunCoach : t.wildCoach) : ev ? coachLine(ev, plan, s.lang, this.hand) : null,
       pitch,
       badges,
     };

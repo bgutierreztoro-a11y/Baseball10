@@ -21,7 +21,7 @@ Haz swing **un instante antes** de que la bola llegue (el bate tarda ~0,12 s; 0,
 
 **Ayudas (activadas por defecto, se apagan en Ajustes):** una *zona dorada* muestra más o menos por dónde pasará cada lanzamiento (nunca el punto exacto), y el *imán de bateo* acerca el círculo a la bola cuando fallas por poco.
 
-**Bateadores:** El Moro (base, con su *peak máximo* en la tecla E), El Mati (enorme y equilibrado), Arturek (gigante de 7,8 m con cuatro brazos: visión 20, contacto 5, poder 2) y Chamo (1,90 m y marcado, con cuernos de villano y un cuerno como bate; swing inspirado en Barry Bonds: visión 10, contacto 5, poder 24). Se eligen en el menú **Bateadores**.
+**Bateadores:** El Moro (base, con su *peak máximo* en la tecla E), El Mati (enorme y equilibrado), Arturek (gigante de 7,8 m con cuatro brazos: visión 20, contacto 5, poder 2) Chamo (1,90 m y marcado, con cuernos de villano y un cuerno como bate; swing inspirado en Barry Bonds: visión 10, contacto 5, poder 24) y Chimon (un mono con raqueta de tenis: cada pelota que toca sale a máxima potencia, 30 % jonrón seguro y 70 % foul hacia cualquier lado; si abanica 3 veces seguidas se enoja y se pone rojo; con él, el lanzador es un pollo). Se eligen en el menú **Bateadores**.
 
 **Modos:** Campaña (El Solar → Malecón → Metropolitano → La Cumbre → Gran Final), Práctica configurable y Derby (10 outs; un jonrón de 440 ft o más da un out extra).
 

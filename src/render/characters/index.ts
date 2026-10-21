@@ -92,6 +92,53 @@ type PitcherState = 'set' | 'delivery';
 /** Look of the pitcher before any match has set one (title / character screens). */
 export const DEFAULT_PITCHER_LOOK: CharacterLook = { skin: '#c68c5a', jersey: '#ffffff', jerseyTrim: '#d7263d', pants: '#dddddd', cap: '#d7263d', build: 1 };
 
+/**
+ * Turns the pitcher into a chicken: orange beak, red comb and wattle, beady
+ * eyes, folded wings on the sides of the body and a fan of tail feathers. The
+ * `cap` colour is the comb/wattle red; feathers use the skin colour.
+ */
+function addChicken(h: Humanoid, look: CharacterLook, quality: QualitySettings): void {
+  const V = (x: number, y: number, z: number): THREE.Vector3 => new THREE.Vector3(x, y, z);
+  const feathers = h.materials.skin!;
+  const red = h.materials.hat!;
+  const beakM = new THREE.MeshStandardMaterial({ color: look.socks ?? '#f2a516', roughness: 0.45 });
+  const eyeM = new THREE.MeshStandardMaterial({ color: '#111111', roughness: 0.25 });
+  const parts: THREE.Mesh[] = [];
+  const add = (parent: THREE.Object3D, g: THREE.BufferGeometry, m: THREE.Material, pos: THREE.Vector3, scale?: THREE.Vector3, rot?: THREE.Euler): THREE.Mesh => {
+    const x = new THREE.Mesh(g, m);
+    x.position.copy(pos);
+    if (scale) x.scale.copy(scale);
+    if (rot) x.rotation.copy(rot);
+    parent.add(x);
+    parts.push(x);
+    return x;
+  };
+  // Beak: two cones (upper bigger), pointing forward (+Z).
+  add(h.head, new THREE.ConeGeometry(0.035, 0.09, 10), beakM, V(0, -0.005, 0.14), V(1.2, 1, 0.7), new THREE.Euler(Math.PI / 2, 0, 0));
+  add(h.head, new THREE.ConeGeometry(0.025, 0.06, 10), beakM, V(0, -0.03, 0.125), V(1.1, 1, 0.6), new THREE.Euler(Math.PI / 2 + 0.2, 0, 0));
+  // Comb: a row of red bumps from the brow over the crown.
+  const bump = new THREE.SphereGeometry(0.03, 10, 8);
+  [
+    [0.1, 0.05, 0.9],
+    [0.13, 0.0, 1.1],
+    [0.125, -0.05, 1],
+    [0.1, -0.09, 0.8],
+  ].forEach(([y, z, k]) => add(h.head, bump, red, V(0, y!, z!), V(0.45 * k!, k!, k!)));
+  // Wattle hanging under the beak.
+  add(h.head, new THREE.SphereGeometry(0.025, 10, 8), red, V(0, -0.075, 0.1), V(0.8, 1.4, 0.7));
+  for (const side of [-1, 1]) {
+    add(h.head, new THREE.SphereGeometry(0.013, 8, 6), eyeM, V(side * 0.07, 0.03, 0.085));
+    // Folded wing on each side of the body.
+    add(h.chest, new THREE.SphereGeometry(0.12, 14, 10), feathers, V(side * 0.2, -0.04, -0.02), V(0.32, 1, 1.15), new THREE.Euler(0.25, 0, side * 0.12));
+  }
+  // Tail feathers fanning up and back from the hips.
+  const feather = new THREE.SphereGeometry(0.1, 12, 8);
+  [-0.45, -0.15, 0.15, 0.45].forEach((a, i) =>
+    add(h.hips, feather, i % 2 ? feathers : h.materials.trim!, V(Math.sin(a) * 0.08, 0.18, -0.2), V(0.28, 1.4, 0.5), new THREE.Euler(-0.6, 0, a)),
+  );
+  for (const x of parts) x.castShadow = quality.shadows;
+}
+
 class Pitcher implements PitcherRig {
   readonly root: THREE.Group;
   private h: Humanoid;
@@ -116,9 +163,26 @@ class Pitcher implements PitcherRig {
 
   private build(look: CharacterLook, hand: Hand): Humanoid {
     const h = new Humanoid(
-      { skin: look.skin, jersey: look.jersey, trim: look.jerseyTrim, sleeve: look.cap, pants: look.pants, socks: look.socks ?? look.cap, jerseyStripe: look.jerseyStripe, shoes: '#111216', hat: look.cap, build: look.build, number: '' },
+      {
+        skin: look.skin,
+        jersey: look.jersey,
+        trim: look.jerseyTrim,
+        sleeve: look.chicken ? look.jersey : look.cap,
+        pants: look.pants,
+        socks: look.socks ?? look.cap,
+        jerseyStripe: look.jerseyStripe,
+        shoes: look.shoes ?? '#111216',
+        hat: look.cap,
+        build: look.chicken ? 1.18 : look.build,
+        number: '',
+      },
       this.quality,
     );
+    h.setMirrored(hand === 'L');
+    if (look.chicken) {
+      addChicken(h, look, this.quality);
+      return h;
+    }
     const capMat = h.materials.hat!;
     const crown = new THREE.Mesh(new THREE.SphereGeometry(0.122, 16, 8, 0, Math.PI * 2, 0, Math.PI * 0.5), capMat);
     crown.position.y = 0.02;
@@ -126,7 +190,6 @@ class Pitcher implements PitcherRig {
     brim.position.set(0, 0.02, 0.1);
     brim.scale.set(1, 1, 0.8);
     h.head.add(crown, brim);
-    h.setMirrored(hand === 'L');
     return h;
   }
 

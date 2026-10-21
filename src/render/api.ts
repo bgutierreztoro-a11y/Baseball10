@@ -99,6 +99,8 @@ export interface BatterRig {
    * animated state (false). Used by shader warm-up only.
    */
   forcePeakVisible(v: boolean): void;
+  /** Angry: the batter turns red (fades in/out). Only Chimon ever gets angry. */
+  setAngry(on: boolean): void;
   /** Detaches from the scene and frees GPU resources. */
   dispose(): void;
 }
