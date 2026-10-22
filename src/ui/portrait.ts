@@ -174,13 +174,17 @@ function figure(look: BatterLook, cx: number, feet: number, H: number, id: strin
     const hipJ: Pt = [legX(side, 0), y(4.15)];
     const knee: Pt = [legX(side, 0.65), y(6.0)];
     const ankle: Pt = [legX(side, 1.0), y(7.72)];
-    // Sock (calf) then pants (thigh + knee) on top.
-    g.append(limb([knee, ankle], legW * 0.74, trim));
-    g.append(limb([lerp(knee, ankle, 0.45), ankle], legW * 0.6, mix(trim, INK, 0.25)));
-    g.append(limb([hipJ, knee, lerp(knee, ankle, 0.2)], legW, jersey));
-    // Pant stripe along the outer seam.
-    const off = side * legW * 0.4;
-    g.append(limb([[hipJ[0] + off, hipJ[1]], [knee[0] + off, knee[1]]], Math.max(1, u * 0.06), trim));
+    // Sock (calf) then pants (thigh + knee) on top. A rabbi wears plain black trousers.
+    if (look.rabbi) {
+      g.append(limb([hipJ, knee, ankle], legW * 0.92, jersey));
+    } else {
+      g.append(limb([knee, ankle], legW * 0.74, trim));
+      g.append(limb([lerp(knee, ankle, 0.45), ankle], legW * 0.6, mix(trim, INK, 0.25)));
+      g.append(limb([hipJ, knee, lerp(knee, ankle, 0.2)], legW, jersey));
+      // Pant stripe along the outer seam.
+      const off = side * legW * 0.4;
+      g.append(limb([[hipJ[0] + off, hipJ[1]], [knee[0] + off, knee[1]]], Math.max(1, u * 0.06), trim));
+    }
     // Cleat.
     g.append(el('ellipse', { cx: ankle[0] + side * u * 0.14, cy: feet - u * 0.1, rx: u * 0.34 + legW * 0.15, ry: u * 0.14, fill: CLEAT }));
   }
@@ -197,6 +201,20 @@ function figure(look: BatterLook, cx: number, feet: number, H: number, id: strin
       fill: jersey,
     }),
   );
+
+  if (look.rabbi) {
+    // Skirt of the long black coat down to the knees, with tzitzit fringes at the hips.
+    const hem = y(5.75);
+    const wide = Math.max(beltHalf, hip) * 1.18;
+    g.append(el('path', { d: `M${r(cx - beltHalf)} ${r(beltY)}L${r(cx - wide)} ${r(hem)}Q${r(cx)} ${r(hem + u * 0.12)} ${r(cx + wide)} ${r(hem)}L${r(cx + beltHalf)} ${r(beltY)}Z`, fill: jersey }));
+    g.append(el('path', { d: `M${r(cx)} ${r(beltY)}L${r(cx + u * 0.05)} ${r(hem + u * 0.06)}`, stroke: mix(jersey, '#ffffff', 0.12), 'stroke-width': u * 0.04 }));
+    for (const sd of [-1, 1]) {
+      for (let k = 0; k < 3; k++) {
+        const x0 = cx + sd * (beltHalf * 0.92 - k * u * 0.06);
+        g.append(el('path', { d: `M${r(x0)} ${r(beltY + u * 0.1)}L${r(x0 + sd * u * 0.03)} ${r(beltY + u * (0.95 + 0.08 * k))}`, stroke: '#f4f2ea', 'stroke-width': Math.max(0.7, u * 0.035), 'stroke-linecap': 'round' }));
+      }
+    }
+  }
 
   // ── Torso (jersey) ──
   const sideC = (s: number): Pt[] => [
@@ -240,13 +258,19 @@ function figure(look: BatterLook, cx: number, feet: number, H: number, id: strin
     }
   }
   g.append(shade);
-  // Placket + buttons.
-  g.append(el('path', { d: `M${r(cx)} ${r(y(1.55))}L${r(cx)} ${r(beltY)}`, stroke: trim, 'stroke-width': Math.max(1, u * 0.05), fill: 'none' }));
-  for (let i = 0; i < 4; i++) g.append(el('circle', { cx: cx + u * 0.08, cy: y(1.85 + i * 0.5), r: Math.max(0.6, u * 0.035), fill: mix(jersey, INK, 0.45) }));
-  // V collar.
-  g.append(el('path', { d: `M${r(cx - neck * 1.15)} ${r(y(1.28))}L${r(cx)} ${r(y(1.62))}L${r(cx + neck * 1.15)} ${r(y(1.28))}`, fill: 'none', stroke: trim, 'stroke-width': Math.max(1.2, u * 0.09), 'stroke-linejoin': 'round' }));
+  if (look.rabbi) {
+    // White shirt in the V of the open coat, buttoned to the collar.
+    g.append(el('path', { d: `M${r(cx - neck * 1.2)} ${r(y(1.28))}L${r(cx)} ${r(y(2.75))}L${r(cx + neck * 1.2)} ${r(y(1.28))}Z`, fill: trim }));
+    for (let i = 0; i < 3; i++) g.append(el('circle', { cx, cy: y(1.6 + i * 0.35), r: Math.max(0.6, u * 0.03), fill: '#9aa0ad' }));
+  } else {
+    // Placket + buttons.
+    g.append(el('path', { d: `M${r(cx)} ${r(y(1.55))}L${r(cx)} ${r(beltY)}`, stroke: trim, 'stroke-width': Math.max(1, u * 0.05), fill: 'none' }));
+    for (let i = 0; i < 4; i++) g.append(el('circle', { cx: cx + u * 0.08, cy: y(1.85 + i * 0.5), r: Math.max(0.6, u * 0.035), fill: mix(jersey, INK, 0.45) }));
+    // V collar.
+    g.append(el('path', { d: `M${r(cx - neck * 1.15)} ${r(y(1.28))}L${r(cx)} ${r(y(1.62))}L${r(cx + neck * 1.15)} ${r(y(1.28))}`, fill: 'none', stroke: trim, 'stroke-width': Math.max(1.2, u * 0.09), 'stroke-linejoin': 'round' }));
+  }
   // Chest number (lower left of the jersey, like the real thing).
-  if (detail) {
+  if (detail && !look.rabbi) {
     g.append(
       el('text', {
         x: cx + sh * 0.4,
@@ -334,10 +358,36 @@ function figure(look: BatterLook, cx: number, feet: number, H: number, id: strin
           fill: bc,
         }),
       );
+      if (look.rabbi) {
+        // A long beard down onto the chest.
+        g.append(el('path', { d: smooth([[cx - headRx * 0.8, headCy + headRy * 0.55], [cx - headRx * 0.62, headCy + headRy * 1.45], [cx, headCy + headRy * 2.05], [cx + headRx * 0.62, headCy + headRy * 1.45], [cx + headRx * 0.8, headCy + headRy * 0.55], [cx, headCy + headRy * 0.9]], true), fill: bc }));
+      }
+    }
+    if (look.rabbi) {
+      // Peyot: curled sidelocks in front of each ear.
+      for (const sd of [-1, 1]) {
+        const px = cx + sd * headRx * 1.0;
+        const pts: Pt[] = [];
+        for (let i = 0; i <= 30; i++) {
+          const tt = i / 30;
+          const a = tt * Math.PI * 8;
+          pts.push([px + Math.cos(a) * u * 0.06, headCy - headRy * 0.1 + tt * headRy * 1.15 + Math.sin(a) * u * 0.03]);
+        }
+        g.append(el('path', { d: `M${pts.map((p) => `${r(p[0])} ${r(p[1])}`).join('L')}`, fill: 'none', stroke: look.hair ?? '#2a1d14', 'stroke-width': u * 0.06, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }));
+      }
     }
     // Smile.
     // Grin: a light crescent outlined in dark lip colour (reads on any skin tone).
     g.append(el('path', { d: `M${r(cx - headRx * 0.32)} ${r(headCy + headRy * 0.47)}Q${r(cx)} ${r(headCy + headRy * 0.55)} ${r(cx + headRx * 0.34)} ${r(headCy + headRy * 0.45)}Q${r(cx + headRx * 0.05)} ${r(headCy + headRy * 0.8)} ${r(cx - headRx * 0.32)} ${r(headCy + headRy * 0.47)}Z`, fill: '#f4f1e8', stroke: mix(skin, '#3a0d0d', 0.6), 'stroke-width': u * 0.04, 'stroke-linejoin': 'round' }));
+    if (look.rabbi) {
+      // Black wide-brimmed hat with a ribbon band.
+      const brimY = headCy - headRy * 0.42;
+      const crownTop = brimY - u * 0.62;
+      g.append(el('path', { d: `M${r(cx - headRx * 0.98)} ${r(brimY)}L${r(cx - headRx * 0.92)} ${r(crownTop + u * 0.08)}Q${r(cx)} ${r(crownTop - u * 0.06)} ${r(cx + headRx * 0.92)} ${r(crownTop + u * 0.08)}L${r(cx + headRx * 0.98)} ${r(brimY)}Z`, fill: '#121318' }));
+      g.append(el('rect', { x: cx - headRx * 0.97, y: brimY - u * 0.16, width: headRx * 1.94, height: u * 0.12, fill: '#2f3038' }));
+      g.append(el('ellipse', { cx, cy: brimY + u * 0.02, rx: headRx * 1.75, ry: u * 0.11, fill: '#0c0d11' }));
+      g.append(el('path', { d: `M${r(cx - headRx * 0.6)} ${r(crownTop + u * 0.12)}Q${r(cx - headRx * 0.2)} ${r(crownTop + u * 0.02)} ${r(cx + headRx * 0.2)} ${r(crownTop + u * 0.05)}`, fill: 'none', stroke: '#ffffff', 'stroke-width': u * 0.05, 'stroke-linecap': 'round', opacity: 0.18 }));
+    } else {
     // Batting helmet: dome, ear flap (viewer's right), bill and a gloss stripe.
     const helmet = trim;
     const hTop = T - u * 0.08;
@@ -346,6 +396,7 @@ function figure(look: BatterLook, cx: number, feet: number, H: number, id: strin
     g.append(el('path', { d: `M${r(cx - headRx * 1.12)} ${r(rim)}C${r(cx - headRx * 1.16)} ${r(hTop - u * 0.02)} ${r(cx + headRx * 1.16)} ${r(hTop - u * 0.02)} ${r(cx + headRx * 1.22)} ${r(rim)}Z`, fill: helmet }));
     g.append(el('path', { d: `M${r(cx - headRx * 0.75)} ${r(headCy - headRy * 0.55)}Q${r(cx - headRx * 0.2)} ${r(hTop + u * 0.06)} ${r(cx + headRx * 0.35)} ${r(hTop + u * 0.1)}`, fill: 'none', stroke: '#ffffff', 'stroke-width': u * 0.07, 'stroke-linecap': 'round', opacity: 0.35 }));
     g.append(el('ellipse', { cx: cx - headRx * 0.05, cy: rim + u * 0.01, rx: headRx * 1.08, ry: u * 0.085, fill: mix(helmet, INK, 0.35) }));
+    }
   }
   if (look.horns) {
     // Villain horns: out from the helmet sides, up, then curling inward at the tips.
@@ -423,6 +474,13 @@ function figure(look: BatterLook, cx: number, feet: number, H: number, id: strin
   }
 
   const arm = (shoulder: Pt, elbow: Pt, hand: Pt, gloved: boolean): void => {
+    if (look.rabbi) {
+      // Long coat sleeves with a white shirt cuff.
+      g.append(limb([shoulder, elbow, hand], armW * 1.08, jersey));
+      g.append(limb([lerp(elbow, hand, 0.82), lerp(elbow, hand, 0.9)], foreW * 1.05, trim));
+      g.append(el('circle', { cx: hand[0], cy: hand[1], r: foreW * 0.6, fill: skin }));
+      return;
+    }
     // Biceps bulge for muscular builds.
     g.append(limb([shoulder, elbow], armW, skin));
     if (m > 0.45) {

@@ -122,7 +122,8 @@ export function createStructures(def: StadiumDef, quality: QualitySettings, atm:
   // ── Seating bowl ──
   // Seats are slightly muted so the crowd and the ball read on top of them.
   const seatColors = def.palette.seats.map((c) => new THREE.Color(c).offsetHSL(0, -0.12, -0.06));
-  const outfieldRows = sandlot ? 0 : 40;
+  // Bratislava keeps the outfield bleachers low so the castle and the bridge show over them.
+  const outfieldRows = sandlot ? 0 : def.features.bratislava ? 14 : 40;
   const foulRows = sandlot ? 7 : 30;
   const crowdSlots: { x: number; y: number; z: number; face: number }[] = [];
   const stands = new MeshBuilder(true);

@@ -61,7 +61,7 @@ export interface QualitySettings {
 
 // ───────────────────────────── Content definitions ─────────────────────────────
 
-export type StadiumId = 'solar' | 'malecon' | 'metro' | 'cumbre' | 'final';
+export type StadiumId = 'solar' | 'malecon' | 'metro' | 'cumbre' | 'final' | 'bratislava';
 export type TimeOfDay = 'day' | 'sunset' | 'night';
 
 /** Fence distances (ft) and wall heights (ft) at LF line, LCF, CF, RCF, RF line. */
@@ -100,6 +100,8 @@ export interface StadiumDef {
     skyline: boolean;
     /** Sandlot look: chain-link fence, no upper deck. */
     sandlot: boolean;
+    /** Bratislava backdrop: the Danube, Bratislava Castle on its hill and the UFO bridge (Most SNP). */
+    bratislava?: boolean;
   };
   /** 0..1 how full the stands are. */
   crowdDensity: number;
@@ -145,6 +147,8 @@ export interface CharacterLook {
   shoes?: string;
   /** A chicken instead of a person: beak, red comb and wattle, tail feathers and wings. */
   chicken?: boolean;
+  /** Rabbi attire: black wide-brimmed hat instead of a cap, long beard and sidelocks (peyot). */
+  rabbi?: boolean;
 }
 
 export interface PitcherDef {
@@ -312,7 +316,7 @@ export interface BatDef {
 
 // ───────────────────────────── Playable characters ─────────────────────────────
 
-export type CharacterId = 'moro' | 'mati' | 'arturek' | 'chamo' | 'chimon';
+export type CharacterId = 'moro' | 'mati' | 'arturek' | 'chamo' | 'chimon' | 'benjamin';
 
 /** Multipliers applied to a swing profile (1 = base batter). */
 export interface SwingMods {
@@ -356,6 +360,12 @@ export interface BatterLook {
   monkey?: boolean;
   /** Bats with a tennis racket instead of a wooden bat. */
   racket?: boolean;
+  /**
+   * Rabbi attire: long black coat over a white shirt with tzitzit fringes,
+   * black wide-brimmed hat over a kippah instead of a helmet, long beard and
+   * curled sidelocks (peyot).
+   */
+  rabbi?: boolean;
   jersey: string;
   trim: string;
   number: string;
@@ -388,14 +398,27 @@ export interface CharacterDef {
   pitcherKit?: Partial<CharacterLook>;
   /** A club crest hovers over the pitcher (bobbing like a little cloud) during matches. */
   pitcherBadge?: boolean;
+  /**
+   * Lucky penny: before each pitch, with probability `spawnChance`, a giant
+   * penny floats somewhere in the outfield. A batted ball that touches it
+   * brings Netanyahu down in a flying-kippah UFO (to Hava Nagila), who fills
+   * the PCI to `pciFill` of the strike zone for the next `pitches` pitches.
+   */
+  pennyBlessing?: { spawnChance: number; pciFill: number; pitches: number };
+  /** Swing multipliers applied on top of `mods` when batting in his home park. */
+  homeStadium?: { stadium: StadiumId; mods: SwingMods };
   /** Passive trait shown on the batter card (characters without an activated ability). */
   trait?: { name: LocalizedText; description: LocalizedText };
   /**
-   * Every ball he connects with leaves at maximum power: `homeRunChance` of
-   * them are guaranteed home runs, the rest fly off in any foul direction
-   * (even backwards) and never score.
+   * While angry (see `temper`), every ball he connects with leaves at maximum
+   * power: `homeRunChance` of them are guaranteed home runs, the rest fly off
+   * in any foul direction (even backwards) and never score.
    */
   wildSwing?: { homeRunChance: number };
-  /** Gets angry (turns red) after this many whiffs in a row; contact calms him down. */
-  temper?: { whiffs: number };
+  /**
+   * Gets angry (red face) after `whiffs` whiffs in a row, which switches on
+   * `wildSwing`. A home run calms him down and starts a cooldown of
+   * `cooldownSwings` swings during which he cannot get angry again.
+   */
+  temper?: { whiffs: number; cooldownSwings: number };
 }

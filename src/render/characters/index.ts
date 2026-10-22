@@ -5,6 +5,7 @@ import { releasePoint } from '../../sim/pitch';
 import type { CatcherRig, CharacterFactory, PitcherRig, UmpireRig } from '../api';
 import { Batter } from './batter';
 import { Humanoid, blendPose, copyPose, ease, easeOut, makePose } from './humanoid';
+import { addRabbiAttire } from './rabbi';
 
 export { Batter, batterMetrics } from './batter';
 
@@ -177,10 +178,15 @@ class Pitcher implements PitcherRig {
         number: '',
       },
       this.quality,
+      look.rabbi ? { beard: '#2a1d14', hair: '#2a1d14', face: true } : {},
     );
     h.setMirrored(hand === 'L');
     if (look.chicken) {
       addChicken(h, look, this.quality);
+      return h;
+    }
+    if (look.rabbi) {
+      addRabbiAttire(h, '#2a1d14', this.quality, { chestDepth: h.chestDepth });
       return h;
     }
     const capMat = h.materials.hat!;

@@ -1,6 +1,6 @@
 import type { BattedBall, CharacterDef, Hand, PitchPlan, PitchTypeId, PitcherDef, Settings, StadiumDef, StageDef, SwingEvaluation, SwingKind, SwingMods, TargetDef, Vec3 } from '../contracts';
 import type { AudioEngine } from '../audio/api';
-import { FT, MPH, STRIKE_ZONE } from '../config/constants';
+import { DEG, FT, MPH, STRIKE_ZONE } from '../config/constants';
 import { PITCHERS } from '../config/pitches';
 import { STADIUMS } from '../config/stadiums';
 import { clamp, damp, smoothstep } from '../core/math';
@@ -8,7 +8,10 @@ import { Rng } from '../core/rng';
 import { coachLine, dist, gameText, pitchLine, speed } from '../i18n/game';
 import type { InputManager } from '../input/InputManager';
 import type { CameraDirector } from '../render/CameraDirector';
-import { combineMods } from '../config/characters';
+import { combineMods, pciFillMods } from '../config/characters';
+import { BLESSING_DURATION } from '../render/fx';
+import { polarToXZ } from '../sim/field';
+import { trajectoryTouches } from '../sim/penny';
 import { assistAim, landingHint } from '../sim/assist';
 import { HOME_RUN_UNDERCUT, SWING_PROFILES, evaluateSwing, swingProfile, wildSwing } from '../sim/contact';
 import { choosePitch, type PitchSelectorConfig } from '../sim/pitcher';
@@ -53,11 +56,13 @@ export interface MatchDeps {
   character: CharacterDef;
 }
 
-type Phase = 'intro' | 'ready' | 'windup' | 'pitch' | 'contact' | 'flight' | 'result' | 'ended';
+type Phase = 'intro' | 'ready' | 'windup' | 'pitch' | 'contact' | 'flight' | 'result' | 'blessing' | 'ended';
 
 const WINDUP = 1.05;
 const CATCH_Z = -0.42;
 const FLIGHT_SPEED = 1.35;
+/** Benjamin's penny: a batted ball within this distance (m) of its centre touches it. */
+const PENNY_HIT_RADIUS = 4.2;
 
 export function stadiumFor(mode: MatchMode): StadiumDef {
   if (mode.kind === 'campaign') return STADIUMS[mode.stage.stadium];
@@ -117,9 +122,19 @@ export class Match {
   /** Ability activations left this match, and pitches left while active. */
   private abilityUses = 0;
   private abilityLeft = 0;
-  /** Whiffs in a row (Chimon's temper), and whether he is currently angry. */
+  /** Whiffs in a row (Chimon's temper), whether he is angry, and swings left before he can get angry again. */
   private whiffStreak = 0;
   private angry = false;
+  private temperCooldown = 0;
+  /**
+   * Benjamin's lucky penny: where it floats this pitch, the flight sample at
+   * which the current batted ball touches it, a blessing waiting to play
+   * after the result, and blessed (PCI-filled) pitches left.
+   */
+  private penny: Vec3 | null = null;
+  private pennyTouchAt = -1;
+  private blessingPending = false;
+  private blessingLeft = 0;
 
   constructor(mode: MatchMode, deps: MatchDeps, seed: number) {
     this.mode = mode;
@@ -158,14 +173,24 @@ export class Match {
     w.umpire.setGhost(1);
     w.batter.setPeak(false);
     w.batter.setAngry(false);
+    w.setPenny(null);
+    w.stopBlessing();
     this.abilityUses = deps.character.ability?.uses ?? 0;
     this.updateScoreboard(null);
   }
 
-  /** Character multipliers, boosted while the ability is active. */
+  /** Character multipliers, boosted while the ability is active and in the batter's home park. */
   private get mods(): SwingMods {
     const c = this.d.character;
-    return this.abilityLeft > 0 && c.ability ? combineMods(c.mods, c.ability.mods) : c.mods;
+    let m = this.abilityLeft > 0 && c.ability ? combineMods(c.mods, c.ability.mods) : c.mods;
+    if (this.atHome) m = combineMods(m, c.homeStadium!.mods);
+    if (this.blessingLeft > 0 && c.pennyBlessing) m = combineMods(m, pciFillMods(c.pennyBlessing.pciFill, m));
+    return m;
+  }
+
+  /** Arturek in Bratislava. */
+  private get atHome(): boolean {
+    return this.d.character.homeStadium?.stadium === this.stadium.id;
   }
 
   /** El Moro's peak: boosts the next few pitches, limited uses per match. */
@@ -213,7 +238,16 @@ export class Match {
     });
     this.phase = 'intro';
     this.phaseT = 0;
-    this.d.camera.playIntro(() => this.enter('ready'), this.mode.kind === 'campaign' ? 2.8 : 1.6);
+    if (this.stadium.features.bratislava) {
+      // Show off the castle and the UFO bridge before the first pitch.
+      this.d.camera.playIntro(() => this.enter('ready'), 4.2, { from: { x: -20, y: 46, z: -60 }, mid: { x: -8, y: 14, z: -24 }, look: { x: 10, y: 60, z: 520 } });
+    } else {
+      this.d.camera.playIntro(() => this.enter('ready'), this.mode.kind === 'campaign' ? 2.8 : 1.6);
+    }
+    if (this.atHome) {
+      const t = gameText(s.lang);
+      window.setTimeout(() => this.d.ui.showCallout(t.homeBuff(this.d.character.name), 'bonus', t.homeBuffSub), 900);
+    }
     if (this.d.firstTime) {
       const t = gameText(s.lang);
       const pro = s.controlMode === 'pro';
@@ -250,10 +284,13 @@ export class Match {
   confirm(): void {
     if (this.phase === 'flight' && this.flight && this.flight.t > 0.5) this.endFlight();
     else if (this.phase === 'result' && this.phaseT > 0.35) this.phaseT = this.resultDuration;
+    else if (this.phase === 'blessing' && this.phaseT > 1.5) this.finishBlessing();
   }
 
   dispose(): void {
     this.d.world.setMatchActive(false);
+    this.d.world.setPenny(null);
+    this.d.world.stopBlessing();
     this.d.input.enabled = false;
     this.d.ui.showTip(null);
   }
@@ -281,7 +318,9 @@ export class Match {
     const ctx = { stadium: this.stadium, targets: this.targets, rng: this.rng };
     let evaluation = evaluateSwing(this.plan, { kind, contactTime, aim, batter: this.hand, mods }, ctx);
     const wild = this.d.character.wildSwing;
-    if (wild) evaluation = wildSwing(evaluation, this.plan, ctx, wild.homeRunChance);
+    // Chimon's wild racket only fires while he is angry.
+    if (wild && this.angry) evaluation = wildSwing(evaluation, this.plan, ctx, wild.homeRunChance);
+    this.pennyTouchAt = this.penny && evaluation.kind === 'contact' ? trajectoryTouches(evaluation.ball, this.penny, PENNY_HIT_RADIUS) : -1;
     const now = performance.now();
     const contactAtMs = timeStamp + prof.swingTime * 1000;
     const tau = Math.max(0, (now - this.releaseAtMs) / 1000);
@@ -341,9 +380,23 @@ export class Match {
         this.d.input.enabled = true;
         if (!this.plan) this.plan = planPitch(choosePitch(this.rng, this.selector, this.lastType));
         this.lastType = this.plan.type;
+        this.spawnPenny();
         // The catcher sets up near (not exactly at) the target.
         this.catcherTarget = { x: this.plan.plateCross.x + this.rng.gaussian() * 0.05, y: this.plan.plateCross.y + this.rng.gaussian() * 0.05 };
         w.catcher.setTarget(this.catcherTarget.x, this.catcherTarget.y);
+        break;
+      }
+      case 'blessing': {
+        // Netanyahu's flying kippah: a side shot of the plate while he comes down.
+        const sd = this.hand === 'R' ? 1 : -1;
+        this.blessingPending = false;
+        this.d.input.enabled = false;
+        w.zone.setVisible(false, false);
+        w.ball.setVisible(false);
+        w.batter.reset();
+        const cam = { x: sd * 4.4, y: 2.6, z: 8.6 };
+        this.d.camera.shot(cam, { x: -sd * 0.8, y: 3.9, z: 0.9 }, 62);
+        w.playBlessing(cam, () => this.giveBlessing());
         break;
       }
       case 'windup':
@@ -374,7 +427,7 @@ export class Match {
     this.phaseT += dt;
     const w = this.d.world;
     const aim = this.currentAim();
-    if (this.phase !== 'flight' && this.phase !== 'result' && this.phase !== 'contact') {
+    if (this.phase !== 'flight' && this.phase !== 'result' && this.phase !== 'contact' && this.phase !== 'blessing') {
       w.zone.setAim(aim.x, aim.y);
       if (!this.swing) w.batter.setAim(aim.x, aim.y);
       w.zone.setPower(this.d.input.power || this.powerToggle);
@@ -417,6 +470,9 @@ export class Match {
         break;
       case 'result':
         if (this.phaseT >= this.resultDuration) this.afterResult();
+        break;
+      case 'blessing':
+        if (!w.blessingPlaying || this.phaseT > BLESSING_DURATION + 0.5) this.finishBlessing();
         break;
       case 'ended':
         break;
@@ -578,6 +634,17 @@ export class Match {
         w.fx.dust(this.ballPos, 1.2);
       }
     }
+    if (this.pennyTouchAt >= 0 && f.idx >= this.pennyTouchAt) {
+      // The ball touched Benjamin's penny: here comes the flying kippah.
+      this.pennyTouchAt = -1;
+      this.blessingPending = true;
+      w.hitPenny();
+      w.fx.fireworks({ x: this.ballPos.x, y: this.ballPos.y + 4, z: this.ballPos.z }, 1);
+      this.d.ui.showCallout(t.pennyHit, 'bonus', t.pennySub);
+      this.d.audio.havaNagila();
+      this.d.audio.crowdReaction('roar');
+      this.excitement = 1;
+    }
     for (const tg of f.targetsAt) {
       if (!tg.done && f.idx >= tg.sample) {
         tg.done = true;
@@ -627,6 +694,10 @@ export class Match {
       this.d.world.batter.setPeak(false);
       window.setTimeout(() => this.d.ui.showCallout(gameText(this.d.settings().lang).peakOff, 'info'), 1300);
     }
+    if (this.blessingLeft > 0 && --this.blessingLeft === 0) {
+      this.d.world.batter.setPeak(false);
+      window.setTimeout(() => this.d.ui.showCallout(gameText(this.d.settings().lang).blessingOff, 'info'), 1300);
+    }
     this.d.ui.showHitCard(this.hitCardVM(result, evaluation));
     this.updateTemper(result);
     this.handleEvents(events);
@@ -637,26 +708,42 @@ export class Match {
     if (result.kind === 'whiff' || result.kind === 'calledStrike') this.d.audio.crowdReaction('groan');
   }
 
-  /** Chimon gets angry (red) after too many whiffs in a row; any contact calms him down. */
+  /**
+   * Chimon's temper: too many whiffs in a row make him angry (red face, wild
+   * racket on). Only a home run calms him down, which starts a cooldown of
+   * `cooldownSwings` swings before whiffs can anger him again.
+   */
   private updateTemper(result: PitchResult): void {
     const temper = this.d.character.temper;
     if (!temper) return;
     const t = gameText(this.d.settings().lang);
+    const swung = result.kind === 'whiff' || result.kind === 'contact';
+    if (!swung) return;
+    if (this.angry) {
+      if (result.kind === 'contact' && result.ball.outcome === 'homeRun') {
+        this.angry = false;
+        this.whiffStreak = 0;
+        this.temperCooldown = temper.cooldownSwings;
+        this.d.world.batter.setAngry(false);
+        window.setTimeout(() => this.d.ui.showCallout(t.calmDown, 'info', t.cooldown(temper.cooldownSwings)), 1600);
+      }
+      return;
+    }
+    if (this.temperCooldown > 0) {
+      this.temperCooldown--;
+      if (this.temperCooldown === 0) window.setTimeout(() => this.d.ui.showCallout(t.temperReady, 'info'), 900);
+      return;
+    }
     if (result.kind === 'whiff') {
       this.whiffStreak++;
-      if (!this.angry && this.whiffStreak >= temper.whiffs) {
+      if (this.whiffStreak >= temper.whiffs) {
         this.angry = true;
         this.d.world.batter.setAngry(true);
         this.d.audio.crowdReaction('ooh');
         window.setTimeout(() => this.d.ui.showCallout(t.angryOn, 'warning', t.angrySub), 700);
       }
-    } else if (result.kind === 'contact') {
+    } else {
       this.whiffStreak = 0;
-      if (this.angry) {
-        this.angry = false;
-        this.d.world.batter.setAngry(false);
-        window.setTimeout(() => this.d.ui.showCallout(t.calmDown, 'info'), 1300);
-      }
     }
   }
 
@@ -677,9 +764,46 @@ export class Match {
     this.d.ui.hideHitCard();
     this.plan = null;
     if (this.session.finished) {
+      this.blessingPending = false;
       this.endMatchSoon();
       return;
     }
+    this.enter(this.blessingPending ? 'blessing' : 'ready');
+  }
+
+  /**
+   * Benjamin's penny: before each pitch, with some chance, it floats over the
+   * outfield where the batting camera can see it (low and in front of the
+   * wall). Never while a blessing is active.
+   */
+  private spawnPenny(): void {
+    const pb = this.d.character.pennyBlessing;
+    this.penny = null;
+    this.pennyTouchAt = -1;
+    this.d.world.setPenny(null);
+    if (!pb || this.blessingLeft > 0 || this.rng.next() >= pb.spawnChance) return;
+    const p = polarToXZ(this.rng.range(-30, 30) * DEG, this.rng.range(45, 75));
+    this.penny = { x: p.x, y: this.rng.range(1.8, 3.8), z: p.z };
+    this.d.world.setPenny(this.penny);
+    const t = gameText(this.d.settings().lang);
+    this.d.ui.showCallout(t.pennyOn, 'info');
+  }
+
+  /** Netanyahu blesses the batter: the PCI fills most of the zone for a few pitches. */
+  private giveBlessing(): void {
+    const pb = this.d.character.pennyBlessing;
+    if (!pb || this.blessingLeft > 0) return;
+    const t = gameText(this.d.settings().lang);
+    this.blessingLeft = pb.pitches;
+    this.d.world.batter.setPeak(true);
+    this.d.ui.showCallout(t.blessingOn, 'bonus', t.blessingSub(Math.round(pb.pciFill * 100), pb.pitches));
+    this.d.audio.crowdReaction('cheer');
+  }
+
+  private finishBlessing(): void {
+    if (this.phase !== 'blessing') return;
+    this.d.world.stopBlessing();
+    this.giveBlessing();
     this.enter('ready');
   }
 
@@ -706,15 +830,7 @@ export class Match {
     const powerOn = this.d.input.power || this.powerToggle;
     const pro = s.controlMode === 'pro';
     const hint = this.d.input.isTouch ? (pro ? t.controlsTouch : t.controlsTouchCasual) : pro ? t.controlsPro : t.controlsCasual;
-    const ab = this.d.character.ability;
-    const ability: HudVM['ability'] = ab
-      ? {
-          label: ab.name[s.lang],
-          state: this.abilityLeft > 0 ? 'active' : this.abilityUses > 0 ? 'ready' : 'used',
-          pitchesLeft: this.abilityLeft > 0 ? this.abilityLeft : null,
-          keyHint: 'E',
-        }
-      : null;
+    const ability = this.abilityVM();
     if (this.mode.kind === 'campaign') {
       const st = this.mode.stage;
       const [cur, target] = ses.progress();
@@ -765,6 +881,30 @@ export class Match {
     };
   }
 
+  /** HUD pill: El Moro's activated peak, or the state of a passive trait (Chimon, Benjamin). */
+  private abilityVM(): HudVM['ability'] {
+    const c = this.d.character;
+    const s = this.d.settings();
+    const t = gameText(s.lang);
+    if (c.ability) {
+      return {
+        label: c.ability.name[s.lang],
+        state: this.abilityLeft > 0 ? 'active' : this.abilityUses > 0 ? 'ready' : 'used',
+        pitchesLeft: this.abilityLeft > 0 ? this.abilityLeft : null,
+        keyHint: 'E',
+      };
+    }
+    if (c.temper) {
+      const stateText = this.angry ? t.temperAngry : this.temperCooldown > 0 ? t.temperCooling(this.temperCooldown) : t.temperCalm(this.whiffStreak, c.temper.whiffs);
+      return { label: t.temperLabel, state: this.angry ? 'active' : 'idle', pitchesLeft: null, keyHint: '', stateText };
+    }
+    if (c.pennyBlessing) {
+      const stateText = this.blessingLeft > 0 ? t.pennyBlessed(this.blessingLeft) : this.penny ? t.pennyField : t.pennyWaiting;
+      return { label: t.pennyLabel, state: this.blessingLeft > 0 || this.penny ? 'active' : 'idle', pitchesLeft: null, keyHint: '', stateText };
+    }
+    return null;
+  }
+
   private hitCardVM(result: PitchResult, ev: SwingEvaluation | null): HitCardVM {
     const s = this.d.settings();
     const t = gameText(s.lang);
@@ -783,7 +923,7 @@ export class Match {
     const b = result.ball;
     const d = b.outcome === 'homeRun' ? b.projectedDistance : b.distance;
     const badges: string[] = [];
-    const wild = !!this.d.character.wildSwing;
+    const wild = !!this.d.character.wildSwing && this.angry;
     if (b.targetsHit.length) badges.push(t.target);
     return {
       result: b.outcome,

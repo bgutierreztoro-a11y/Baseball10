@@ -969,12 +969,17 @@ class DomUI implements UI {
     btn.className = `ability-btn is-${ab.state} ${this.touch ? 'is-touch' : ''}`;
     btn.setAttribute('aria-disabled', ab.state === 'ready' ? 'false' : 'true');
     btn.querySelector('.ab-label')!.textContent = ab.label;
-    btn.querySelector('.ab-state')!.textContent = ab.state === 'ready' ? this.t('abilityReady') : ab.state === 'active' ? this.t('abilityLeft', { n: left }) : this.t('abilityUsed');
-    const key = btn.querySelector('.ab-key');
-    if (key) key.textContent = ab.keyHint;
+    btn.querySelector('.ab-state')!.textContent = ab.stateText ?? (ab.state === 'ready' ? this.t('abilityReady') : ab.state === 'active' ? this.t('abilityLeft', { n: left }) : this.t('abilityUsed'));
+    const key = btn.querySelector('.ab-key') as HTMLElement | null;
+    if (key) {
+      key.textContent = ab.keyHint;
+      key.hidden = !ab.keyHint;
+    }
     btn.setAttribute(
       'aria-label',
-      ab.state === 'ready'
+      ab.stateText
+        ? `${ab.label}: ${ab.stateText}`
+        : ab.state === 'ready'
         ? this.touch
           ? this.t('abilityReadyAriaTouch', { name: ab.label })
           : this.t('abilityReadyAria', { name: ab.label, key: ab.keyHint })
@@ -982,7 +987,7 @@ class DomUI implements UI {
           ? this.t('abilityActiveAria', { name: ab.label, n: left })
           : this.t('abilityUsedAria', { name: ab.label }),
     );
-    if (prev && prev.state !== 'active' && ab.state === 'active') this.announce(this.t('abilityOn', { name: ab.label, n: left }));
+    if (prev && prev.state !== 'active' && ab.state === 'active') this.announce(ab.stateText ? `${ab.label}: ${ab.stateText}` : this.t('abilityOn', { name: ab.label, n: left }));
   }
 
   showHitCard(vm: HitCardVM): void {

@@ -1,4 +1,6 @@
-import type { BatterRatings, CharacterDef, CharacterId, SwingMods } from '../contracts';
+import type { BatterRatings, CharacterDef, CharacterId, SwingKind, SwingMods } from '../contracts';
+import { SWING_PROFILES } from '../sim/contact';
+import { STRIKE_ZONE } from './constants';
 
 const mods = (contactPci: number, powerPci: number, contactBat: number, powerBat: number): SwingMods => ({
   pci: { contact: contactPci, power: powerPci },
@@ -36,8 +38,11 @@ const rated = (vision: number, contact: number, power: number) => {
  * - Arturek: huge vision → much bigger PCI for both swings, but almost no power.
  * - Chamo: the strongest power swing, average vision, below-average contact.
  * - Chimon: a monkey with a tennis racket — the big string bed is easy to hit
- *   with, but every ball he touches leaves at max power: 30 % home runs, 70 %
- *   wild fouls in any direction (wildSwing). Whiffs make him angry (temper).
+ *   with. Three whiffs in a row make him angry (temper): until he hits a home
+ *   run every ball he touches leaves at max power, 50 % home runs and 50 %
+ *   wild fouls in any direction (wildSwing); then a 10-swing cooldown.
+ * - Benjamin Gutenberg: a rabbi, slightly above average all round; his lucky
+ *   penny (pennyBlessing) can fill 85 % of the strike zone with his PCI.
  */
 export const CHARACTERS: readonly CharacterDef[] = [
   {
@@ -86,6 +91,15 @@ export const CHARACTERS: readonly CharacterDef[] = [
     look: { skin: '#f1d2bd', hair: '#f2d16b', heightM: 7.8, build: 1, belly: 0, muscle: 0.2, extraArms: true, beard: false, horns: false, hornBat: false, jersey: '#f4f1e8', trim: '#2fa36b', number: '99' },
     ...rated(20, 5, 2),
     ability: null,
+    // At home in Bratislava his swing gets a big power boost (+25 % bat speed on both swings).
+    homeStadium: { stadium: 'bratislava', mods: mods(1, 1, 1.25, 1.25) },
+    trait: {
+      name: { es: 'En casa, en Bratislava', en: 'At home in Bratislava' },
+      description: {
+        es: 'En el Estadio del Danubio, con el castillo y el puente OVNI de fondo, batea con mucha más potencia: +25 % de velocidad de bate en ambos swings.',
+        en: 'At the Danube Ballpark, with the castle and the UFO bridge behind the fence, he hits much harder: +25 % bat speed on both swings.',
+      },
+    },
   },
   {
     id: 'chamo',
@@ -107,8 +121,8 @@ export const CHARACTERS: readonly CharacterDef[] = [
     name: 'Chimon',
     title: { es: 'El Mono Tenista', en: 'The Tennis Monkey' },
     bio: {
-      es: 'Un mono que se coló en el estadio con su raqueta de tenis y se niega a soltarla. Con esa cabeza de cuerdas le pega a casi todo y siempre con toda su fuerza… pero sin ninguna dirección. Si falla muchas veces seguidas se enoja y se pone rojo como un tomate. Cuando él batea, el lanzador es un pollo.',
-      en: 'A monkey who snuck into the ballpark with his tennis racket and refuses to let go of it. With that string bed he hits almost anything, always as hard as he can… but with no direction at all. Miss too many in a row and he gets angry and turns red as a tomato. When he bats, the pitcher is a chicken.',
+      es: 'Un mono que se coló en el estadio con su raqueta de tenis y se niega a soltarla. Con esa cabeza de cuerdas le pega a casi todo. Si falla muchas veces seguidas se enoja, se le pone la cara roja como un tomate y empieza a pegarle con toda su fuerza… pero sin ninguna dirección. Cuando él batea, el lanzador es un pollo.',
+      en: 'A monkey who snuck into the ballpark with his tennis racket and refuses to let go of it. With that string bed he hits almost anything. Miss too many in a row and he gets angry, his face turns red as a tomato and he starts hitting as hard as he can… but with no direction at all. When he bats, the pitcher is a chicken.',
     },
     look: { skin: '#7a4a2a', hair: null, heightM: 1.6, build: 1, belly: 0.25, muscle: 0.3, extraArms: false, beard: false, horns: false, hornBat: false, monkey: true, racket: true, jersey: '#fdfcf7', trim: '#c9d82b', number: '1' },
     ...rated(15, 12, 25),
@@ -116,18 +130,53 @@ export const CHARACTERS: readonly CharacterDef[] = [
     trait: {
       name: { es: 'Raquetazo salvaje', en: 'Wild Racket' },
       description: {
-        es: 'Cada pelota que toca sale a máxima potencia: 30 % jonrón seguro y 70 % foul hacia cualquier lado, hasta hacia atrás (nunca puntúa). Si abanica 3 veces seguidas se enoja y se pone rojo.',
-        en: 'Every ball he touches leaves at max power: 30 % a sure home run, 70 % a foul in any direction, even backwards (never scores). Whiff 3 times in a row and he gets angry and turns red.',
+        es: 'Si abanica 3 veces seguidas se enoja y se le pone la cara roja: cada pelota que toque sale a máxima potencia, 50 % jonrón seguro y 50 % foul hacia cualquier lado, hasta hacia atrás. Se calma al batear un jonrón y luego necesita 10 swings para volver a enojarse.',
+        en: 'Whiff 3 times in a row and he gets angry and his face turns red: every ball he touches leaves at max power, 50 % a sure home run and 50 % a foul in any direction, even backwards. A home run calms him down, and then it takes 10 swings before he can get angry again.',
       },
     },
-    wildSwing: { homeRunChance: 0.3 },
-    temper: { whiffs: 3 },
+    wildSwing: { homeRunChance: 0.5 },
+    temper: { whiffs: 3, cooldownSwings: 10 },
     // When Chimon bats, the pitcher is a chicken.
     pitcherKit: { skin: '#fbf7ec', jersey: '#fbf7ec', jerseyTrim: '#e8c547', pants: '#fbf7ec', cap: '#d9262c', socks: '#f2a516', shoes: '#f2a516', chicken: true },
+  },
+  {
+    id: 'benjamin',
+    name: 'Benjamin Gutenberg',
+    title: { es: 'El Rabino Bateador', en: 'The Batting Rabbi' },
+    bio: {
+      es: 'Rabino de barba larga, sombrero negro y peyot rizados que batea con su traje de sinagoga. A veces aparece un centavo flotando en el campo: si la pelota lo toca, Benjamín Netanyahu baja del cielo en un kipá volador al ritmo de Hava Nagila y le llena el ojo de bateo. Con él al bate, el lanzador también viste de rabino.',
+      en: 'A long-bearded rabbi with a black hat and curly peyot who bats in his synagogue suit. Sometimes a penny floats over the field: if the ball touches it, Benjamin Netanyahu comes down from the sky in a flying kippah to the beat of Hava Nagila and fills his batting eye. When he bats, the pitcher dresses as a rabbi too.',
+    },
+    look: { skin: '#eac7a8', hair: '#5b3b22', heightM: 1.78, build: 1.02, belly: 0.2, muscle: 0.1, extraArms: false, beard: true, horns: false, hornBat: false, rabbi: true, jersey: '#15161b', trim: '#f4f1e8', number: '18' },
+    ...rated(12, 12, 11),
+    ability: null,
+    trait: {
+      name: { es: 'El centavo de la suerte', en: 'The Lucky Penny' },
+      description: {
+        es: 'Antes de cada lanzamiento hay un 25 % de que aparezca un centavo gigante en el campo. Si tu batazo lo toca, Netanyahu baja en su kipá volador y, durante 3 lanzamientos, el ojo de bateo cubre el 85 % de la zona de strike.',
+        en: 'Before each pitch there is a 25 % chance a giant penny appears over the field. If your batted ball touches it, Netanyahu comes down in his flying kippah and, for 3 pitches, the batting eye covers 85 % of the strike zone.',
+      },
+    },
+    pennyBlessing: { spawnChance: 0.25, pciFill: 0.85, pitches: 3 },
+    // The pitcher facing Benjamin dresses as a rabbi too.
+    pitcherKit: { skin: '#e3b894', jersey: '#15161b', jerseyTrim: '#f4f1e8', pants: '#15161b', cap: '#15161b', socks: '#15161b', shoes: '#0c0c0f', rabbi: true },
   },
 ];
 
 export const DEFAULT_CHARACTER: CharacterId = 'moro';
+
+/**
+ * Multipliers that, applied on top of `base`, make each swing's PCI ellipse
+ * cover `fill` (0..1) of the strike zone's area (Benjamin's blessing).
+ */
+export function pciFillMods(fill: number, base: SwingMods): SwingMods {
+  const zone = 2 * STRIKE_ZONE.halfWidth * (STRIKE_ZONE.top - STRIKE_ZONE.bottom);
+  const k = (kind: SwingKind): number => {
+    const p = SWING_PROFILES[kind];
+    return Math.sqrt((fill * zone) / (Math.PI * p.pciHalfWidth * p.pciHalfHeight)) / base.pci[kind];
+  };
+  return mods(k('contact'), k('power'), 1, 1);
+}
 
 export function characterById(id: string): CharacterDef {
   return CHARACTERS.find((c) => c.id === id) ?? CHARACTERS.find((c) => c.id === DEFAULT_CHARACTER)!;
