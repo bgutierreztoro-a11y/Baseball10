@@ -134,6 +134,12 @@ export class Match {
   private penny: Vec3 | null = null;
   private pennyTouchAt = -1;
   private blessingPending = false;
+  /**
+   * The kippah cinematic currently playing is the welcome at the start of the
+   * match (greeting only), not a penny blessing.
+   */
+  private welcoming = false;
+  private welcomed = false;
   private blessingLeft = 0;
 
   constructor(mode: MatchMode, deps: MatchDeps, seed: number) {
@@ -240,20 +246,24 @@ export class Match {
     this.phaseT = 0;
     if (this.stadium.features.bratislava) {
       // Show off the castle and the UFO bridge before the first pitch.
-      this.d.camera.playIntro(() => this.enter('ready'), 4.2, { from: { x: -20, y: 46, z: -60 }, mid: { x: -8, y: 14, z: -24 }, look: { x: 10, y: 60, z: 520 } });
+      this.d.camera.playIntro(() => this.afterIntro(), 4.2, { from: { x: -20, y: 46, z: -60 }, mid: { x: -8, y: 14, z: -24 }, look: { x: 10, y: 60, z: 520 } });
     } else {
-      this.d.camera.playIntro(() => this.enter('ready'), this.mode.kind === 'campaign' ? 2.8 : 1.6);
+      this.d.camera.playIntro(() => this.afterIntro(), this.mode.kind === 'campaign' ? 2.8 : 1.6);
     }
     if (this.atHome) {
       const t = gameText(s.lang);
       window.setTimeout(() => this.d.ui.showCallout(t.homeBuff(this.d.character.name), 'bonus', t.homeBuffSub), 900);
     }
-    if (this.d.firstTime) {
-      const t = gameText(s.lang);
-      const pro = s.controlMode === 'pro';
-      this.d.ui.showTip(this.d.input.isTouch ? (pro ? t.tipFirstTouch : t.tipFirstTouchCasual) : pro ? t.tipFirst : t.tipFirstCasual);
-      this.tipActive = true;
-    }
+    // Benjamin's welcome cinematic comes first: the tip would cover the kippah.
+    if (this.d.firstTime && !this.d.character.pennyBlessing) this.showFirstTip();
+  }
+
+  private showFirstTip(): void {
+    const s = this.d.settings();
+    const t = gameText(s.lang);
+    const pro = s.controlMode === 'pro';
+    this.d.ui.showTip(this.d.input.isTouch ? (pro ? t.tipFirstTouch : t.tipFirstTouchCasual) : pro ? t.tipFirst : t.tipFirstCasual);
+    this.tipActive = true;
   }
 
   pause(): void {
@@ -396,7 +406,8 @@ export class Match {
         w.batter.reset();
         const cam = { x: sd * 4.4, y: 2.6, z: 8.6 };
         this.d.camera.shot(cam, { x: -sd * 0.8, y: 3.9, z: 0.9 }, 62);
-        w.playBlessing(cam, () => this.giveBlessing());
+        if (this.welcoming) this.d.audio.havaNagila();
+        w.playBlessing(cam, () => (this.welcoming ? this.greet() : this.giveBlessing()));
         break;
       }
       case 'windup':
@@ -800,10 +811,38 @@ export class Match {
     this.d.audio.crowdReaction('cheer');
   }
 
+  /**
+   * Whoever brings the penny blessing (Benjamin) is welcomed into the match
+   * by Netanyahu in his flying kippah, once, right after the camera intro.
+   */
+  private afterIntro(): void {
+    if (this.d.character.pennyBlessing && !this.welcomed) {
+      this.welcomed = true;
+      this.welcoming = true;
+      this.enter('blessing');
+    } else {
+      this.enter('ready');
+    }
+  }
+
+  /** Netanyahu raises his arms and welcomes the player to the game. */
+  private greet(): void {
+    if (!this.welcoming) return;
+    this.welcoming = false;
+    const t = gameText(this.d.settings().lang);
+    this.d.ui.showCallout(t.welcomeNetanyahu, 'bonus', t.welcomeSub);
+    this.d.audio.crowdReaction('cheer');
+  }
+
   private finishBlessing(): void {
     if (this.phase !== 'blessing') return;
     this.d.world.stopBlessing();
-    this.giveBlessing();
+    if (this.welcoming) {
+      this.greet();
+      if (this.d.firstTime) this.showFirstTip();
+    } else {
+      this.giveBlessing();
+    }
     this.enter('ready');
   }
 
