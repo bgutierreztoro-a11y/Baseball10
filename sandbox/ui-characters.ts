@@ -32,7 +32,7 @@ function vm(): CharactersVM {
         stat(lang === 'es' ? 'Contacto' : 'Contact', c.ratings.contact),
         stat(lang === 'es' ? 'Poder' : 'Power', c.ratings.power),
       ],
-      ability: c.ability ? { name: c.ability.name[lang], description: c.ability.description[lang] } : null,
+      ability: c.ability ? { name: c.ability.name[lang], description: c.ability.description[lang] } : c.trait ? { name: c.trait.name[lang], description: c.trait.description[lang] } : null,
       selected: c.id === selected,
     })),
   };

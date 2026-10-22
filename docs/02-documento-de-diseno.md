@@ -137,6 +137,7 @@ Se eligen en el menú **Bateadores** y la elección se guarda.
 | **El Mati** | David "Big Papi" Ortiz | Enorme, 1,93 m | 10 | 14 | 17 | El más equilibrado. Su tamaño tapa mucha más pantalla. |
 | **Arturek** | — | Gigante eslovaco rubio de 7,8 m con cuatro brazos | 20 | 5 | 2 | Alcanza casi todo (PCI +35 %), pero le pega flojo. |
 | **Chamo** | Swing de Barry Bonds | Blanco, 1,90 m, marcado: six-pack y bíceps que se notan en la camiseta; cuernos de villano y un cuerno gigante como bate | 10 | 5 | 24 | El swing de poder más fuerte; contacto flojo. |
+| **Chimon** | — | Mono de 1,60 m con cola, cinta de tenista y una raqueta de tenis en vez de bate | 15 | 12 | 25 | **Raquetazo salvaje:** toda pelota que toca sale a máxima potencia (≈120 mph), sin importar timing ni puntería: 30 % jonrón asegurado y 70 % foul en cualquier dirección (por las líneas, al cielo o hacia atrás), que nunca puntúa. Tras 3 abanicadas seguidas se enoja y se pone rojo (pataleta con la raqueta); cualquier contacto lo calma. Con él al bate, el lanzador es un pollo. |
 
 Swing de potencia perfecto en el Metropolitano (92 mph): Moro 434 ft (460 con peak), Mati 464, Arturek 381, Chamo 494.
 

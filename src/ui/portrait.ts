@@ -162,6 +162,12 @@ function figure(look: BatterLook, cx: number, feet: number, H: number, id: strin
   const trim = look.trim;
   const g = el('g');
 
+  if (look.monkey) {
+    // Curled tail peeking out from behind (viewer's right).
+    const c = curvePts([[cx + hip * 0.4, y(4.0)], [cx + hip * 1.6, y(4.6)], [cx + hip * 2.4, y(4.1)], [cx + hip * 2.3, y(3.3)], [cx + hip * 1.8, y(3.05)], [cx + hip * 1.65, y(3.45)]], 24);
+    g.append(el('path', { d: taper(c, (t) => u * (0.2 - 0.08 * t)), fill: skin }));
+  }
+
   // ── Legs ──
   const legX = (side: number, k: number): number => cx + side * (hip * 0.52 + k * u * 0.16);
   for (const side of [-1, 1]) {
@@ -277,48 +283,70 @@ function figure(look: BatterLook, cx: number, feet: number, H: number, id: strin
     // Hair peeking out under the helmet (longer at the back).
     g.append(el('ellipse', { cx, cy: headCy + headRy * 0.05, rx: headRx * 1.18, ry: headRy * 0.92, fill: look.hair }));
   }
-  // Ear (viewer's left; the right one is under the flap).
-  g.append(el('ellipse', { cx: cx - headRx * 0.98, cy: headCy + headRy * 0.08, rx: headRx * 0.2, ry: headRy * 0.24, fill: skinDark }));
-  g.append(el('ellipse', { cx, cy: headCy, rx: headRx, ry: headRy, fill: skin }));
-  // Shadow cast by the helmet bill.
-  g.append(el('ellipse', { cx, cy: headCy - headRy * 0.2, rx: headRx * 0.98, ry: headRy * 0.3, fill: '#000000', opacity: 0.16 }));
-  // Eyes.
-  for (const s of [-1, 1]) {
-    // White of the eye first so the eyes read on every skin tone.
-    g.append(el('ellipse', { cx: cx + s * headRx * 0.4, cy: headCy + headRy * 0.03, rx: u * 0.085, ry: u * 0.062, fill: '#f4f1e8' }));
-    g.append(el('circle', { cx: cx + s * headRx * 0.4 + u * 0.012, cy: headCy + headRy * 0.04, r: u * 0.045, fill: '#14100e' }));
+  if (look.monkey) {
+    // Monkey head: big round ears, fur crown, light heart-shaped face mask and muzzle, sweatband.
+    const faceC = '#e2b48a';
+    for (const sd of [-1, 1]) {
+      g.append(el('circle', { cx: cx + sd * headRx * 1.05, cy: headCy - headRy * 0.02, r: headRx * 0.42, fill: skin }));
+      g.append(el('circle', { cx: cx + sd * headRx * 1.07, cy: headCy - headRy * 0.0, r: headRx * 0.26, fill: faceC }));
+    }
+    g.append(el('ellipse', { cx, cy: headCy, rx: headRx * 1.02, ry: headRy, fill: skin }));
+    for (const sd of [-1, 1]) g.append(el('circle', { cx: cx + sd * headRx * 0.36, cy: headCy - headRy * 0.02, r: headRx * 0.42, fill: faceC }));
+    g.append(el('ellipse', { cx, cy: headCy + headRy * 0.46, rx: headRx * 0.66, ry: headRy * 0.42, fill: faceC }));
+    for (const sd of [-1, 1]) {
+      g.append(el('ellipse', { cx: cx + sd * headRx * 0.36, cy: headCy + headRy * 0.0, rx: u * 0.085, ry: u * 0.075, fill: '#f4f1e8' }));
+      g.append(el('circle', { cx: cx + sd * headRx * 0.36 + u * 0.012, cy: headCy + headRy * 0.01, r: u * 0.05, fill: '#14100e' }));
+      g.append(el('ellipse', { cx: cx + sd * u * 0.05, cy: headCy + headRy * 0.3, rx: u * 0.025, ry: u * 0.018, fill: skinDark }));
+    }
+    // Cheeky grin across the muzzle.
+    g.append(el('path', { d: `M${r(cx - headRx * 0.4)} ${r(headCy + headRy * 0.5)}Q${r(cx)} ${r(headCy + headRy * 0.88)} ${r(cx + headRx * 0.42)} ${r(headCy + headRy * 0.48)}`, fill: 'none', stroke: '#3a1d12', 'stroke-width': u * 0.05, 'stroke-linecap': 'round' }));
+    // Tennis sweatband over the forehead, fur tuft sticking out on top.
+    g.append(el('path', { d: `M${r(cx - headRx * 0.25)} ${r(headCy - headRy * 0.88)}Q${r(cx)} ${r(headCy - headRy * 1.25)} ${r(cx + headRx * 0.3)} ${r(headCy - headRy * 0.9)}Z`, fill: skin }));
+    g.append(el('path', { d: `M${r(cx - headRx * 0.98)} ${r(headCy - headRy * 0.42)}Q${r(cx)} ${r(headCy - headRy * 0.72)} ${r(cx + headRx * 0.98)} ${r(headCy - headRy * 0.42)}L${r(cx + headRx * 0.94)} ${r(headCy - headRy * 0.66)}Q${r(cx)} ${r(headCy - headRy * 0.98)} ${r(cx - headRx * 0.94)} ${r(headCy - headRy * 0.66)}Z`, fill: trim }));
+  } else {
+    // Ear (viewer's left; the right one is under the flap).
+    g.append(el('ellipse', { cx: cx - headRx * 0.98, cy: headCy + headRy * 0.08, rx: headRx * 0.2, ry: headRy * 0.24, fill: skinDark }));
+    g.append(el('ellipse', { cx, cy: headCy, rx: headRx, ry: headRy, fill: skin }));
+    // Shadow cast by the helmet bill.
+    g.append(el('ellipse', { cx, cy: headCy - headRy * 0.2, rx: headRx * 0.98, ry: headRy * 0.3, fill: '#000000', opacity: 0.16 }));
+    // Eyes.
+    for (const s of [-1, 1]) {
+      // White of the eye first so the eyes read on every skin tone.
+      g.append(el('ellipse', { cx: cx + s * headRx * 0.4, cy: headCy + headRy * 0.03, rx: u * 0.085, ry: u * 0.062, fill: '#f4f1e8' }));
+      g.append(el('circle', { cx: cx + s * headRx * 0.4 + u * 0.012, cy: headCy + headRy * 0.04, r: u * 0.045, fill: '#14100e' }));
+    }
+    // Nose.
+    g.append(el('path', { d: `M${r(cx + u * 0.02)} ${r(headCy + headRy * 0.08)}Q${r(cx + u * 0.09)} ${r(headCy + headRy * 0.3)} ${r(cx - u * 0.04)} ${r(headCy + headRy * 0.33)}`, fill: 'none', stroke: skinDark, 'stroke-width': u * 0.045, 'stroke-linecap': 'round' }));
+    if (look.beard) {
+      const bc = look.hair ?? '#15100c';
+      g.append(
+        el('path', {
+          d: smooth([
+            [cx - headRx * 0.97, headCy + headRy * 0.02],
+            [cx - headRx * 0.82, headCy + headRy * 0.62],
+            [cx, headCy + headRy * 1.06],
+            [cx + headRx * 0.82, headCy + headRy * 0.62],
+            [cx + headRx * 0.97, headCy + headRy * 0.02],
+            [cx + headRx * 0.55, headCy + headRy * 0.36],
+            [cx, headCy + headRy * 0.32],
+            [cx - headRx * 0.55, headCy + headRy * 0.36],
+          ], true),
+          fill: bc,
+        }),
+      );
+    }
+    // Smile.
+    // Grin: a light crescent outlined in dark lip colour (reads on any skin tone).
+    g.append(el('path', { d: `M${r(cx - headRx * 0.32)} ${r(headCy + headRy * 0.47)}Q${r(cx)} ${r(headCy + headRy * 0.55)} ${r(cx + headRx * 0.34)} ${r(headCy + headRy * 0.45)}Q${r(cx + headRx * 0.05)} ${r(headCy + headRy * 0.8)} ${r(cx - headRx * 0.32)} ${r(headCy + headRy * 0.47)}Z`, fill: '#f4f1e8', stroke: mix(skin, '#3a0d0d', 0.6), 'stroke-width': u * 0.04, 'stroke-linejoin': 'round' }));
+    // Batting helmet: dome, ear flap (viewer's right), bill and a gloss stripe.
+    const helmet = trim;
+    const hTop = T - u * 0.08;
+    const rim = headCy - headRy * 0.12;
+    g.append(el('path', { d: `M${r(cx + headRx * 0.7)} ${r(rim)}L${r(cx + headRx * 1.2)} ${r(rim)}L${r(cx + headRx * 1.22)} ${r(headCy + headRy * 0.42)}Q${r(cx + headRx * 1.0)} ${r(headCy + headRy * 0.62)} ${r(cx + headRx * 0.78)} ${r(headCy + headRy * 0.4)}Z`, fill: mix(helmet, INK, 0.12) }));
+    g.append(el('path', { d: `M${r(cx - headRx * 1.12)} ${r(rim)}C${r(cx - headRx * 1.16)} ${r(hTop - u * 0.02)} ${r(cx + headRx * 1.16)} ${r(hTop - u * 0.02)} ${r(cx + headRx * 1.22)} ${r(rim)}Z`, fill: helmet }));
+    g.append(el('path', { d: `M${r(cx - headRx * 0.75)} ${r(headCy - headRy * 0.55)}Q${r(cx - headRx * 0.2)} ${r(hTop + u * 0.06)} ${r(cx + headRx * 0.35)} ${r(hTop + u * 0.1)}`, fill: 'none', stroke: '#ffffff', 'stroke-width': u * 0.07, 'stroke-linecap': 'round', opacity: 0.35 }));
+    g.append(el('ellipse', { cx: cx - headRx * 0.05, cy: rim + u * 0.01, rx: headRx * 1.08, ry: u * 0.085, fill: mix(helmet, INK, 0.35) }));
   }
-  // Nose.
-  g.append(el('path', { d: `M${r(cx + u * 0.02)} ${r(headCy + headRy * 0.08)}Q${r(cx + u * 0.09)} ${r(headCy + headRy * 0.3)} ${r(cx - u * 0.04)} ${r(headCy + headRy * 0.33)}`, fill: 'none', stroke: skinDark, 'stroke-width': u * 0.045, 'stroke-linecap': 'round' }));
-  if (look.beard) {
-    const bc = look.hair ?? '#15100c';
-    g.append(
-      el('path', {
-        d: smooth([
-          [cx - headRx * 0.97, headCy + headRy * 0.02],
-          [cx - headRx * 0.82, headCy + headRy * 0.62],
-          [cx, headCy + headRy * 1.06],
-          [cx + headRx * 0.82, headCy + headRy * 0.62],
-          [cx + headRx * 0.97, headCy + headRy * 0.02],
-          [cx + headRx * 0.55, headCy + headRy * 0.36],
-          [cx, headCy + headRy * 0.32],
-          [cx - headRx * 0.55, headCy + headRy * 0.36],
-        ], true),
-        fill: bc,
-      }),
-    );
-  }
-  // Smile.
-  // Grin: a light crescent outlined in dark lip colour (reads on any skin tone).
-  g.append(el('path', { d: `M${r(cx - headRx * 0.32)} ${r(headCy + headRy * 0.47)}Q${r(cx)} ${r(headCy + headRy * 0.55)} ${r(cx + headRx * 0.34)} ${r(headCy + headRy * 0.45)}Q${r(cx + headRx * 0.05)} ${r(headCy + headRy * 0.8)} ${r(cx - headRx * 0.32)} ${r(headCy + headRy * 0.47)}Z`, fill: '#f4f1e8', stroke: mix(skin, '#3a0d0d', 0.6), 'stroke-width': u * 0.04, 'stroke-linejoin': 'round' }));
-  // Batting helmet: dome, ear flap (viewer's right), bill and a gloss stripe.
-  const helmet = trim;
-  const hTop = T - u * 0.08;
-  const rim = headCy - headRy * 0.12;
-  g.append(el('path', { d: `M${r(cx + headRx * 0.7)} ${r(rim)}L${r(cx + headRx * 1.2)} ${r(rim)}L${r(cx + headRx * 1.22)} ${r(headCy + headRy * 0.42)}Q${r(cx + headRx * 1.0)} ${r(headCy + headRy * 0.62)} ${r(cx + headRx * 0.78)} ${r(headCy + headRy * 0.4)}Z`, fill: mix(helmet, INK, 0.12) }));
-  g.append(el('path', { d: `M${r(cx - headRx * 1.12)} ${r(rim)}C${r(cx - headRx * 1.16)} ${r(hTop - u * 0.02)} ${r(cx + headRx * 1.16)} ${r(hTop - u * 0.02)} ${r(cx + headRx * 1.22)} ${r(rim)}Z`, fill: helmet }));
-  g.append(el('path', { d: `M${r(cx - headRx * 0.75)} ${r(headCy - headRy * 0.55)}Q${r(cx - headRx * 0.2)} ${r(hTop + u * 0.06)} ${r(cx + headRx * 0.35)} ${r(hTop + u * 0.1)}`, fill: 'none', stroke: '#ffffff', 'stroke-width': u * 0.07, 'stroke-linecap': 'round', opacity: 0.35 }));
-  g.append(el('ellipse', { cx: cx - headRx * 0.05, cy: rim + u * 0.01, rx: headRx * 1.08, ry: u * 0.085, fill: mix(helmet, INK, 0.35) }));
   if (look.horns) {
     // Villain horns: out from the helmet sides, up, then curling inward at the tips.
     for (const sd of [-1, 1]) {
@@ -343,7 +371,29 @@ function figure(look: BatterLook, cx: number, feet: number, H: number, id: strin
   const batPts: Pt[] = [];
   for (const t of [0, 0.45, 0.75, 1]) batPts.push([knob[0] + dir[0] * len * t + nrm[0] * wAt(t), knob[1] + dir[1] * len * t + nrm[1] * wAt(t)]);
   for (const t of [1, 0.75, 0.45, 0]) batPts.push([knob[0] + dir[0] * len * t - nrm[0] * wAt(t), knob[1] + dir[1] * len * t - nrm[1] * wAt(t)]);
-  if (look.hornBat) {
+  if (look.racket) {
+    // Tennis racket: white grip, dark shaft and an oval strung head at the top.
+    const at = (t: number): Pt => [knob[0] + dir[0] * len * t, knob[1] + dir[1] * len * t];
+    const head = at(0.78);
+    const ang = (Math.atan2(dir[1], dir[0]) * 180) / Math.PI;
+    const tr = `rotate(${r(ang)} ${r(head[0])} ${r(head[1])})`;
+    const hrx = len * 0.24;
+    const hry = u * 0.62;
+    g.append(limb([at(0.32), at(0.56)], u * 0.08, '#1f2a44'));
+    g.append(limb([at(0.02), at(0.34)], u * 0.15, '#f1f1ea'));
+    const clip = `${id}-strings`;
+    g.append(el('clipPath', { id: clip }, el('ellipse', { cx: head[0], cy: head[1], rx: hrx, ry: hry, transform: tr })));
+    const net = el('g', { 'clip-path': `url(#${clip})` });
+    net.append(el('ellipse', { cx: head[0], cy: head[1], rx: hrx, ry: hry, transform: tr, fill: '#ffffff', opacity: 0.08 }));
+    for (let i = -6; i <= 6; i++) {
+      const k = i / 6;
+      net.append(el('path', { d: `M${r(head[0] - hrx)} ${r(head[1] + k * hry)}L${r(head[0] + hrx)} ${r(head[1] + k * hry)}`, transform: tr, stroke: '#e6edcc', 'stroke-width': u * 0.025 }));
+      net.append(el('path', { d: `M${r(head[0] + k * hrx)} ${r(head[1] - hry)}L${r(head[0] + k * hrx)} ${r(head[1] + hry)}`, transform: tr, stroke: '#e6edcc', 'stroke-width': u * 0.025 }));
+    }
+    g.append(net);
+    g.append(el('ellipse', { cx: head[0], cy: head[1], rx: hrx, ry: hry, transform: tr, fill: 'none', stroke: '#1f2a44', 'stroke-width': u * 0.11 }));
+    g.append(el('circle', { cx: knob[0], cy: knob[1], r: u * 0.09, fill: '#1f2a44' }));
+  } else if (look.hornBat) {
     // A giant crescent horn: dark leather-wrapped handle, ivory barrel with growth rings.
     const ctrl: Pt[] = [0, 0.3, 0.6, 0.85, 1.04].map((t) => {
       const bow = Math.sin(Math.min(1, t) * Math.PI) * u * 0.42;

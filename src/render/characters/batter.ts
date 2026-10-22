@@ -151,6 +151,140 @@ function makeHeadHorns(quality: QualitySettings): THREE.Group {
   return g;
 }
 
+/** String bed texture: a lime grid clipped to the racket's oval head (transparent outside). */
+function stringsTexture(): THREE.CanvasTexture {
+  const c = document.createElement('canvas');
+  c.width = 128;
+  c.height = 160;
+  const ctx = c.getContext('2d')!;
+  ctx.beginPath();
+  ctx.ellipse(64, 80, 62, 78, 0, 0, Math.PI * 2);
+  ctx.clip();
+  ctx.fillStyle = 'rgba(240,244,230,0.12)';
+  ctx.fillRect(0, 0, 128, 160);
+  ctx.strokeStyle = 'rgba(236,242,214,0.95)';
+  ctx.lineWidth = 2;
+  for (let x = 6; x < 128; x += 10) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, 160);
+    ctx.stroke();
+  }
+  for (let y = 6; y < 160; y += 10) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(128, y);
+    ctx.stroke();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+/**
+ * Chimon's tennis racket. Same axis convention as the bat (knob at 0, along
+ * local +Y): grip under the hands, an open throat, and an oval head whose
+ * centre sits on the bat's sweet spot so contact lands in the strings. The
+ * head lies in the local YZ plane, facing the pitcher in the swing.
+ */
+function makeRacket(): { group: THREE.Group; wood: THREE.MeshStandardMaterial; grip: THREE.MeshStandardMaterial } {
+  const frame = new THREE.MeshStandardMaterial({ color: '#1f2a44', roughness: 0.3, metalness: 0.35 });
+  const grip = new THREE.MeshStandardMaterial({ color: '#f1f1ea', roughness: 0.85 });
+  const accent = new THREE.MeshStandardMaterial({ color: '#c9d82b', roughness: 0.4 });
+  const group = new THREE.Group();
+  const butt = new THREE.Mesh(new THREE.CylinderGeometry(0.021, 0.021, 0.02, 10), frame);
+  butt.position.y = 0.01;
+  const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.017, 0.018, 0.26, 8), grip);
+  handle.position.y = 0.15;
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.014, 0.14, 8), frame);
+  shaft.position.y = 0.34;
+  group.add(butt, handle, shaft);
+  // Open throat: two arms from the shaft to the bottom of the head.
+  const HEAD_Y = SWEET - 0.02;
+  const HY = 0.13;
+  const HZ = 0.1;
+  for (const side of [-1, 1]) {
+    const a = V(0, 0.4, 0);
+    const b = V(0, HEAD_Y - HY * 0.82, side * HZ * 0.55);
+    const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.009, a.distanceTo(b), 6), frame);
+    arm.position.copy(a).add(b).multiplyScalar(0.5);
+    arm.quaternion.setFromUnitVectors(V(0, 1, 0), b.clone().sub(a).normalize());
+    group.add(arm);
+  }
+  const ringG = new THREE.TorusGeometry(HZ, 0.009, 8, 44);
+  ringG.scale(1, HY / HZ, 1);
+  ringG.rotateY(Math.PI / 2);
+  const ring = new THREE.Mesh(ringG, frame);
+  ring.position.y = HEAD_Y;
+  // Lime bumper on the tip of the head.
+  const bumperG = new THREE.TorusGeometry(HZ, 0.011, 6, 20, Math.PI * 0.5);
+  bumperG.rotateZ(Math.PI * 0.25);
+  bumperG.scale(1, HY / HZ, 1);
+  bumperG.rotateY(Math.PI / 2);
+  const bumper = new THREE.Mesh(bumperG, accent);
+  bumper.position.y = HEAD_Y;
+  const strings = new THREE.Mesh(
+    new THREE.PlaneGeometry(HZ * 2, HY * 2),
+    new THREE.MeshStandardMaterial({ map: stringsTexture(), transparent: true, alphaTest: 0.05, side: THREE.DoubleSide, roughness: 0.6, depthWrite: false }),
+  );
+  strings.rotation.y = Math.PI / 2;
+  strings.position.y = HEAD_Y;
+  strings.castShadow = false;
+  group.add(ring, bumper, strings);
+  return { group, wood: frame, grip };
+}
+
+/**
+ * Monkey parts on top of the humanoid: a light face mask and muzzle, big
+ * round ears, a curled tail on the hips and a tennis sweatband. The fur is
+ * the humanoid's skin material, so it tints with the rest of the body.
+ */
+function addMonkey(h: Humanoid, look: BatterLook, quality: QualitySettings): THREE.MeshStandardMaterial {
+  const fur = h.materials.skin!;
+  const face = new THREE.MeshStandardMaterial({ color: '#e2b48a', roughness: 0.55 });
+  face.emissive.set('#e2b48a').multiplyScalar(0.12);
+  h.materials.face = face;
+  const dark = new THREE.MeshStandardMaterial({ color: '#2a1810', roughness: 0.6 });
+  const eyeWhite = new THREE.MeshStandardMaterial({ color: '#f4f1e8', roughness: 0.35 });
+  const band = new THREE.MeshStandardMaterial({ color: look.trim, roughness: 0.85 });
+  h.materials.band = band;
+  const parts: THREE.Mesh[] = [];
+  const add = (parent: THREE.Object3D, g: THREE.BufferGeometry, m: THREE.Material, pos: THREE.Vector3, scale?: THREE.Vector3): THREE.Mesh => {
+    const x = new THREE.Mesh(g, m);
+    x.position.copy(pos);
+    if (scale) x.scale.copy(scale);
+    parent.add(x);
+    parts.push(x);
+    return x;
+  };
+  // Heart-shaped face mask around the eyes, then the muzzle.
+  add(h.head, new THREE.SphereGeometry(0.085, 18, 12), face, V(0, 0.012, 0.066), V(1.08, 0.82, 0.55));
+  add(h.head, new THREE.SphereGeometry(0.06, 18, 12), face, V(0, -0.045, 0.075), V(1.18, 0.82, 0.86));
+  for (const side of [-1, 1]) {
+    add(h.head, new THREE.SphereGeometry(0.008, 6, 4), dark, V(side * 0.013, -0.03, 0.125));
+    // Big round eyes in front of the mask (the humanoid's own eyes sit behind it).
+    add(h.head, new THREE.SphereGeometry(0.019, 12, 8), eyeWhite, V(side * 0.036, 0.022, 0.106), V(1, 1.1, 0.6));
+    add(h.head, new THREE.SphereGeometry(0.011, 10, 6), dark, V(side * 0.035, 0.021, 0.116), V(1, 1.1, 0.6));
+    // Brow ridge.
+    const brow = add(h.head, new THREE.CapsuleGeometry(0.008, 0.03, 2, 6), fur, V(side * 0.038, 0.05, 0.103));
+    brow.rotation.set(0, 0, Math.PI / 2 + side * 0.18);
+    // Ears: fur cup with a light inside.
+    const ear = add(h.head, new THREE.SphereGeometry(0.048, 14, 10), fur, V(side * 0.118, 0.005, -0.01), V(0.42, 1, 1));
+    ear.rotation.y = side * 0.25;
+    add(h.head, new THREE.SphereGeometry(0.034, 12, 8), face, V(side * 0.128, 0.005, 0.0), V(0.3, 1, 1));
+  }
+  add(h.head, new THREE.BoxGeometry(0.05, 0.006, 0.01), dark, V(0, -0.07, 0.115));
+  // Tufts of fur on top of the head, over the sweatband.
+  add(h.head, new THREE.SphereGeometry(0.11, 18, 10, 0, Math.PI * 2, 0, Math.PI * 0.42), fur, V(0, 0.012, -0.005), V(0.98, 1.04, 1.02));
+  const sweat = add(h.head, new THREE.TorusGeometry(0.112, 0.016, 8, 32), band, V(0, 0.055, 0), V(0.95, 1, 1.03));
+  sweat.rotation.x = Math.PI / 2 - 0.12;
+  // Long curled tail from the base of the back.
+  const tail = new THREE.CatmullRomCurve3([V(0, -0.02, -0.12), V(0, -0.14, -0.26), V(0.03, -0.3, -0.38), V(0.06, -0.3, -0.54), V(0.05, -0.14, -0.6), V(0.03, -0.05, -0.52), V(0.02, -0.08, -0.45)]);
+  add(h.hips, new THREE.TubeGeometry(tail, 40, 0.022, 8, false), fur, V(0, 0, 0));
+  for (const x of parts) x.castShadow = quality.shadows;
+  return face;
+}
+
 interface BatKey {
   pose: HumanoidPose;
   K: THREE.Vector3;
@@ -213,6 +347,17 @@ const SLUMP = key(
   V(0.15, -0.95, 0.25),
 );
 
+/** Angry tantrum after a whiff: racket raised overhead, ready to smash something. */
+const TANTRUM = key(
+  { hips: V(0, 0.95, 0), hipsYaw: 0.4, hipsLean: -0.05, chestYaw: 0.2, chestLean: -0.08, headYaw: 0.3, headPitch: -0.2, footL: V(0.42, 0, 0.04), footR: V(-0.32, 0, 0), footYawL: 0.5, footYawR: 0.5, elbowL: V(0.6, 0.2, 0.3), elbowR: V(-0.6, 0.2, 0.3) },
+  V(0.02, 1.62, 0.12),
+  V(0.15, 0.85, -0.5),
+);
+
+/** Fur / skin colour when angry. */
+const ANGRY_RED = new THREE.Color('#c8141a');
+const ANGRY_FACE = new THREE.Color('#ff3326');
+
 /** Height of the base body the keyframes were authored for. */
 const BASE_HEIGHT = 1.85;
 /** Distance from the plate centre line to the root of a base-sized batter. */
@@ -272,6 +417,10 @@ export class Batter implements BatterRig {
   private readonly q = new THREE.Quaternion();
   private flip: { pos: THREE.Vector3; vel: THREE.Vector3; rot: THREE.Euler; spin: THREE.Vector3; landed: boolean } | null = null;
   private reactKey: BatKey = SLUMP;
+  /** Anger 0..1 (fades toward `angryTarget`); tints skin/fur and face red. */
+  private anger = 0;
+  private angryTarget = 0;
+  private readonly tintable: { m: THREE.MeshStandardMaterial; color: THREE.Color; emissive: THREE.Color; red: THREE.Color }[] = [];
 
   constructor(quality: QualitySettings, look: BatterLook) {
     const m = batterMetrics(look);
@@ -289,7 +438,7 @@ export class Batter implements BatterRig {
       socks: mixHex(look.trim, '#0b1426', 0.25),
       shoes: '#15161a',
       hat: mixHex(look.trim, '#0b1426', 0.08),
-      gloves: look.trim,
+      gloves: look.monkey ? '#e2b48a' : look.trim,
       build: look.build,
       number: look.number,
     };
@@ -308,10 +457,11 @@ export class Batter implements BatterRig {
     this.h = new Humanoid(outfit, quality, shape);
     this.tuneSkin(this.h.materials.skin!);
     this.root = this.h.root;
-    this.addHelmet(look, quality);
+    const face = look.monkey ? addMonkey(this.h, look, quality) : null;
+    if (!look.monkey) this.addHelmet(look, quality);
     if (look.horns) this.h.head.add(makeHeadHorns(quality));
-    this.hornBat = look.hornBat;
-    const bat = look.hornBat ? makeHornBat() : makeBat();
+    this.hornBat = look.hornBat || !!look.racket;
+    const bat = look.racket ? makeRacket() : look.hornBat ? makeHornBat() : makeBat();
     this.bat = bat.group;
     this.bat.scale.setScalar(this.batScale);
     this.batWood = bat.wood;
@@ -323,6 +473,11 @@ export class Batter implements BatterRig {
     const M = this.h.materials;
     this.aura = new PeakAura(quality, [M.jersey!, M.skin!, M.sleeve!], m.scale);
     this.h.body.add(this.aura.group);
+    const tint = (m: THREE.MeshStandardMaterial | undefined, red: THREE.Color): void => {
+      if (m) this.tintable.push({ m, color: m.color.clone(), emissive: m.emissive.clone(), red });
+    };
+    tint(this.h.materials.skin, ANGRY_RED);
+    if (face) tint(face, ANGRY_FACE);
     this.contact = key({}, new THREE.Vector3(), new THREE.Vector3(0, 0, 1));
     this.from = key({}, new THREE.Vector3(), new THREE.Vector3(0, 1, 0));
     this.cur = key({}, new THREE.Vector3(), new THREE.Vector3(0, 1, 0));
@@ -376,7 +531,7 @@ export class Batter implements BatterRig {
   }
 
   setBatColors(wood: string, grip: string): void {
-    // A horn keeps its own colours; only the leather grip follows the bat skin.
+    // A horn (or a racket) keeps its own colours; only the grip follows the bat skin.
     if (!this.hornBat) this.batWood.color.set(wood);
     this.batGrip.color.set(grip);
   }
@@ -392,6 +547,10 @@ export class Batter implements BatterRig {
   /** Shows the aura immediately at full strength (shader warm-up), or restores it. */
   forcePeakVisible(v: boolean): void {
     this.aura.forceVisible(v);
+  }
+
+  setAngry(on: boolean): void {
+    this.angryTarget = on ? 1 : 0;
   }
 
   /** Stride/load timed to the pitch (called at release). */
@@ -419,7 +578,7 @@ export class Batter implements BatterRig {
   }
 
   react(kind: 'whiff' | 'out'): void {
-    this.reactKey = SLUMP;
+    this.reactKey = this.angryTarget > 0 && kind === 'whiff' ? TANTRUM : SLUMP;
     this.begin('react', kind === 'whiff' ? 0.35 : 0.5);
   }
 
@@ -593,12 +752,14 @@ export class Batter implements BatterRig {
     this.time += dt;
     this.t += dt;
     this.aura.update(dt);
+    this.updateAnger(dt);
     const u = this.dur > 0 ? this.t / this.dur : 1;
     switch (this.state) {
       case 'stance': {
         this.copyKey(STANCE, this.cur);
         // Idle: breathing + bat waggle.
-        const w = Math.sin(this.time * 2.1);
+        // Angry: a fast, jittery waggle.
+        const w = Math.sin(this.time * (2.1 + 9 * this.anger)) * (1 + 1.5 * this.anger);
         this.cur.D.applyAxisAngle(this.tmp2.set(0, 0, 1), w * 0.06);
         this.cur.K.y += Math.sin(this.time * 1.3) * 0.01;
         this.cur.pose.hipsPos.y += Math.sin(this.time * 1.3) * 0.006;
@@ -623,9 +784,28 @@ export class Batter implements BatterRig {
         break;
       case 'react':
         this.mix(this.from, this.reactKey, ease(u), this.cur);
+        if (this.reactKey === TANTRUM) {
+          // Shakes the racket over his head.
+          this.cur.K.x += Math.sin(this.time * 22) * 0.05;
+          this.cur.pose.hipsPos.y += Math.abs(Math.sin(this.time * 11)) * 0.03;
+        }
         break;
     }
     this.applyCurrent(dt);
+  }
+
+  /** Fades the red tint in/out and makes it throb while angry. */
+  private updateAnger(dt: number): void {
+    if (this.anger === this.angryTarget && this.anger === 0) return;
+    const k = 1 - Math.exp(-dt * 4);
+    this.anger += (this.angryTarget - this.anger) * k;
+    if (Math.abs(this.anger - this.angryTarget) < 0.002) this.anger = this.angryTarget;
+    const a = this.anger;
+    const throb = 0.75 + 0.25 * Math.sin(this.time * 7);
+    for (const t of this.tintable) {
+      t.m.color.copy(t.color).lerp(t.red, 0.85 * a);
+      t.m.emissive.copy(t.emissive).lerp(t.red, 0.35 * a * throb);
+    }
   }
 
   private applyCurrent(dt = 0): void {
