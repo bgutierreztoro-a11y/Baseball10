@@ -3,6 +3,7 @@ import type { BatterLook, Hand, QualitySettings, SwingKind } from '../../contrac
 import { PLATE } from '../../config/constants';
 import type { BatterRig } from '../api';
 import { PeakAura } from './aura';
+import { addRabbiAttire } from './rabbi';
 import { Humanoid, blendPose, copyPose, ease, easeOut, makePose, type BodyShape, type HumanoidPose, type Outfit } from './humanoid';
 
 /**
@@ -417,7 +418,7 @@ export class Batter implements BatterRig {
   private readonly q = new THREE.Quaternion();
   private flip: { pos: THREE.Vector3; vel: THREE.Vector3; rot: THREE.Euler; spin: THREE.Vector3; landed: boolean } | null = null;
   private reactKey: BatKey = SLUMP;
-  /** Anger 0..1 (fades toward `angryTarget`); tints skin/fur and face red. */
+  /** Anger 0..1 (fades toward `angryTarget`); tints the face (or the skin) red. */
   private anger = 0;
   private angryTarget = 0;
   private readonly tintable: { m: THREE.MeshStandardMaterial; color: THREE.Color; emissive: THREE.Color; red: THREE.Color }[] = [];
@@ -433,12 +434,13 @@ export class Batter implements BatterRig {
       skin: look.skin,
       jersey: look.jersey,
       trim: look.trim,
-      sleeve: look.trim,
-      pants: '#ece8dc',
-      socks: mixHex(look.trim, '#0b1426', 0.25),
+      // A rabbi's coat has long black sleeves and black trousers.
+      sleeve: look.rabbi ? look.jersey : look.trim,
+      pants: look.rabbi ? look.jersey : '#ece8dc',
+      socks: look.rabbi ? '#101014' : mixHex(look.trim, '#0b1426', 0.25),
       shoes: '#15161a',
       hat: mixHex(look.trim, '#0b1426', 0.08),
-      gloves: look.monkey ? '#e2b48a' : look.trim,
+      gloves: look.monkey ? '#e2b48a' : look.rabbi ? look.skin : look.trim,
       build: look.build,
       number: look.number,
     };
@@ -458,7 +460,8 @@ export class Batter implements BatterRig {
     this.tuneSkin(this.h.materials.skin!);
     this.root = this.h.root;
     const face = look.monkey ? addMonkey(this.h, look, quality) : null;
-    if (!look.monkey) this.addHelmet(look, quality);
+    if (look.rabbi) addRabbiAttire(this.h, look.hair ?? '#2a1d14', quality, { chestDepth: this.h.chestDepth });
+    if (!look.monkey && !look.rabbi) this.addHelmet(look, quality);
     if (look.horns) this.h.head.add(makeHeadHorns(quality));
     this.hornBat = look.hornBat || !!look.racket;
     const bat = look.racket ? makeRacket() : look.hornBat ? makeHornBat() : makeBat();
@@ -476,8 +479,9 @@ export class Batter implements BatterRig {
     const tint = (m: THREE.MeshStandardMaterial | undefined, red: THREE.Color): void => {
       if (m) this.tintable.push({ m, color: m.color.clone(), emissive: m.emissive.clone(), red });
     };
-    tint(this.h.materials.skin, ANGRY_RED);
+    // A monkey's anger shows on his face (mask, muzzle, inner ears); anyone else reddens all over.
     if (face) tint(face, ANGRY_FACE);
+    else tint(this.h.materials.skin, ANGRY_RED);
     this.contact = key({}, new THREE.Vector3(), new THREE.Vector3(0, 0, 1));
     this.from = key({}, new THREE.Vector3(), new THREE.Vector3(0, 1, 0));
     this.cur = key({}, new THREE.Vector3(), new THREE.Vector3(0, 1, 0));
@@ -803,8 +807,8 @@ export class Batter implements BatterRig {
     const a = this.anger;
     const throb = 0.75 + 0.25 * Math.sin(this.time * 7);
     for (const t of this.tintable) {
-      t.m.color.copy(t.color).lerp(t.red, 0.85 * a);
-      t.m.emissive.copy(t.emissive).lerp(t.red, 0.35 * a * throb);
+      t.m.color.copy(t.color).lerp(t.red, 0.92 * a);
+      t.m.emissive.copy(t.emissive).lerp(t.red, 0.45 * a * throb);
     }
   }
 

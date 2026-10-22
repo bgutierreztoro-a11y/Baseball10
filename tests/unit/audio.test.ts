@@ -20,6 +20,7 @@ describe('audio engine', () => {
       a.fireworks(3);
       a.organCharge();
       a.homeRunJingle();
+      a.havaNagila();
       a.stageEnd(true);
       a.uiClick();
       a.uiHover();

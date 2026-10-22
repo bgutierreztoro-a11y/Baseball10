@@ -111,6 +111,30 @@ export const STADIUMS: Record<StadiumId, StadiumDef> = {
     features: { lightTowers: true, fireworks: true, sea: false, mountains: false, skyline: true, sandlot: false },
     crowdDensity: 1,
   },
+  bratislava: {
+    id: 'bratislava',
+    name: { es: 'Estadio del Danubio', en: 'Danube Ballpark' },
+    subtitle: { es: 'Bratislava: el castillo y el puente OVNI de fondo', en: 'Bratislava: the castle and the UFO bridge behind the fence' },
+    timeOfDay: 'sunset',
+    altitudeM: 140,
+    airDensity: 1.19,
+    fence: { distancesFt: [325, 370, 400, 370, 325], heightsFt: [10, 10, 10, 10, 10] },
+    palette: {
+      grass: '#4b9545',
+      grassAlt: '#41833c',
+      dirt: '#b07c52',
+      wall: '#0b4ea2',
+      wallTrim: '#ee1c25',
+      seats: ['#0b4ea2', '#f4f4f4'],
+      crowd: ['#ffffff', '#0b4ea2', '#ee1c25', '#f4f4f4', '#ffd166', '#1d3557'],
+      accent: '#ee1c25',
+    },
+    features: { lightTowers: true, fireworks: false, sea: false, mountains: false, skyline: false, sandlot: false, bratislava: true },
+    crowdDensity: 0.75,
+  },
 };
 
 export const STADIUM_ORDER: StadiumId[] = ['solar', 'malecon', 'metro', 'cumbre', 'final'];
+
+/** Parks outside the campaign: always open in Practice and Home Run Derby. */
+export const EXTRA_STADIUMS: StadiumId[] = ['bratislava'];

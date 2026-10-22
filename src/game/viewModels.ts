@@ -3,7 +3,7 @@ import { BATS, MAX_STARS, STAGES } from '../config/campaign';
 import { BASE_RATING, CHARACTERS, characterById } from '../config/characters';
 import { FT, MPH } from '../config/constants';
 import { PITCHERS, PITCH_TYPES } from '../config/pitches';
-import { STADIUMS, STADIUM_ORDER } from '../config/stadiums';
+import { EXTRA_STADIUMS, STADIUMS, STADIUM_ORDER } from '../config/stadiums';
 import { controlsText, dist, distFt, gameText, goalText, limitText, speedMph, starText } from '../i18n/game';
 import { isBatUnlocked, isStageUnlocked, nextStageId, totalStars } from '../persistence/save';
 import type { Session } from '../sim/session';
@@ -141,7 +141,10 @@ export function stageIntroVM(stage: StageDef, save: SaveData, s: Settings, touch
 }
 
 export function practiceVM(save: SaveData, s: Settings, last: PracticeVM['initial'] | null): PracticeVM {
-  const unlockedStadiums = STADIUM_ORDER.map((id, i) => ({ id, name: STADIUMS[id].name[s.lang], locked: !isStageUnlocked(save, STAGES.find((st) => st.chapter === i + 1)!.id) }));
+  const unlockedStadiums = [
+    ...STADIUM_ORDER.map((id, i) => ({ id, name: STADIUMS[id].name[s.lang], locked: !isStageUnlocked(save, STAGES.find((st) => st.chapter === i + 1)!.id) })),
+    ...EXTRA_STADIUMS.map((id) => ({ id, name: STADIUMS[id].name[s.lang], locked: false })),
+  ];
   return {
     stadiums: unlockedStadiums,
     pitches: Object.values(PITCH_TYPES).map((p) => ({ id: p.id, name: p.name[s.lang], color: p.color })),
@@ -152,13 +155,16 @@ export function practiceVM(save: SaveData, s: Settings, last: PracticeVM['initia
 export function derbySetupVM(save: SaveData, s: Settings): DerbySetupVM {
   const t = gameText(s.lang);
   return {
-    stadiums: STADIUM_ORDER.map((id, i) => ({
-      id,
-      name: STADIUMS[id].name[s.lang],
-      info: stadiumInfo(id, s),
-      locked: !isStageUnlocked(save, STAGES.find((st) => st.chapter === i + 1)!.id),
-      best: save.derbyBest > 0 ? `${save.derbyBest} HR` : null,
-    })),
+    stadiums: [
+      ...STADIUM_ORDER.map((id, i) => ({
+        id,
+        name: STADIUMS[id].name[s.lang],
+        info: stadiumInfo(id, s),
+        locked: !isStageUnlocked(save, STAGES.find((st) => st.chapter === i + 1)!.id),
+        best: save.derbyBest > 0 ? `${save.derbyBest} HR` : null,
+      })),
+      ...EXTRA_STADIUMS.map((id) => ({ id, name: STADIUMS[id].name[s.lang], info: stadiumInfo(id, s), locked: false, best: save.derbyBest > 0 ? `${save.derbyBest} HR` : null })),
+    ],
     rules: t.derbyRules,
   };
 }

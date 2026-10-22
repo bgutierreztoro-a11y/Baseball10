@@ -1,5 +1,5 @@
 // Visual QA for characters.
-//   ?char=moro|mati|arturek|chamo|chimon (batter)   &peak=1 (golden aura)   &angry=1 (red tint)   &live=1 (interactive panel)
+//   ?char=moro|mati|arturek|chamo|chimon|benjamin (batter)   &peak=1 (golden aura)   &angry=1 (red tint)   &live=1 (interactive panel)
 //   &view=batting (game camera)|side|front|pitcher|closeup|back|profile|rear|face|lineup  (&zoom=, &ly= for profile/rear)
 //   &zone=1 (strike-zone outline)  &marker=0 (hide aim/sweet-spot markers)  &debug=1 (log arm IK overreach per step)
 //   &pose=stance|load|mid|contact|follow|celebrate|whiff|delivery|release|follow2|strike

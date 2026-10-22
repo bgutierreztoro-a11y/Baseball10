@@ -9,7 +9,8 @@ import { mergeSimple } from './structures';
 
 /**
  * Backdrop outside the ballpark: terrain, sea (Malecón), mountains (Cumbre),
- * skyline (Metro/Final), trees and houses (El Solar).
+ * skyline (Metro/Final), trees and houses (El Solar), the Danube with
+ * Bratislava Castle and the UFO bridge (Bratislava).
  */
 export interface Scenery {
   group: THREE.Group;
@@ -124,6 +125,10 @@ export function createScenery(def: StadiumDef, quality: QualitySettings, atm: At
   if (def.features.sandlot) {
     group.add(createTrees(def, rnd, track));
     group.add(createHouses(rnd, track));
+  }
+
+  if (def.features.bratislava) {
+    group.add(createBratislava(rnd, track));
   }
 
   return {
@@ -242,4 +247,185 @@ function createPalms(rnd: () => number, track: <T extends { dispose(): void }>(x
   trunks.forEach((x) => x.dispose());
   leaves.forEach((x) => x.dispose());
   return g;
+}
+
+/**
+ * Bratislava behind the outfield (+Z): the Danube running across the view,
+ * the castle on its hill above the river (left-centre: a white block with four
+ * corner towers and red roofs) and the UFO bridge (Most SNP, right-centre): a
+ * leaning A-shaped pylon on the near bank topped by the flying-saucer
+ * restaurant, with stay cables fanning out to the deck across the river.
+ * Everything is oversized a little so it reads over the bleachers.
+ */
+function createBratislava(rnd: () => number, track: <T extends { dispose(): void }>(x: T) => T): THREE.Group {
+  const g = new THREE.Group();
+  g.name = 'bratislava';
+  const lambert = (color: string, extra: THREE.MeshLambertMaterialParameters = {}): THREE.MeshLambertMaterial => track(new THREE.MeshLambertMaterial({ color, ...extra }));
+  const add = (geo: THREE.BufferGeometry, mat: THREE.Material): THREE.Mesh => {
+    const m = new THREE.Mesh(track(geo), mat);
+    g.add(m);
+    return m;
+  };
+
+  // The Danube: a wide band across the view, then the far bank.
+  const RIVER_NEAR = 360;
+  const RIVER_FAR = 470;
+  const river = add(new THREE.PlaneGeometry(4000, RIVER_FAR - RIVER_NEAR), track(new THREE.MeshStandardMaterial({ color: '#41708a', roughness: 0.25, metalness: 0.2 })));
+  river.rotation.x = -Math.PI / 2;
+  river.position.set(0, 0.05, (RIVER_NEAR + RIVER_FAR) / 2);
+
+  // Castle hill (left-centre, on the far bank) with a few trees.
+  const HX = 175;
+  const HZ = 600;
+  const HILL_H = 70;
+  const hill = new THREE.SphereGeometry(1, 28, 14, 0, Math.PI * 2, 0, Math.PI / 2);
+  hill.scale(170, HILL_H, 120);
+  hill.translate(HX, 0, HZ);
+  add(hill, lambert('#4f7d3a', { flatShading: true }));
+  const trees: THREE.BufferGeometry[] = [];
+  for (let i = 0; i < 60; i++) {
+    const a = rnd() * Math.PI * 2;
+    const k = 0.55 + rnd() * 0.4;
+    const x = HX + Math.cos(a) * 170 * k;
+    const z = HZ + Math.sin(a) * 120 * k;
+    const y = HILL_H * Math.sqrt(Math.max(0, 1 - k * k)) - 2;
+    const t = new THREE.IcosahedronGeometry(7 + rnd() * 5, 0);
+    t.translate(x, y + 5, z);
+    trees.push(t);
+  }
+  add(mergeSimple(trees), lambert('#3c6b2f', { flatShading: true }));
+  trees.forEach((t) => t.dispose());
+
+  // Bratislava Castle: white rectangular palace, red hipped roof, four corner towers.
+  const white = lambert('#f1ece0');
+  const roofRed = lambert('#b8432f', { flatShading: true });
+  const CW = 110;
+  const CD = 70;
+  const CH = 42;
+  const base = HILL_H - 4;
+  const body = new THREE.BoxGeometry(CW, CH, CD);
+  body.translate(HX, base + CH / 2, HZ);
+  const walls: THREE.BufferGeometry[] = [body];
+  const roofs: THREE.BufferGeometry[] = [];
+  const mainRoof = new THREE.ConeGeometry(1, 1, 4, 1);
+  mainRoof.rotateY(Math.PI / 4);
+  mainRoof.scale((CW / 2) * 1.414, 22, (CD / 2) * 1.414);
+  mainRoof.translate(HX, base + CH + 11, HZ);
+  roofs.push(mainRoof);
+  const TW = 22;
+  const TH = CH + 26;
+  for (const sx of [-1, 1]) {
+    for (const sz of [-1, 1]) {
+      const tx = HX + sx * (CW / 2 - TW / 2 + 3);
+      const tz = HZ + sz * (CD / 2 - TW / 2 + 3);
+      const tower = new THREE.BoxGeometry(TW, TH, TW);
+      tower.translate(tx, base + TH / 2, tz);
+      walls.push(tower);
+      const cap = new THREE.ConeGeometry(TW * 0.75, 18, 4, 1);
+      cap.rotateY(Math.PI / 4);
+      cap.translate(tx, base + TH + 9, tz);
+      roofs.push(cap);
+    }
+  }
+  add(mergeSimple(walls), white);
+  add(mergeSimple(roofs), roofRed);
+  walls.forEach((w) => w.dispose());
+  roofs.forEach((r) => r.dispose());
+  // Rows of dark windows on the facade facing the ballpark.
+  const winTex = track(castleWindowsTexture());
+  const facade = add(new THREE.PlaneGeometry(CW - TW * 2 + 4, CH - 8), track(new THREE.MeshLambertMaterial({ map: winTex, transparent: true })));
+  facade.position.set(HX, base + CH / 2 + 2, HZ - CD / 2 - 0.3);
+  facade.rotation.y = Math.PI;
+
+  // Old-town roofs at the foot of the hill.
+  const houses = new MeshBuilder(true);
+  const houseCols = ['#efe6d2', '#e9d8b4', '#f3efe6', '#d9c7a3'].map((c) => new THREE.Color(c));
+  const houseRoofs: THREE.BufferGeometry[] = [];
+  for (let i = 0; i < 46; i++) {
+    const cx = HX - 260 + rnd() * 420;
+    const cz = RIVER_FAR + 25 + rnd() * 60;
+    if (Math.abs(cx - HX) < 120 && cz > HZ - 140) continue;
+    const w = 12 + rnd() * 10;
+    const d = 10 + rnd() * 8;
+    const h = 10 + rnd() * 12;
+    const col = houseCols[Math.floor(rnd() * houseCols.length)]!;
+    const hw = w / 2;
+    const hd = d / 2;
+    houses.quad([cx - hw, 0, cz - hd], [cx + hw, 0, cz - hd], [cx + hw, h, cz - hd], [cx - hw, h, cz - hd], col);
+    houses.quad([cx + hw, 0, cz - hd], [cx + hw, 0, cz + hd], [cx + hw, h, cz + hd], [cx + hw, h, cz - hd], col);
+    houses.quad([cx - hw, 0, cz + hd], [cx - hw, 0, cz - hd], [cx - hw, h, cz - hd], [cx - hw, h, cz + hd], col);
+    const roof = new THREE.ConeGeometry(Math.max(w, d) * 0.75, 7, 4);
+    roof.rotateY(Math.PI / 4);
+    roof.translate(cx, h + 3.5, cz);
+    houseRoofs.push(roof);
+  }
+  add(houses.build(), lambert('#ffffff', { vertexColors: true }));
+  add(mergeSimple(houseRoofs), roofRed);
+  houseRoofs.forEach((r) => r.dispose());
+
+  // UFO bridge (Most SNP): pylon on the near bank, deck across the river.
+  const BX = -150;
+  const steel = track(new THREE.MeshStandardMaterial({ color: '#d9dde2', roughness: 0.45, metalness: 0.55 }));
+  const PZ = RIVER_NEAR - 18;
+  const TOP = new THREE.Vector3(BX, 150, PZ - 22);
+  const parts: THREE.BufferGeometry[] = [];
+  const beam = (a: THREE.Vector3, b: THREE.Vector3, r0: number, r1: number): void => {
+    const len = a.distanceTo(b);
+    const c = new THREE.CylinderGeometry(r1, r0, len, 8, 1);
+    c.translate(0, len / 2, 0);
+    const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.clone().sub(a).normalize());
+    c.applyQuaternion(q);
+    c.translate(a.x, a.y, a.z);
+    parts.push(c);
+  };
+  // Two legs leaning back from the bank, joining under the saucer.
+  for (const s of [-1, 1]) beam(new THREE.Vector3(BX + s * 26, 0, PZ + 6), TOP.clone().add(new THREE.Vector3(s * 3, -6, 0)), 4.2, 2.6);
+  // Deck: from the near bank across the Danube to the old town.
+  const DECK_Y = 16;
+  const deck = new THREE.BoxGeometry(34, 4, RIVER_FAR - PZ + 50);
+  deck.translate(BX, DECK_Y, (PZ + RIVER_FAR + 50) / 2);
+  parts.push(deck);
+  for (const z of [RIVER_NEAR + 40, RIVER_NEAR + 80]) {
+    for (const s of [-1, 1]) beam(new THREE.Vector3(BX + s * 12, 0, z), new THREE.Vector3(BX + s * 12, DECK_Y - 2, z), 2.2, 2.2);
+  }
+  add(mergeSimple(parts), steel);
+  parts.forEach((p) => p.dispose());
+  // Stay cables fanning from the pylon to the deck edges.
+  const cablePts: number[] = [];
+  for (let i = 1; i <= 6; i++) {
+    const z = PZ + 15 + i * ((RIVER_FAR - PZ) / 6);
+    for (const s of [-1, 1]) {
+      const top = TOP.clone().add(new THREE.Vector3(s * 3, -14 - i * 4, 0));
+      cablePts.push(top.x, top.y, top.z, BX + s * 16, DECK_Y + 2, z);
+    }
+  }
+  const cg = new THREE.BufferGeometry();
+  cg.setAttribute('position', new THREE.Float32BufferAttribute(cablePts, 3));
+  g.add(new THREE.LineSegments(track(cg), track(new THREE.LineBasicMaterial({ color: '#c3c9cf' }))));
+  // The saucer ("UFO") on top: a flattened lens with a glazed band.
+  const saucer = new THREE.SphereGeometry(1, 32, 12);
+  saucer.scale(30, 7.5, 30);
+  const ufo = add(saucer, steel);
+  ufo.position.copy(TOP).add(new THREE.Vector3(0, 4, 0));
+  const band = add(new THREE.CylinderGeometry(29, 29, 3.6, 32, 1, true), track(new THREE.MeshStandardMaterial({ color: '#2a3542', roughness: 0.2, metalness: 0.6, emissive: '#ffcf7a', emissiveIntensity: 0.25 })));
+  band.position.copy(ufo.position);
+  const dome = add(new THREE.SphereGeometry(9, 20, 8, 0, Math.PI * 2, 0, Math.PI / 2), steel);
+  dome.position.copy(ufo.position).add(new THREE.Vector3(0, 5, 0));
+  const mast = add(new THREE.CylinderGeometry(0.6, 0.9, 16, 6), steel);
+  mast.position.copy(dome.position).add(new THREE.Vector3(0, 14, 0));
+  return g;
+}
+
+function castleWindowsTexture(): THREE.CanvasTexture {
+  const c = document.createElement('canvas');
+  c.width = 256;
+  c.height = 64;
+  const ctx = c.getContext('2d')!;
+  ctx.fillStyle = '#1f2a33';
+  for (let row = 0; row < 3; row++) {
+    for (let i = 0; i < 16; i++) ctx.fillRect(8 + i * 15.5, 8 + row * 19, 6, 11);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
 }

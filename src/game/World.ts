@@ -4,7 +4,7 @@ import { MOUND, RUBBER_Z } from '../config/constants';
 import { characterById, DEFAULT_CHARACTER } from '../config/characters';
 import type { BallView, BatterRig, CatcherRig, Effects, PitcherRig, StadiumView, UmpireRig } from '../render/api';
 import { characters, DEFAULT_PITCHER_LOOK } from '../render/characters';
-import { createBallView, createEffects, PitcherBadge } from '../render/fx';
+import { createBallView, createEffects, KippahUfo, PennyView, PitcherBadge } from '../render/fx';
 import type { Renderer } from '../render/Renderer';
 import { createStadium } from '../render/stadium';
 import { ZoneOverlay } from '../render/ZoneOverlay';
@@ -34,6 +34,9 @@ export class World {
   private playersVisible = true;
   private matchActive = false;
   private readonly pitcherBadge = new PitcherBadge();
+  /** Benjamin's lucky penny and the flying kippah that answers it. */
+  private readonly penny = new PennyView();
+  private readonly kippah: KippahUfo;
 
   constructor(renderer: Renderer, def: StadiumDef) {
     this.renderer = renderer;
@@ -53,8 +56,9 @@ export class World {
     this.ball = createBallView(this.quality);
     this.fx = createEffects(this.quality);
     this.zone = new ZoneOverlay();
+    this.kippah = new KippahUfo(this.quality);
     this.pitcherBadge.setAnchor(0, MOUND.height, RUBBER_Z);
-    this.group.add(this.pitcherBadge.root, this.batter.root, this.pitcher.root, this.catcher.root, this.umpire.root, this.ball.root, this.fx.root, this.zone.group);
+    this.group.add(this.penny.root, this.kippah.root, this.pitcherBadge.root, this.batter.root, this.pitcher.root, this.catcher.root, this.umpire.root, this.ball.root, this.fx.root, this.zone.group);
     scene.add(this.group);
     this.setHandedness('R');
     this.ball.setVisible(false);
@@ -182,6 +186,35 @@ export class World {
     roots.forEach((o, i) => (o.visible = was[i]!));
   }
 
+  /** Shows Benjamin's penny at a world position, or hides it (null). */
+  setPenny(pos: { x: number; y: number; z: number } | null): void {
+    if (pos) this.penny.show(pos);
+    else this.penny.hide();
+  }
+
+  /** The batted ball touched the penny: it spins away. */
+  hitPenny(): void {
+    this.penny.hit();
+  }
+
+  /**
+   * The flying kippah lands Netanyahu beside home plate (on the side away
+   * from the batter, facing him and the camera, the kippah tilted toward
+   * `camera` so its dome shows); `onGive` fires as he blesses.
+   */
+  playBlessing(camera: { x: number; z: number }, onGive: () => void): void {
+    const s = this.hand === 'R' ? 1 : -1;
+    this.kippah.play({ x: -s * 1.9, z: 1.1 }, s * 1.05, camera, onGive);
+  }
+
+  stopBlessing(): void {
+    this.kippah.stop();
+  }
+
+  get blessingPlaying(): boolean {
+    return this.kippah.playing;
+  }
+
   /** Characters + ball visible only while batting (hidden on the title orbit). */
   setPlayersVisible(v: boolean): void {
     this.playersVisible = v;
@@ -200,6 +233,8 @@ export class World {
     this.fx.update(dt, camera);
     this.zone.update(dt);
     this.pitcherBadge.update(elapsed);
+    this.penny.update(dt);
+    this.kippah.update(dt);
   }
 
   dispose(): void {
@@ -207,6 +242,8 @@ export class World {
     this.stadium.dispose();
     this.zone.dispose();
     this.pitcherBadge.dispose();
+    this.penny.dispose();
+    this.kippah.dispose();
     this.group.traverse((o) => {
       if (o instanceof THREE.Mesh || o instanceof THREE.Points || o instanceof THREE.Sprite) {
         o.geometry?.dispose();

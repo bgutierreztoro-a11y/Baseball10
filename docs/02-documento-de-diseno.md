@@ -137,9 +137,12 @@ Se eligen en el menú **Bateadores** y la elección se guarda.
 | **El Mati** | David "Big Papi" Ortiz | Enorme, 1,93 m | 10 | 14 | 17 | El más equilibrado. Su tamaño tapa mucha más pantalla. |
 | **Arturek** | — | Gigante eslovaco rubio de 7,8 m con cuatro brazos | 20 | 5 | 2 | Alcanza casi todo (PCI +35 %), pero le pega flojo. |
 | **Chamo** | Swing de Barry Bonds | Blanco, 1,90 m, marcado: six-pack y bíceps que se notan en la camiseta; cuernos de villano y un cuerno gigante como bate | 10 | 5 | 24 | El swing de poder más fuerte; contacto flojo. |
-| **Chimon** | — | Mono de 1,60 m con cola, cinta de tenista y una raqueta de tenis en vez de bate | 15 | 12 | 25 | **Raquetazo salvaje:** toda pelota que toca sale a máxima potencia (≈120 mph), sin importar timing ni puntería: 30 % jonrón asegurado y 70 % foul en cualquier dirección (por las líneas, al cielo o hacia atrás), que nunca puntúa. Tras 3 abanicadas seguidas se enoja y se pone rojo (pataleta con la raqueta); cualquier contacto lo calma. Con él al bate, el lanzador es un pollo. |
+| **Chimon** | — | Mono de 1,60 m con cola, cinta de tenista y una raqueta de tenis en vez de bate | 15 | 12 | 25 | **Enojo y raquetazo salvaje:** tras 3 abanicadas seguidas se enoja y se le pone la cara roja; mientras está enojado, toda pelota que toca sale a máxima potencia (≈120 mph): 50 % jonrón asegurado y 50 % foul en cualquier dirección (por las líneas, al cielo o hacia atrás). Solo se calma al batear un jonrón y luego entra en enfriamiento de 10 swings. Con él al bate, el lanzador es un pollo. |
+| **Benjamin Gutenberg** | — | Rabino de 1,78 m: sombrero negro de ala ancha, barba larga, peyot, abrigo largo negro, camisa blanca y tzitzit | 12 | 12 | 11 | **El centavo de la suerte:** antes de cada lanzamiento, 25 % de que aparezca un centavo gigante flotando en el campo. Si el batazo lo toca, Netanyahu baja en un kipá volador estilo OVNI, suena Hava Nagila y durante 3 lanzamientos el PCI cubre el 85 % de la zona de strike. Con él al bate, el lanzador también viste de rabino. |
 
 Swing de potencia perfecto en el Metropolitano (92 mph): Moro 434 ft (460 con peak), Mati 464, Arturek 381, Chamo 494.
+
+**Estadio del Danubio (Bratislava):** parque fuera de la campaña, siempre disponible en Práctica y Derby de jonrones. Atardecer con el Danubio, el castillo de Bratislava en su colina y el puente OVNI (Most SNP) detrás del outfield; las gradas del outfield son más bajas para que se vean, y la intro del partido arranca mirándolos. Arturek juega en casa: +25 % de velocidad de bate en ambos swings.
 
 ## 6. Requisitos
 

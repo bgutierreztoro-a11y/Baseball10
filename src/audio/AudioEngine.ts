@@ -425,6 +425,52 @@ class Engine implements AudioEngine {
     for (const m of [72, 76]) this.brass(t + 0.75, m, 0.6, 0.09);
   }
 
+  havaNagila(): void {
+    const ctx = this.ready();
+    if (!ctx) return;
+    // E "freygish" (Phrygian dominant): semitones above E4 = MIDI 64.
+    // [degree, length in eighths]; the rising "hava nagila" sequence, then
+    // "hava neranena", then the accelerating "uru, uru achim" run.
+    const theme: [number, number][] = [
+      [0, 1], [0, 1], [4, 1], [1, 1], [0, 2],
+      [4, 1], [4, 1], [7, 1], [5, 1], [4, 2],
+      [5, 1], [5, 1], [8, 1], [7, 1], [5, 2],
+      [7, 1], [5, 1], [4, 1], [1, 1], [0, 3],
+      [7, 1], [7, 1], [7, 1], [5, 1], [4, 1], [5, 2],
+      [7, 1], [7, 1], [7, 1], [5, 1], [4, 1], [5, 2],
+      [4, 1], [1, 1], [0, 2],
+      [0, 1], [1, 1], [4, 1], [5, 1], [7, 1], [8, 1], [10, 1], [12, 3],
+      [10, 1], [8, 1], [7, 1], [5, 1], [4, 1], [1, 1], [0, 3],
+    ];
+    const notes: { at: number; midi: number; dur: number }[] = [];
+    let t = 0;
+    theme.forEach(([deg, len], i) => {
+      // Starts at a dance tempo and speeds up towards the end, klezmer style.
+      const eighth = 0.2 - 0.075 * (i / theme.length);
+      notes.push({ at: t, midi: 64 + deg, dur: len * eighth * 0.92 });
+      t += len * eighth;
+    });
+    const start = ctx.currentTime + 0.08;
+    // Schedule a little ahead in batches so long tunes never exhaust the voice pool.
+    const queue = (from: number): void => {
+      const c = this.ready();
+      if (!c) return;
+      const horizon = c.currentTime + 0.6;
+      let i = from;
+      for (; i < notes.length && start + notes[i]!.at < horizon; i++) {
+        const n = notes[i]!;
+        const at = Math.max(c.currentTime, start + n.at);
+        this.brass(at, n.midi, Math.max(0.08, n.dur), 0.13);
+        // Oom-pah: low E on the beat, an E-major chord stab off the beat.
+        if (i % 2 === 0) this.organNote(at, 40, Math.min(0.25, n.dur), 0.16);
+        else for (const m of [56, 59]) this.organNote(at, m, Math.min(0.15, n.dur), 0.07);
+      }
+      if (i < notes.length) window.setTimeout(() => queue(i), 300);
+      else for (const m of [64, 76]) this.brass(Math.max(c.currentTime, start + t), m, 0.6, 0.12);
+    };
+    queue(0);
+  }
+
   stageEnd(success: boolean): void {
     const ctx = this.ready();
     if (!ctx) return;

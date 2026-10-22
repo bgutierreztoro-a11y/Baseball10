@@ -175,11 +175,14 @@ export interface HudVM {
   /** Special ability button (El Moro's peak); null when the batter has none. */
   ability: {
     label: string;
-    state: 'ready' | 'active' | 'used';
+    /** `idle`: a passive trait waiting for its moment (not clickable, not used up). */
+    state: 'ready' | 'active' | 'used' | 'idle';
     /** Pitches left while active. */
     pitchesLeft: number | null;
-    /** Key/tap hint, e.g. "E". */
+    /** Key/tap hint, e.g. "E"; empty for passive traits. */
     keyHint: string;
+    /** Overrides the state line (passive traits: Chimon's temper, Benjamin's penny). */
+    stateText?: string;
   } | null;
 }
 

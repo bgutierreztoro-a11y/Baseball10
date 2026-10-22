@@ -13,7 +13,7 @@ export const BATTING_POS = new THREE.Vector3(0, 2.65, -5.2);
 export const BATTING_LOOK = new THREE.Vector3(0, -2.0, 16);
 export const BATTING_FOV = 31;
 
-type Mode = 'batting' | 'follow' | 'intro' | 'title';
+type Mode = 'batting' | 'follow' | 'intro' | 'title' | 'shot';
 
 export class CameraDirector {
   readonly camera: THREE.PerspectiveCamera;
@@ -30,8 +30,8 @@ export class CameraDirector {
   private introFrom = new THREE.Vector3();
   private introMid = new THREE.Vector3();
   private introDur = 2.6;
+  private readonly introLook = new THREE.Vector3(0, 1, 0);
   private onIntroDone: (() => void) | null = null;
-  private readonly tmp = new THREE.Vector3();
   private readonly curve = new THREE.QuadraticBezierCurve3(new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3());
 
   constructor(camera: THREE.PerspectiveCamera) {
@@ -53,8 +53,12 @@ export class CameraDirector {
     this.fov = 48;
   }
 
-  /** Flyover from deep center field to the batting view. */
-  playIntro(onDone: () => void, duration = 2.8): void {
+  /**
+   * Flyover from deep center field to the batting view. `view` overrides the
+   * start (e.g. Bratislava starts high behind home looking out at the castle
+   * and the UFO bridge, then drops into the batting view).
+   */
+  playIntro(onDone: () => void, duration = 2.8, view?: { from: Vec3; mid: Vec3; look: Vec3 }): void {
     if (this.reducedMotion) {
       this.setBatting();
       onDone();
@@ -63,9 +67,21 @@ export class CameraDirector {
     this.mode = 'intro';
     this.t = 0;
     this.introDur = duration;
-    this.introFrom.set(18, 34, 150);
-    this.introMid.set(30, 16, 35);
+    this.introFrom.set(view?.from.x ?? 18, view?.from.y ?? 34, view?.from.z ?? 150);
+    this.introMid.set(view?.mid.x ?? 30, view?.mid.y ?? 16, view?.mid.z ?? 35);
+    this.introLook.set(view?.look.x ?? 0, view?.look.y ?? 1, view?.look.z ?? 0);
     this.onIntroDone = onDone;
+  }
+
+  /** A fixed, slowly drifting shot (cinematics such as Benjamin's blessing). */
+  shot(pos: Vec3, look: Vec3, fov: number): void {
+    this.mode = 'shot';
+    this.t = 0;
+    this.desired.set(pos.x, pos.y, pos.z);
+    this.desiredLook.set(look.x, look.y, look.z);
+    this.pos.copy(this.desired);
+    this.look.copy(this.desiredLook);
+    this.fov = fov;
   }
 
   /** Begin following a batted ball. */
@@ -98,7 +114,7 @@ export class CameraDirector {
         this.curve.v1.copy(this.introMid);
         this.curve.v2.copy(BATTING_POS);
         this.curve.getPoint(e, this.pos);
-        this.look.lerpVectors(this.tmp.set(0, 1, 0), BATTING_LOOK, e * e);
+        this.look.lerpVectors(this.introLook, BATTING_LOOK, e * e);
         this.fov = 50 + (BATTING_FOV - 50) * e;
         if (u >= 1) {
           this.setBatting();
@@ -117,6 +133,13 @@ export class CameraDirector {
         const portrait = Math.min(1, Math.max(0, (1.3 - cam.aspect) / 0.75));
         this.look.y -= portrait * 2.4;
         this.fov = BATTING_FOV;
+        break;
+      }
+      case 'shot': {
+        // Gentle push-in.
+        const k = this.reducedMotion ? 0 : Math.min(1, this.t / 8);
+        this.pos.lerpVectors(this.desired, this.desiredLook, 0.12 * k);
+        this.look.copy(this.desiredLook);
         break;
       }
       case 'follow': {
@@ -151,7 +174,7 @@ export class CameraDirector {
     cam.lookAt(this.look);
     // Portrait screens: widen the vertical FOV so a minimum horizontal FOV is kept
     // (otherwise the batter falls off-screen on phones).
-    const minH = (this.mode === 'batting' ? 40 : this.mode === 'follow' ? 54 : 62) * (Math.PI / 180);
+    const minH = (this.mode === 'batting' ? 40 : this.mode === 'follow' || this.mode === 'shot' ? 54 : 62) * (Math.PI / 180);
     const fromH = (2 * Math.atan(Math.tan(minH / 2) / Math.max(0.2, cam.aspect)) * 180) / Math.PI;
     const fov = Math.max(this.fov, fromH);
     if (Math.abs(cam.fov - fov) > 0.01) {

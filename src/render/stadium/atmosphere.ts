@@ -39,6 +39,9 @@ export function atmosphereFor(def: StadiumDef): Atmosphere {
       return { skyTop: '#03050d', skyHorizon: '#16244a', skyBottom: '#05070c', sunDir: [0.12, 0.85, -0.5], sunColor: '#e8efff', sunDisc: false, keyColor: '#edf2ff', keyIntensity: 2.5, hemiSky: '#3b4c7a', hemiGround: '#0e1712', hemiIntensity: 0.65, fogColor: '#111c38', fogNear: 220, fogFar: 1400, clouds: 0.0, stars: true, night: true, bloom: 0.75, exposure: 1.0, lampsOn: true };
     case 'cumbre':
       return { skyTop: '#1450c0', skyHorizon: '#b4d4f2', skyBottom: '#8aa38a', sunDir: [0.5, 0.72, -0.35], sunColor: '#fff8ec', sunDisc: true, keyColor: '#fff7ee', keyIntensity: 2.9, hemiSky: '#cfe4ff', hemiGround: '#5f6f4a', hemiIntensity: 1.0, fogColor: '#bcd6ee', fogNear: 300, fogFar: 3200, clouds: 0.35, stars: false, night: false, bloom: 0.08, exposure: 1.0, lampsOn: false };
+    case 'bratislava':
+      // Late-afternoon light from behind home plate, so the castle and the bridge are lit.
+      return { skyTop: '#2f5fae', skyHorizon: '#f7c58f', skyBottom: '#6d7a5a', sunDir: [0.35, 0.42, -0.84], sunColor: '#ffd9a8', sunDisc: false, keyColor: '#ffe2bd', keyIntensity: 2.8, hemiSky: '#c9d8f2', hemiGround: '#5d6b45', hemiIntensity: 1.1, fogColor: '#e8c9a6', fogNear: 320, fogFar: 2600, clouds: 0.45, stars: false, night: false, bloom: 0.2, exposure: 1.06, lampsOn: true };
     case 'final':
       return { skyTop: '#05030f', skyHorizon: '#2a1458', skyBottom: '#06040c', sunDir: [-0.1, 0.85, -0.5], sunColor: '#f2e8ff', sunDisc: false, keyColor: '#f1eeff', keyIntensity: 2.6, hemiSky: '#4b3a7a', hemiGround: '#0f0f14', hemiIntensity: 0.7, fogColor: '#1b1238', fogNear: 220, fogFar: 1400, clouds: 0.0, stars: true, night: true, bloom: 0.85, exposure: 1.0, lampsOn: true };
   }

@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { MPH } from '../../src/config/constants';
-import { BASE_MODS, CHARACTERS, characterById, combineMods, modsFromRatings } from '../../src/config/characters';
+import { BASE_MODS, CHARACTERS, characterById, combineMods, modsFromRatings, pciFillMods } from '../../src/config/characters';
+import { STRIKE_ZONE } from '../../src/config/constants';
+import { EXTRA_STADIUMS, STADIUMS, STADIUM_ORDER } from '../../src/config/stadiums';
+import { trajectoryTouches } from '../../src/sim/penny';
 import { Rng } from '../../src/core/rng';
 import { defaultSave, migrate } from '../../src/persistence/save';
 import { evaluateSwing, swingProfile, SWING_PROFILES, WILD_MAX_EV, wildSwing } from '../../src/sim/contact';
@@ -19,8 +22,8 @@ const ev = (r: ReturnType<typeof hit>) => (r.kind === 'contact' ? r.ball.exitVel
 const mods = (id: string) => characterById(id).mods;
 
 describe('characters', () => {
-  it('has the five batters with valid looks and unique ids', () => {
-    expect(CHARACTERS.map((c) => c.id).sort()).toEqual(['arturek', 'chamo', 'chimon', 'mati', 'moro']);
+  it('has the six batters with valid looks and unique ids', () => {
+    expect(CHARACTERS.map((c) => c.id).sort()).toEqual(['arturek', 'benjamin', 'chamo', 'chimon', 'mati', 'moro']);
     expect(characterById('arturek').look.heightM).toBeGreaterThan(7.5);
     expect(characterById('chamo').look.heightM).toBeCloseTo(1.9);
     expect(characterById('nope').id).toBe('moro');
@@ -38,12 +41,12 @@ describe('characters', () => {
     expect(c.look).toMatchObject({ monkey: true, racket: true, hornBat: false });
     expect(CHARACTERS.filter((x) => x.pitcherKit?.chicken).map((x) => x.id)).toEqual(['chimon']);
     expect(CHARACTERS.filter((x) => x.wildSwing).map((x) => x.id)).toEqual(['chimon']);
-    expect(c.wildSwing!.homeRunChance).toBe(0.3);
-    expect(c.temper!.whiffs).toBeGreaterThanOrEqual(2);
+    expect(c.wildSwing!.homeRunChance).toBe(0.5);
+    expect(c.temper).toEqual({ whiffs: 3, cooldownSwings: 10 });
     expect(c.trait).toBeTruthy();
   });
 
-  it("Chimon's racket: every contact is max power, ~30 % home runs and the rest fouls", () => {
+  it("Chimon's angry racket: every contact is max power, ~50 % home runs and the rest fouls", () => {
     const rng = new Rng(11);
     const c = { stadium: metro, targets: [], rng };
     let hr = 0;
@@ -54,7 +57,7 @@ describe('characters', () => {
       const sw = swingAt(plan, { kind: 'contact', nx: 0.3 });
       const base = evaluateSwing(plan, { ...sw, mods: mods('chimon') }, c);
       expect(base.kind).toBe('contact');
-      const r = wildSwing(base, plan, c, 0.3);
+      const r = wildSwing(base, plan, c, 0.5);
       if (r.kind !== 'contact') throw new Error('contact expected');
       expect(r.ball.exitVelocity).toBeGreaterThan(WILD_MAX_EV * 0.94);
       expect(['homeRun', 'foul']).toContain(r.ball.outcome);
@@ -66,8 +69,8 @@ describe('characters', () => {
       }
     }
     expect(hr + foul).toBe(N);
-    expect(hr / N).toBeGreaterThan(0.24);
-    expect(hr / N).toBeLessThan(0.36);
+    expect(hr / N).toBeGreaterThan(0.43);
+    expect(hr / N).toBeLessThan(0.57);
     // Some of the wild ones go backwards, over the screen.
     expect(back).toBeGreaterThan(foul * 0.3);
   });
@@ -77,6 +80,47 @@ describe('characters', () => {
     const whiff = hit(BASE_MODS, 'power', 1.1);
     expect(whiff.kind).toBe('whiff');
     expect(wildSwing(whiff, plan, c, 0.3)).toBe(whiff);
+  });
+
+  it('Benjamin is a rabbi facing a rabbi pitcher, with a 25 % lucky penny', () => {
+    const b = characterById('benjamin');
+    expect(b.name).toBe('Benjamin Gutenberg');
+    expect(b.look.rabbi).toBe(true);
+    expect(CHARACTERS.filter((c) => c.pitcherKit?.rabbi).map((c) => c.id)).toEqual(['benjamin']);
+    expect(b.pennyBlessing).toEqual({ spawnChance: 0.25, pciFill: 0.85, pitches: 3 });
+  });
+
+  it("the penny blessing makes both PCIs cover 85 % of the strike zone", () => {
+    const zone = 2 * STRIKE_ZONE.halfWidth * (STRIKE_ZONE.top - STRIKE_ZONE.bottom);
+    for (const id of ['benjamin', 'moro', 'arturek']) {
+      const base = mods(id);
+      const m = combineMods(base, pciFillMods(0.85, base));
+      for (const kind of ['contact', 'power'] as const) {
+        const p = swingProfile(kind, m);
+        expect((Math.PI * p.pciHalfWidth * p.pciHalfHeight) / zone).toBeCloseTo(0.85, 5);
+        // Bat speed is untouched.
+        expect(p.batSpeed).toBeCloseTo(swingProfile(kind, base).batSpeed);
+      }
+    }
+  });
+
+  it('a batted ball touches the penny only along its flight', () => {
+    const r = hit(mods('benjamin'), 'power');
+    if (r.kind !== 'contact') throw new Error('contact expected');
+    const mid = r.ball.trajectory[Math.floor(r.ball.trajectory.length / 3)]!;
+    expect(trajectoryTouches(r.ball, { x: mid.x + 1, y: mid.y, z: mid.z }, 4)).toBeGreaterThan(0);
+    expect(trajectoryTouches(r.ball, { x: mid.x + 40, y: mid.y, z: mid.z }, 4)).toBe(-1);
+  });
+
+  it('Arturek hits much harder at home in Bratislava, which is open outside the campaign', () => {
+    const a = characterById('arturek');
+    expect(a.homeStadium!.stadium).toBe('bratislava');
+    expect(STADIUMS.bratislava.features.bratislava).toBe(true);
+    expect(EXTRA_STADIUMS).toEqual(['bratislava']);
+    expect(STADIUM_ORDER).not.toContain('bratislava');
+    const home = combineMods(a.mods, a.homeStadium!.mods);
+    for (const kind of ['contact', 'power'] as const) expect(ev(hit(home, kind))).toBeGreaterThan(ev(hit(a.mods, kind)) * 1.15);
+    expect(CHARACTERS.filter((c) => c.homeStadium).map((c) => c.id)).toEqual(['arturek']);
   });
 
   it('El Moro is the base model and only he has an ability', () => {

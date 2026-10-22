@@ -32,6 +32,11 @@ export interface AudioEngine {
   organCharge(): void;
   /** Short jingle when a home run is confirmed. */
   homeRunJingle(): void;
+  /**
+   * Recreation of "Hava Nagila" (traditional) for Benjamin's blessing: the
+   * main theme, "hava neranena" and an accelerating "uru achim" finale (~10 s).
+   */
+  havaNagila(): void;
   /** Stage cleared fanfare / failed sting. */
   stageEnd(success: boolean): void;
   uiClick(): void;
