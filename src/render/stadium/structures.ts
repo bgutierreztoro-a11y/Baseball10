@@ -5,6 +5,7 @@ import { STAND_GAP, STAND_RISE, fenceDistance, fenceHeight, fencePolyline, polar
 import { chainLinkTexture, netTexture, seeded, textTexture, wallTexture } from '../textures';
 import { MeshBuilder } from './geom';
 import type { Atmosphere } from './atmosphere';
+import { createHouseRows } from './houses';
 
 /**
  * Architecture: outfield wall (matches physics exactly), foul poles, seating
@@ -127,6 +128,15 @@ export function createStructures(def: StadiumDef, quality: QualitySettings, atm:
   const foulRows = sandlot ? 7 : 30;
   const crowdSlots: { x: number; y: number; z: number; face: number }[] = [];
   const stands = new MeshBuilder(true);
+  // Southampton has no stands at all: terraced houses, with the fans at the windows.
+  const houses = def.features.southampton ? createHouseRows(def, rnd, foulBowlPath(def, false)) : null;
+  if (houses) {
+    const brick = new THREE.Mesh(track(houses.solid), track(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.78, side: THREE.DoubleSide })));
+    brick.receiveShadow = quality.shadows && quality.tier === 'high';
+    const glass = new THREE.Mesh(track(houses.glass), track(new THREE.MeshBasicMaterial({ vertexColors: true })));
+    group.add(brick, glass);
+    crowdSlots.push(...houses.windows);
+  }
 
   // Outfield bleachers: radial rows from STAND_GAP behind the wall (physics surface).
   const ofPath: PathPoint[] = [];
@@ -136,22 +146,23 @@ export function createStructures(def: StadiumDef, quality: QualitySettings, atm:
     const p = polarToXZ(ang, r);
     ofPath.push({ x: p.x, z: p.z, nx: p.x / r, nz: p.z / r, h0: fenceHeight(def, ang) });
   }
-  if (outfieldRows > 0) {
+  // (The houses cover both the outfield hill and foul territory.)
+  if (!houses && outfieldRows > 0) {
     buildRows(stands, ofPath, outfieldRows, seatColors, crowdSlots, rnd, true);
-  } else {
+  } else if (!houses) {
     buildBerm(stands, ofPath, 34, new THREE.Color(def.palette.grassAlt), crowdSlots, rnd);
   }
 
   // Foul territory: from the LF pole back along the 3B line, around home, out the 1B line.
   const foulPath = foulBowlPath(def, sandlot);
-  buildRows(stands, foulPath, foulRows, seatColors, crowdSlots, rnd, false);
+  if (!houses) buildRows(stands, foulPath, foulRows, seatColors, crowdSlots, rnd, false);
   const standsMat = track(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, side: THREE.DoubleSide }));
   const standsMesh = new THREE.Mesh(track(stands.build()), standsMat);
   standsMesh.receiveShadow = quality.shadows && quality.tier === 'high';
   group.add(standsMesh);
 
   // Upper deck facade for the big parks (foul side).
-  if (!sandlot && def.crowdDensity >= 0.6) {
+  if (!sandlot && !houses && def.crowdDensity >= 0.6) {
     const deck = new MeshBuilder(true);
     const upper = foulPath.map((p) => ({ ...p, x: p.x + p.nx * (foulRows * ROW_DEPTH + 3), z: p.z + p.nz * (foulRows * ROW_DEPTH + 3), h0: p.h0 + foulRows * ROW_RISE * 1.05 + 4 }));
     buildRows(deck, upper, 18, seatColors.map((c) => c.clone().offsetHSL(0, -0.05, -0.06)), crowdSlots, rnd, false);
@@ -188,7 +199,7 @@ export function createStructures(def: StadiumDef, quality: QualitySettings, atm:
   group.add(net);
 
   // ── Crowd ──
-  const crowd = createCrowd(def, quality, crowdSlots, rnd);
+  const crowd = createCrowd(def, quality, crowdSlots, rnd, !!houses);
   if (crowd) {
     group.add(crowd.mesh);
     disposables.push(crowd);
@@ -202,7 +213,7 @@ export function createStructures(def: StadiumDef, quality: QualitySettings, atm:
   const cfR = fenceDistance(def, 0) + STAND_GAP + outfieldRows * ROW_DEPTH;
   return {
     group,
-    cfBack: { r: cfR, y: fenceHeight(def, 0) + outfieldRows * ROW_RISE },
+    cfBack: houses ? houses.cfBack : { r: cfR, y: fenceHeight(def, 0) + outfieldRows * ROW_RISE },
     update(elapsed, excitement) {
       crowd?.update(elapsed, excitement);
     },
@@ -357,15 +368,19 @@ interface Crowd {
   dispose(): void;
 }
 
-/** Instanced spectators animated entirely in the vertex shader. */
-function createCrowd(def: StadiumDef, quality: QualitySettings, slots: { x: number; y: number; z: number; face: number }[], rnd: () => number): Crowd | null {
+/**
+ * Instanced spectators animated entirely in the vertex shader. `busts`: only
+ * head and shoulders (fans looking out of windows), with small hops so they
+ * never jump out of the frame.
+ */
+function createCrowd(def: StadiumDef, quality: QualitySettings, slots: { x: number; y: number; z: number; face: number }[], rnd: () => number, busts = false): Crowd | null {
   const wanted = Math.min(slots.length, Math.round(quality.crowdCount * def.crowdDensity));
   if (wanted <= 0) return null;
   // Spectator: torso + head, ~24 triangles.
-  const body = new THREE.BoxGeometry(0.44, 0.62, 0.3);
-  body.translate(0, 0.31, 0);
+  const body = new THREE.BoxGeometry(0.44, busts ? 0.36 : 0.62, 0.3);
+  body.translate(0, busts ? 0.18 : 0.31, 0);
   const head = new THREE.OctahedronGeometry(0.15, 0);
-  head.translate(0, 0.78, 0);
+  head.translate(0, busts ? 0.52 : 0.78, 0);
   const geo = mergeSimple([body, head]);
   body.dispose();
   head.dispose();
@@ -383,7 +398,7 @@ function createCrowd(def: StadiumDef, quality: QualitySettings, slots: { x: numb
         #ifdef USE_INSTANCING
           float ph = fract(sin(dot(instanceMatrix[3].xz, vec2(12.9898, 78.233))) * 43758.5453);
           float idle = sin(uTime * (1.2 + ph) + ph * 6.2831) * 0.025;
-          float jump = max(0.0, sin(uTime * (7.0 + ph * 4.0) + ph * 6.2831)) * 0.38 * uExcite * step(0.25, ph + uExcite * 0.6);
+          float jump = max(0.0, sin(uTime * (7.0 + ph * 4.0) + ph * 6.2831)) * ${busts ? '0.1' : '0.38'} * uExcite * step(0.25, ph + uExcite * 0.6);
           transformed.y += idle + jump;
           transformed.x += sin(uTime * 2.0 + ph * 10.0) * 0.03 * uExcite;
         #endif`,

@@ -132,9 +132,31 @@ export const STADIUMS: Record<StadiumId, StadiumDef> = {
     features: { lightTowers: true, fireworks: false, sea: false, mountains: false, skyline: false, sandlot: false, bratislava: true },
     crowdDensity: 0.75,
   },
+  southampton: {
+    id: 'southampton',
+    name: { es: 'Estadio de Southampton', en: 'Southampton Ballpark' },
+    subtitle: { es: 'Llueve sin parar y la afición mira desde las ventanas de las casas', en: 'It never stops raining and the fans watch from their windows' },
+    timeOfDay: 'day',
+    altitudeM: 10,
+    // Cold, damp sea air: the ball carries a little less.
+    airDensity: 1.24,
+    fence: { distancesFt: [320, 365, 395, 365, 320], heightsFt: [9, 9, 9, 9, 9] },
+    palette: {
+      grass: '#3f7f3a',
+      grassAlt: '#376f33',
+      dirt: '#7d5a3e',
+      wall: '#b3121b',
+      wallTrim: '#f4f4f4',
+      seats: ['#7a3b2e', '#5e2c22'],
+      crowd: ['#d71920', '#ffffff', '#1d2b4f', '#4a5560', '#f2c84b', '#2e7d5b'],
+      accent: '#d71920',
+    },
+    features: { lightTowers: false, fireworks: false, sea: false, mountains: false, skyline: false, sandlot: false, southampton: true, rain: true },
+    crowdDensity: 0.7,
+  },
 };
 
 export const STADIUM_ORDER: StadiumId[] = ['solar', 'malecon', 'metro', 'cumbre', 'final'];
 
 /** Parks outside the campaign: always open in Practice and Home Run Derby. */
-export const EXTRA_STADIUMS: StadiumId[] = ['bratislava'];
+export const EXTRA_STADIUMS: StadiumId[] = ['bratislava', 'southampton'];

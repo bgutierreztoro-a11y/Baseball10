@@ -28,6 +28,8 @@ export interface AudioEngine {
   /** Short crowd reaction. */
   crowdReaction(kind: 'cheer' | 'roar' | 'ooh' | 'groan'): void;
   fireworks(bursts: number): void;
+  /** A firecracker going off: 0..1 (small pop in the mitt … the blast that burns the park). */
+  explosion(size: number): void;
   /** Stadium organ riff ("charge!") at stage start. */
   organCharge(): void;
   /** Short jingle when a home run is confirmed. */

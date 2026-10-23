@@ -320,6 +320,21 @@ class Engine implements AudioEngine {
     }
   }
 
+  explosion(size: number): void {
+    const ctx = this.ready();
+    if (!ctx) return;
+    const t = ctx.currentTime + 0.01;
+    const k = Math.max(0.1, Math.min(1, size));
+    // Crack, boom and a long low rumble.
+    this.noise(this.sfx, t, 0.08, 'highpass', 1800, 0.6, 0.6 * k);
+    this.noise(this.sfx, t, 0.4 + 1.6 * k, 'lowpass', 900, 0.6, 0.9 * k, 0.002, false, 120);
+    this.tone(this.sfx, t, 0.5 + 1.2 * k, 'sine', 90, 28, 0.9 * k);
+    if (k < 0.5) return;
+    this.noise(this.sfx, t + 0.1, 3.5, 'lowpass', 220, 0.5, 0.5 * k, 0.3, true);
+    // Then the fire crackles.
+    for (let i = 0; i < 40; i++) this.noise(this.sfx, t + 0.6 + Math.random() * 4.5, 0.015 + Math.random() * 0.03, 'bandpass', 2500 + Math.random() * 3000, 1.2, 0.05 + Math.random() * 0.08);
+  }
+
   /** Additive "drawbar" organ note with tremolo. */
   private organNote(at: number, midi: number, dur: number, gain: number): void {
     const ctx = this.ctx!;

@@ -144,6 +144,10 @@ Swing de potencia perfecto en el Metropolitano (92 mph): Moro 434 ft (460 con pe
 
 **Estadio del Danubio (Bratislava):** parque fuera de la campaña, siempre disponible en Práctica y Derby de jonrones. Atardecer con el Danubio, el castillo de Bratislava en su colina y el puente OVNI (Most SNP) detrás del outfield; las gradas del outfield son más bajas para que se vean, y la intro del partido arranca mirándolos. Arturek juega en casa: +25 % de velocidad de bate en ambos swings.
 
+**Estadio de Southampton:** el segundo parque fuera de la campaña. Una ciudad británica con lluvia constante (cielo gris, niebla baja y los focos encendidos a mediodía); el aire frío y húmedo (1,24 kg/m³) hace volar un poco menos la bola. No tiene gradas: detrás de la cerca sube una colina con una calle mojada y cuatro hileras de casas adosadas de ladrillo (ventanas en saliente, puertas de colores y chimeneas), y en territorio foul hay dos hileras más; la afición mira desde las ventanas iluminadas. Al fondo, el puerto de Southampton con grúas y un crucero. Chamo está nerfeado aquí: su primer jonrón del partido lo atrapa detrás de la cerca un eslovaco de los «mandem» con su Nike Tech, que se escapa con la pelota hasta Valentina (la ex de Chamo, ahora su novia); se abrazan y se van de la mano. Cuenta como out (`homeRunThief`, `sim/thief.ts`).
+
+**La maldición de Bubenik (Arturek):** con Arturek lanza Vikokotor, bajito y con sobrepeso, del MŠK Žilina (camiseta amarilla y verde, con el escudo del club flotando encima como el del Southampton con Chamo). Antes de cada lanzamiento hay un 20 % de que tire un petardo encendido en vez de la bola. Si Arturek lo batea: 50 % explota en el plato, lo mata (cae carbonizado y su fantasma sube con aureola), el estadio entero arde y el partido termina como derrota (`Session.forfeit`); 50 % es jonrón seguro. Si no lo batea, revienta en el guante del receptor sin consecuencias (`firecracker`).
+
 ## 6. Requisitos
 
 ### P0 — imprescindibles (implementados)

@@ -74,6 +74,8 @@ export class Session {
   goalMet = false;
   finished = false;
   success = false;
+  /** Ended early by forfeit() (Arturek blown up by the firecracker). */
+  forfeited = false;
 
   constructor(rules: SessionRules) {
     this.rules = rules;
@@ -227,6 +229,16 @@ export class Session {
     this.success = this.rules.goal ? this.goalMet || this.checkGoal() : true;
     this.goalMet = this.success && !!this.rules.goal;
     return [{ type: 'finished', success: this.success }];
+  }
+
+  /** Ends the session as a failure whatever the score (the batter cannot go on). */
+  forfeit(): SessionEvent[] {
+    if (this.finished) return [];
+    this.finished = true;
+    this.forfeited = true;
+    this.success = false;
+    this.goalMet = false;
+    return [{ type: 'finished', success: false }];
   }
 
   /** [goal, star2, star3] — independent checks; stars = count of true when goal met. */

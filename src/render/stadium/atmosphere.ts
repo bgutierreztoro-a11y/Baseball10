@@ -42,6 +42,9 @@ export function atmosphereFor(def: StadiumDef): Atmosphere {
     case 'bratislava':
       // Late-afternoon light from behind home plate, so the castle and the bridge are lit.
       return { skyTop: '#2f5fae', skyHorizon: '#f7c58f', skyBottom: '#6d7a5a', sunDir: [0.35, 0.42, -0.84], sunColor: '#ffd9a8', sunDisc: false, keyColor: '#ffe2bd', keyIntensity: 2.8, hemiSky: '#c9d8f2', hemiGround: '#5d6b45', hemiIntensity: 1.1, fogColor: '#e8c9a6', fogNear: 320, fogFar: 2600, clouds: 0.45, stars: false, night: false, bloom: 0.2, exposure: 1.06, lampsOn: true };
+    case 'southampton':
+      // Grey English drizzle: flat overcast light, low misty fog and the floodlights on at midday.
+      return { skyTop: '#5d6670', skyHorizon: '#a3abb2', skyBottom: '#4b544f', sunDir: [-0.3, 0.8, -0.5], sunColor: '#b9c0c6', sunDisc: false, keyColor: '#e4e9ee', keyIntensity: 1.7, hemiSky: '#c3cad1', hemiGround: '#47513f', hemiIntensity: 1.35, fogColor: '#8e979e', fogNear: 110, fogFar: 950, clouds: 1, stars: false, night: false, bloom: 0.12, exposure: 1.0, lampsOn: true };
     case 'final':
       return { skyTop: '#05030f', skyHorizon: '#2a1458', skyBottom: '#06040c', sunDir: [-0.1, 0.85, -0.5], sunColor: '#f2e8ff', sunDisc: false, keyColor: '#f1eeff', keyIntensity: 2.6, hemiSky: '#4b3a7a', hemiGround: '#0f0f14', hemiIntensity: 0.7, fogColor: '#1b1238', fogNear: 220, fogFar: 1400, clouds: 0.0, stars: true, night: true, bloom: 0.85, exposure: 1.0, lampsOn: true };
   }

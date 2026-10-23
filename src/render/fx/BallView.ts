@@ -92,6 +92,12 @@ class Ball implements BallView {
   private readonly seg = new THREE.Vector3();
   private readonly colA = new THREE.Color();
   private readonly colB = new THREE.Color();
+  /** Arturek's curse: a lit firecracker (red stick, fuse and sparks) flies instead of the ball. */
+  private readonly cracker = new THREE.Group();
+  private readonly spark: THREE.Sprite;
+  private crackerOn = false;
+  private visible = false;
+  private time = 0;
 
   constructor(quality: QualitySettings) {
     const tex = seamTexture();
@@ -135,16 +141,37 @@ class Ball implements BallView {
     };
     this.root.add(this.mesh, this.shadow, this.trail);
     void quality;
+    // Firecracker: chunky enough to read from the plate (≈ 3× a ball's length).
+    const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.26, 14), new THREE.MeshStandardMaterial({ color: '#d0161b', roughness: 0.5, emissive: '#5a0505', emissiveIntensity: 0.4 }));
+    const band = new THREE.Mesh(new THREE.CylinderGeometry(0.047, 0.047, 0.07, 14), new THREE.MeshStandardMaterial({ color: '#f7d117', roughness: 0.5 }));
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.046, 0.046, 0.012, 14), new THREE.MeshStandardMaterial({ color: '#efe6cf', roughness: 0.8 }));
+    cap.position.y = 0.135;
+    const fuse = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.09, 6), new THREE.MeshStandardMaterial({ color: '#3b2a1a', roughness: 0.9 }));
+    fuse.position.y = 0.18;
+    this.spark = new THREE.Sprite(new THREE.SpriteMaterial({ map: radialTexture('rgba(255,248,200,1)', 'rgba(255,120,20,0)'), color: '#ffd27a', blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, toneMapped: false }));
+    this.spark.position.y = 0.23;
+    this.spark.scale.setScalar(0.22);
+    this.cracker.add(stick, band, cap, fuse, this.spark);
+    this.cracker.visible = false;
+    this.root.add(this.cracker);
   }
 
   setVisible(v: boolean): void {
-    this.mesh.visible = v;
+    this.visible = v;
+    this.mesh.visible = v && !this.crackerOn;
+    this.cracker.visible = v && this.crackerOn;
     this.shadow.visible = v;
+  }
+
+  setFirecracker(on: boolean): void {
+    this.crackerOn = on;
+    this.setVisible(this.visible);
   }
 
   setPosition(p: Vec3): void {
     this.pos.set(p.x, p.y, p.z);
     this.mesh.position.copy(this.pos);
+    this.cracker.position.copy(this.pos);
     const h = Math.max(0, p.y);
     const size = 0.16 + h * 0.035;
     this.shadow.position.set(p.x, 0.012, p.z);
@@ -171,8 +198,15 @@ class Ball implements BallView {
   }
 
   update(dt: number): void {
+    this.time += dt;
     if (this.rps > 0) this.mesh.rotateOnWorldAxis(this.axis, this.rps * Math.PI * 2 * dt);
-    if (this.mode === 'off' || !this.mesh.visible) {
+    if (this.cracker.visible) {
+      // Tumbles end over end, the fuse fizzing.
+      this.cracker.rotation.x += dt * 9;
+      this.cracker.rotation.z = Math.sin(this.time * 3) * 0.4;
+      this.spark.scale.setScalar(0.16 + 0.12 * Math.abs(Math.sin(this.time * 41)) + 0.05 * Math.sin(this.time * 17));
+    }
+    if (this.mode === 'off' || !this.visible) {
       this.trail.visible = this.hist.length > 0 && this.mode !== 'off';
       return;
     }

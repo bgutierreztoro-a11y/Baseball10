@@ -192,6 +192,21 @@ function launchBall(at: { x: number; y: number; z: number }, ev: number, la: num
 export const WILD_MAX_EV = 120 * MPH;
 
 /**
+ * A no-doubt home run off this pitch: dead-centre, perfect launch at maximum
+ * power, with more speed only if a deep park would keep it in. Whiffs are
+ * untouched. Used by Chimon's wild racket and Arturek's firecracker.
+ */
+export function forcedHomeRun(evaluation: SwingEvaluation, plan: PitchPlan, ctx: ContactContext): SwingEvaluation {
+  if (evaluation.kind !== 'contact') return evaluation;
+  const rng = ctx.rng;
+  const at = plan.plateCross;
+  const spray = rng.range(-28, 28);
+  let ball = launchBall(at, WILD_MAX_EV * rng.range(0.98, 1.02), rng.range(25, 31), spray, ctx);
+  for (let k = 1.05; ball.outcome !== 'homeRun' && k < 1.5; k += 0.05) ball = launchBall(at, WILD_MAX_EV * k, 29, spray * 0.5, ctx);
+  return { ...evaluation, ball };
+}
+
+/**
  * Chimon's racket: whatever the timing or aim, a ball he touches leaves at
  * maximum power. With probability `homeRunChance` it is a no-doubt home run;
  * otherwise it flies off in any foul direction — down the lines, straight up
@@ -201,13 +216,7 @@ export function wildSwing(evaluation: SwingEvaluation, plan: PitchPlan, ctx: Con
   if (evaluation.kind !== 'contact') return evaluation;
   const rng = ctx.rng;
   const at = plan.plateCross;
-  if (rng.next() < homeRunChance) {
-    // Dead-centre, perfect launch; more speed only if a deep park keeps it in.
-    const spray = rng.range(-28, 28);
-    let ball = launchBall(at, WILD_MAX_EV * rng.range(0.98, 1.02), rng.range(25, 31), spray, ctx);
-    for (let k = 1.05; ball.outcome !== 'homeRun' && k < 1.5; k += 0.05) ball = launchBall(at, WILD_MAX_EV * k, 29, spray * 0.5, ctx);
-    return { ...evaluation, ball };
-  }
+  if (rng.next() < homeRunChance) return forcedHomeRun(evaluation, plan, ctx);
   // Any foul direction: past either line (|spray| > 45°) all the way round to
   // straight back (180°), at any launch angle from a chopper to a sky-high pop.
   for (let i = 0; i < 12; i++) {

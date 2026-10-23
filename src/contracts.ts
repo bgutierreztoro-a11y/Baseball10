@@ -61,7 +61,7 @@ export interface QualitySettings {
 
 // ───────────────────────────── Content definitions ─────────────────────────────
 
-export type StadiumId = 'solar' | 'malecon' | 'metro' | 'cumbre' | 'final' | 'bratislava';
+export type StadiumId = 'solar' | 'malecon' | 'metro' | 'cumbre' | 'final' | 'bratislava' | 'southampton';
 export type TimeOfDay = 'day' | 'sunset' | 'night';
 
 /** Fence distances (ft) and wall heights (ft) at LF line, LCF, CF, RCF, RF line. */
@@ -102,6 +102,13 @@ export interface StadiumDef {
     sandlot: boolean;
     /** Bratislava backdrop: the Danube, Bratislava Castle on its hill and the UFO bridge (Most SNP). */
     bratislava?: boolean;
+    /**
+     * Southampton: rows of British terraced houses instead of stands (the fans
+     * watch from the windows), wet streets and a town backdrop.
+     */
+    southampton?: boolean;
+    /** Constant rain falling over the park. */
+    rain?: boolean;
   };
   /** 0..1 how full the stands are. */
   crowdDensity: number;
@@ -149,6 +156,10 @@ export interface CharacterLook {
   chicken?: boolean;
   /** Rabbi attire: black wide-brimmed hat instead of a cap, long beard and sidelocks (peyot). */
   rabbi?: boolean;
+  /** Uniform body scale (1 = stock pitcher ≈ 1.85 m); below 1 = shorter. */
+  scale?: number;
+  /** Belly size 0..1 (0 = flat). */
+  belly?: number;
 }
 
 export interface PitcherDef {
@@ -397,7 +408,9 @@ export interface CharacterDef {
   /** Overrides applied to the pitcher's look while this character is at the plate. */
   pitcherKit?: Partial<CharacterLook>;
   /** A club crest hovers over the pitcher (bobbing like a little cloud) during matches. */
-  pitcherBadge?: boolean;
+  pitcherBadge?: PitcherBadgeId;
+  /** Name of the pitcher while this character bats (e.g. Vikokotor for Arturek). */
+  pitcherName?: string;
   /**
    * Lucky penny: before each pitch, with probability `spawnChance`, a giant
    * penny floats somewhere in the outfield. A batted ball that touches it
@@ -421,4 +434,21 @@ export interface CharacterDef {
    * `cooldownSwings` swings during which he cannot get angry again.
    */
   temper?: { whiffs: number; cooldownSwings: number };
+  /**
+   * In `stadium`, the first home run of the match never lands: a Slovak
+   * "mandem" in a Nike Tech tracksuit catches it beyond the wall, runs off
+   * with it and meets the batter's ex. The ball counts as an out.
+   */
+  homeRunThief?: { stadium: StadiumId };
+  /**
+   * La maldición de Bubenik: before each pitch, with probability `chance`,
+   * the pitcher throws a lit firecracker instead of the ball. If the batter
+   * hits it, with probability `explodeChance` it blows up at the plate (the
+   * batter dies, the whole park burns and the match ends); otherwise it is a
+   * guaranteed home run.
+   */
+  firecracker?: { chance: number; explodeChance: number };
 }
+
+/** Club crests that can hover over the pitcher. */
+export type PitcherBadgeId = 'southampton' | 'zilina';

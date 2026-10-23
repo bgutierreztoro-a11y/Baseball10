@@ -193,8 +193,8 @@ export function resultsVM(
     return {
       mode: 'campaign',
       success: session.success,
-      title: session.success ? t.stageCleared : t.stageFailed,
-      subtitle: session.success ? t.stageClearedSub(stars) : t.stageFailedSub,
+      title: session.success ? t.stageCleared : session.forfeited ? t.dead : t.stageFailed,
+      subtitle: session.success ? t.stageClearedSub(stars) : session.forfeited ? t.boomSub : t.stageFailedSub,
       stars,
       newStars: opts.newStars,
       starTexts: [goalText(st.goal, s.lang, s.units), starText(st.stars[0], s.lang, s.units), starText(st.stars[1], s.lang, s.units)],
@@ -209,8 +209,8 @@ export function resultsVM(
     return {
       mode: 'derby',
       success: true,
-      title: t.derbyOver,
-      subtitle: `${t.derbyScore(session.homeRuns)}${opts.derbyNewBest ? ` · ${t.derbyNewBest}` : ''}`,
+      title: session.forfeited ? t.dead : t.derbyOver,
+      subtitle: `${t.derbyScore(session.homeRuns)}${opts.derbyNewBest ? ` · ${t.derbyNewBest}` : ''}${session.forfeited ? ` · ${t.boomSub}` : ''}`,
       stars: 0,
       newStars: 0,
       starTexts: ['', '', ''],
@@ -224,8 +224,8 @@ export function resultsVM(
   return {
     mode: 'practice',
     success: true,
-    title: t.practice,
-    subtitle: `${session.swings} ${L.swings.toLowerCase()}`,
+    title: session.forfeited ? t.dead : t.practice,
+    subtitle: `${session.swings} ${L.swings.toLowerCase()}${session.forfeited ? ` · ${t.boomSub}` : ''}`,
     stars: 0,
     newStars: 0,
     starTexts: ['', '', ''],
