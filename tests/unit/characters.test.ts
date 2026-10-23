@@ -116,11 +116,50 @@ describe('characters', () => {
     const a = characterById('arturek');
     expect(a.homeStadium!.stadium).toBe('bratislava');
     expect(STADIUMS.bratislava.features.bratislava).toBe(true);
-    expect(EXTRA_STADIUMS).toEqual(['bratislava', 'southampton']);
+    expect(EXTRA_STADIUMS).toEqual(['bratislava', 'southampton', 'tenis']);
     expect(STADIUM_ORDER).not.toContain('bratislava');
     const home = combineMods(a.mods, a.homeStadium!.mods);
     for (const kind of ['contact', 'power'] as const) expect(ev(hit(home, kind))).toBeGreaterThan(ev(hit(a.mods, kind)) * 1.15);
-    expect(CHARACTERS.filter((c) => c.homeStadium).map((c) => c.id)).toEqual(['arturek']);
+    expect(CHARACTERS.filter((c) => c.homeStadium).map((c) => c.id)).toEqual(['arturek', 'chimon']);
+  });
+
+  it('Chimon gets a 15 % bigger batting eye on the tennis court, a park outside the campaign', () => {
+    const c = characterById('chimon');
+    expect(c.homeStadium!.stadium).toBe('tenis');
+    expect(STADIUMS.tenis.features.tennis).toBe(true);
+    expect(STADIUM_ORDER).not.toContain('tenis');
+    const home = combineMods(c.mods, c.homeStadium!.mods);
+    for (const kind of ['contact', 'power'] as const) {
+      const base = swingProfile(kind, c.mods);
+      const court = swingProfile(kind, home);
+      expect(court.pciHalfWidth / base.pciHalfWidth).toBeCloseTo(1.15);
+      expect(court.pciHalfHeight / base.pciHalfHeight).toBeCloseTo(1.15);
+      // Only the eye changes: same bat speed.
+      expect(court.batSpeed).toBeCloseTo(base.batSpeed);
+    }
+    expect(c.homeStadium!.buff.es).toContain('15 %');
+  });
+
+  it('El Mati is Ronnie Coleman in a wheelchair, with a 10 % pre-workout that gets him up', () => {
+    const m = characterById('mati');
+    expect(m.look).toMatchObject({ wheelchair: true, muscle: 1 });
+    // Sitting he keeps his usual ratings.
+    expect(m.ratings).toEqual({ vision: 10, contact: 14, power: 17 });
+    const pw = m.preWorkout!;
+    expect(pw).toMatchObject({ chance: 0.1, pitches: 3 });
+    expect(pw.mods).toEqual(modsFromRatings(pw.ratings));
+    expect(CHARACTERS.filter((c) => c.preWorkout).map((c) => c.id)).toEqual(['mati']);
+    // Pumped, every rating goes up: bigger circle and a harder swing on both swings.
+    for (const k of ['vision', 'contact', 'power'] as const) expect(pw.ratings[k]).toBeGreaterThan(m.ratings[k]);
+    for (const kind of ['contact', 'power'] as const) {
+      expect(swingProfile(kind, pw.mods).pciHalfWidth).toBeGreaterThan(swingProfile(kind, m.mods).pciHalfWidth);
+      expect(ev(hit(pw.mods, kind))).toBeGreaterThan(ev(hit(m.mods, kind)));
+    }
+  });
+
+  it('Chamo is a horned skeleton', () => {
+    expect(characterById('chamo').look).toMatchObject({ skeleton: true, horns: true, hornBat: true });
+    expect(CHARACTERS.filter((c) => c.look.skeleton).map((c) => c.id)).toEqual(['chamo']);
   });
 
   it('El Moro is the base model and only he has an ability', () => {

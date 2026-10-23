@@ -45,6 +45,9 @@ export function atmosphereFor(def: StadiumDef): Atmosphere {
     case 'southampton':
       // Grey English drizzle: flat overcast light, low misty fog and the floodlights on at midday.
       return { skyTop: '#5d6670', skyHorizon: '#a3abb2', skyBottom: '#4b544f', sunDir: [-0.3, 0.8, -0.5], sunColor: '#b9c0c6', sunDisc: false, keyColor: '#e4e9ee', keyIntensity: 1.7, hemiSky: '#c3cad1', hemiGround: '#47513f', hemiIntensity: 1.35, fogColor: '#8e979e', fogNear: 110, fogFar: 950, clouds: 1, stars: false, night: false, bloom: 0.12, exposure: 1.0, lampsOn: true };
+    case 'tenis':
+      // Bright summer afternoon for a tennis final: clear sky, crisp shadows.
+      return { skyTop: '#1f6fd6', skyHorizon: '#cfe8fb', skyBottom: '#93b98f', sunDir: [-0.4, 0.8, -0.45], sunColor: '#fff6e0', sunDisc: true, keyColor: '#fff6e6', keyIntensity: 2.9, hemiSky: '#d9eeff', hemiGround: '#5d7f4a', hemiIntensity: 1.05, fogColor: '#cfe6f6', fogNear: 240, fogFar: 1700, clouds: 0.25, stars: false, night: false, bloom: 0.08, exposure: 1.02, lampsOn: false };
     case 'final':
       return { skyTop: '#05030f', skyHorizon: '#2a1458', skyBottom: '#06040c', sunDir: [-0.1, 0.85, -0.5], sunColor: '#f2e8ff', sunDisc: false, keyColor: '#f1eeff', keyIntensity: 2.6, hemiSky: '#4b3a7a', hemiGround: '#0f0f14', hemiIntensity: 0.7, fogColor: '#1b1238', fogNear: 220, fogFar: 1400, clouds: 0.0, stars: true, night: true, bloom: 0.85, exposure: 1.0, lampsOn: true };
   }

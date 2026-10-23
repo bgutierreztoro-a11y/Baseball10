@@ -1,4 +1,4 @@
-// Visual QA sandbox: ?id=solar|malecon|metro|cumbre|final|bratislava|southampton&view=batting|outfield|overview|title|intro&quality=low|medium|high&targets=1
+// Visual QA sandbox: ?id=solar|malecon|metro|cumbre|final|bratislava|southampton|tenis&view=batting|outfield|overview|title|intro&quality=low|medium|high&targets=1
 import { STADIUMS } from '../src/config/stadiums';
 import { STAGES } from '../src/config/campaign';
 import type { QualityTier, StadiumId } from '../src/contracts';

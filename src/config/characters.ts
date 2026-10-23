@@ -34,15 +34,17 @@ const rated = (vision: number, contact: number, power: number) => {
  * PCI size (how forgiving the aim is) and bat speed (exit velocity).
  * Balance intent:
  * - El Moro: the base model, plus a once-per-match "peak" boost.
- * - El Mati: all-rounder with a bit more pop; his size blocks more of the view.
+ * - El Mati: Ronnie Coleman in a wheelchair, an all-rounder with a bit more pop;
+ *   a random pre-workout (preWorkout) gets him up with much better ratings.
  * - Arturek: huge vision → much bigger PCI for both swings, but almost no power.
  *   Vikokotor pitches to him and sometimes throws a firecracker (firecracker).
- * - Chamo: the strongest power swing, average vision, below-average contact;
+ * - Chamo: a horned skeleton with the strongest power swing, average vision, below-average contact;
  *   his first home run in Southampton is always stolen (homeRunThief).
  * - Chimon: a monkey with a tennis racket — the big string bed is easy to hit
  *   with. Three whiffs in a row make him angry (temper): until he hits a home
  *   run every ball he touches leaves at max power, 50 % home runs and 50 %
- *   wild fouls in any direction (wildSwing); then a 10-swing cooldown.
+ *   wild fouls in any direction (wildSwing); then a 10-swing cooldown. At home
+ *   on the tennis court his batting eye (PCI) is 15 % bigger.
  * - Benjamin Gutenberg: a rabbi, slightly above average all round; his lucky
  *   penny (pennyBlessing) can fill 85 % of the strike zone with his PCI.
  */
@@ -73,14 +75,22 @@ export const CHARACTERS: readonly CharacterDef[] = [
   {
     id: 'mati',
     name: 'El Mati',
-    title: { es: 'El Gran Papá', en: 'Big Papa' },
+    title: { es: 'Lightweight, Baby', en: 'Lightweight, Baby' },
     bio: {
-      es: 'Inspirado en David "Big Papi" Ortiz. Enorme, tranquilo y siempre peligroso: batea bien de contacto y de poder. Ocupa tanto espacio en la caja de bateo que tapa buena parte de la vista.',
-      en: 'Inspired by David "Big Papi" Ortiz. Huge, calm and always dangerous: hits well for contact and power. He fills so much of the batter’s box that he blocks a good part of the view.',
+      es: 'Es Ronnie Coleman, el fisicoculturista más famoso de la historia… pero en silla de ruedas. Batea sentado y aun así le pega bien de contacto y de poder. A veces le cae del cielo un preentreno y vuelve el Ronnie de los buenos tiempos.',
+      en: 'He is Ronnie Coleman, the most famous bodybuilder ever… but in a wheelchair. He bats sitting down and still hits well for contact and power. Sometimes a pre-workout falls from the sky and the Ronnie of the glory days is back.',
     },
-    look: { skin: '#3a2318', hair: null, heightM: 1.93, build: 1.95, belly: 1, muscle: 0.3, extraArms: false, beard: true, horns: false, hornBat: false, jersey: '#f4f1e8', trim: '#2563c9', number: '34' },
+    look: { skin: '#3a2318', hair: null, heightM: 1.8, build: 1.5, belly: 0.1, muscle: 1, extraArms: false, beard: true, horns: false, hornBat: false, wheelchair: true, jersey: '#f4f1e8', trim: '#2563c9', number: '8' },
     ...rated(10, 14, 17),
     ability: null,
+    trait: {
+      name: { es: 'Preentreno', en: 'Pre-Workout' },
+      description: {
+        es: 'Antes de cada lanzamiento hay un 10 % de que le caiga un preentreno con café, Monster y semen de caballo: se levanta de la silla de ruedas convertido en el Ronnie Coleman de sus mejores años y, durante 3 lanzamientos, batea con visión 15, contacto 20 y poder 25. Después vuelve a la silla, con sus estadísticas de siempre.',
+        en: 'Before each pitch there is a 10 % chance a pre-workout of coffee, Monster and horse semen lands on him: he gets out of the wheelchair as the Ronnie Coleman of his prime and, for 3 pitches, bats with vision 15, contact 20 and power 25. Then it is back to the chair, with his usual ratings.',
+      },
+    },
+    preWorkout: { chance: 0.1, pitches: 3, ...rated(15, 20, 25) },
   },
   {
     id: 'arturek',
@@ -94,7 +104,7 @@ export const CHARACTERS: readonly CharacterDef[] = [
     ...rated(20, 5, 2),
     ability: null,
     // At home in Bratislava his swing gets a big power boost (+25 % bat speed on both swings).
-    homeStadium: { stadium: 'bratislava', mods: mods(1, 1, 1.25, 1.25) },
+    homeStadium: { stadium: 'bratislava', mods: mods(1, 1, 1.25, 1.25), buff: { es: 'Bratislava le da +25 % de potencia', en: 'Bratislava gives him +25 % power' } },
     trait: {
       name: { es: 'La maldición de Bubenik', en: 'The Curse of Bubenik' },
       description: {
@@ -111,12 +121,12 @@ export const CHARACTERS: readonly CharacterDef[] = [
   {
     id: 'chamo',
     name: 'Chamo',
-    title: { es: 'El Roto', en: 'The Shredded' },
+    title: { es: 'El Esqueleto', en: 'The Skeleton' },
     bio: {
-      es: '1,90 m, marcado de pies a cabeza: el six-pack y los bíceps se le notan a través de la camiseta. Tiene un par de cuernos de villano y no usa bate de madera: le pega a la pelota con un cuerno gigante. Su swing está inspirado en el de Barry Bonds y es el más potente del juego, aunque su contacto es flojo.',
-      en: '1.90 m and shredded head to toe: his six-pack and biceps show through the jersey. He has a pair of villain horns and doesn’t use a wooden bat: he hits the ball with a giant horn. His swing is modelled on Barry Bonds’s and is the most powerful in the game, though his contact is weak.',
+      es: 'Un esqueleto de 1,90 m con un par de cuernos de villano en la calavera y los ojos encendidos en rojo. No usa bate de madera: le pega a la pelota con un cuerno gigante. Su swing está inspirado en el de Barry Bonds y es el más potente del juego, aunque su contacto es flojo.',
+      en: 'A 1.90 m skeleton with a pair of villain horns on his skull and glowing red eyes. He doesn’t use a wooden bat: he hits the ball with a giant horn. His swing is modelled on Barry Bonds’s and is the most powerful in the game, though his contact is weak.',
     },
-    look: { skin: '#f0cdb4', hair: null, heightM: 1.9, build: 1.12, belly: 0, muscle: 1, extraArms: false, beard: false, horns: true, hornBat: true, jersey: '#f4f1e8', trim: '#f28c28', number: '25' },
+    look: { skin: '#ebe4cf', hair: null, heightM: 1.9, build: 1, belly: 0, muscle: 0, extraArms: false, beard: false, horns: true, hornBat: true, skeleton: true, jersey: '#f4f1e8', trim: '#f28c28', number: '25' },
     ...rated(10, 5, 24),
     ability: null,
     trait: {
@@ -145,10 +155,12 @@ export const CHARACTERS: readonly CharacterDef[] = [
     trait: {
       name: { es: 'Raquetazo salvaje', en: 'Wild Racket' },
       description: {
-        es: 'Si abanica 3 veces seguidas se enoja y se le pone la cara roja: cada pelota que toque sale a máxima potencia, 50 % jonrón seguro y 50 % foul hacia cualquier lado, hasta hacia atrás. Se calma al batear un jonrón y luego necesita 10 swings para volver a enojarse.',
-        en: 'Whiff 3 times in a row and he gets angry and his face turns red: every ball he touches leaves at max power, 50 % a sure home run and 50 % a foul in any direction, even backwards. A home run calms him down, and then it takes 10 swings before he can get angry again.',
+        es: 'Si abanica 3 veces seguidas se enoja y se le pone la cara roja: cada pelota que toque sale a máxima potencia, 50 % jonrón seguro y 50 % foul hacia cualquier lado, hasta hacia atrás. Se calma al batear un jonrón y luego necesita 10 swings para volver a enojarse. En la Cancha Central (el estadio de tenis) juega en casa: +15 % de ojo de bateo.',
+        en: 'Whiff 3 times in a row and he gets angry and his face turns red: every ball he touches leaves at max power, 50 % a sure home run and 50 % a foul in any direction, even backwards. A home run calms him down, and then it takes 10 swings before he can get angry again. At Centre Court (the tennis park) he is at home: +15 % batting eye.',
       },
     },
+    // On a tennis court the racket feels at home: +15 % PCI size on both swings.
+    homeStadium: { stadium: 'tenis', mods: mods(1.15, 1.15, 1, 1), buff: { es: 'En la cancha de tenis: +15 % de ojo de bateo', en: 'On the tennis court: +15 % batting eye' } },
     wildSwing: { homeRunChance: 0.5 },
     temper: { whiffs: 3, cooldownSwings: 10 },
     // When Chimon bats, the pitcher is a chicken.

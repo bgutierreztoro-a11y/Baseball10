@@ -139,7 +139,9 @@ function figure(look: BatterLook, cx: number, feet: number, H: number, id: strin
   const b = Math.max(0.7, look.build);
   const m = Math.max(0, Math.min(1, look.muscle));
   const bl = Math.max(0, Math.min(1, look.belly));
-  const y = (k: number): number => T + k * u;
+  // In the wheelchair the whole upper body drops onto the seat.
+  const sit = look.wheelchair ? u * 1.55 : 0;
+  const y = (k: number): number => T + sit + k * u;
 
   const sh = u * 0.95 * (1 + 0.45 * (b - 1)) * (1 + 0.4 * m);
   const waist = u * 0.66 * b * (1 - 0.2 * m);
@@ -168,236 +170,245 @@ function figure(look: BatterLook, cx: number, feet: number, H: number, id: strin
     g.append(el('path', { d: taper(c, (t) => u * (0.2 - 0.08 * t)), fill: skin }));
   }
 
-  // ── Legs ──
-  const legX = (side: number, k: number): number => cx + side * (hip * 0.52 + k * u * 0.16);
-  for (const side of [-1, 1]) {
-    const hipJ: Pt = [legX(side, 0), y(4.15)];
-    const knee: Pt = [legX(side, 0.65), y(6.0)];
-    const ankle: Pt = [legX(side, 1.0), y(7.72)];
-    // Sock (calf) then pants (thigh + knee) on top. A rabbi wears plain black trousers.
-    if (look.rabbi) {
-      g.append(limb([hipJ, knee, ankle], legW * 0.92, jersey));
-    } else {
-      g.append(limb([knee, ankle], legW * 0.74, trim));
-      g.append(limb([lerp(knee, ankle, 0.45), ankle], legW * 0.6, mix(trim, INK, 0.25)));
-      g.append(limb([hipJ, knee, lerp(knee, ankle, 0.2)], legW, jersey));
-      // Pant stripe along the outer seam.
-      const off = side * legW * 0.4;
-      g.append(limb([[hipJ[0] + off, hipJ[1]], [knee[0] + off, knee[1]]], Math.max(1, u * 0.06), trim));
-    }
-    // Cleat.
-    g.append(el('ellipse', { cx: ankle[0] + side * u * 0.14, cy: feet - u * 0.1, rx: u * 0.34 + legW * 0.15, ry: u * 0.14, fill: CLEAT }));
-  }
-  // Pants seat between the legs.
-  g.append(
-    el('path', {
-      d: smooth([
-        [cx - beltHalf, beltY],
-        [cx - hip * 1.02, y(4.35)],
-        [cx, y(4.55)],
-        [cx + hip * 1.02, y(4.35)],
-        [cx + beltHalf, beltY],
-      ]) + 'Z',
-      fill: jersey,
-    }),
-  );
+  const chair = look.wheelchair ? wheelchairParts(cx, feet, u, beltHalf, y) : null;
+  if (chair) g.append(chair.back);
 
-  if (look.rabbi) {
-    // Skirt of the long black coat down to the knees, with tzitzit fringes at the hips.
-    const hem = y(5.75);
-    const wide = Math.max(beltHalf, hip) * 1.18;
-    g.append(el('path', { d: `M${r(cx - beltHalf)} ${r(beltY)}L${r(cx - wide)} ${r(hem)}Q${r(cx)} ${r(hem + u * 0.12)} ${r(cx + wide)} ${r(hem)}L${r(cx + beltHalf)} ${r(beltY)}Z`, fill: jersey }));
-    g.append(el('path', { d: `M${r(cx)} ${r(beltY)}L${r(cx + u * 0.05)} ${r(hem + u * 0.06)}`, stroke: mix(jersey, '#ffffff', 0.12), 'stroke-width': u * 0.04 }));
-    for (const sd of [-1, 1]) {
-      for (let k = 0; k < 3; k++) {
-        const x0 = cx + sd * (beltHalf * 0.92 - k * u * 0.06);
-        g.append(el('path', { d: `M${r(x0)} ${r(beltY + u * 0.1)}L${r(x0 + sd * u * 0.03)} ${r(beltY + u * (0.95 + 0.08 * k))}`, stroke: '#f4f2ea', 'stroke-width': Math.max(0.7, u * 0.035), 'stroke-linecap': 'round' }));
-      }
-    }
-  }
-
-  // ── Torso (jersey) ──
-  const sideC = (s: number): Pt[] => [
-    [cx + s * neck * 1.05, y(1.3)],
-    [cx + s * (sh * 0.72 + neck * 0.3), y(1.42)],
-    [cx + s * sh, y(1.68)],
-    [cx + s * (sh * 0.92 - 0.04 * u), y(2.25)],
-    [cx + s * (waist * (1 - 0.15 * m) + bellyOut * 0.8 + (sh - waist) * 0.35 * (1 - m)), y(2.95)],
-    [cx + s * (waist + bellyOut * 0.75), y(3.4)],
-    [cx + s * beltHalf, beltY + u * 0.05],
-  ];
-  const left = sideC(-1);
-  const right = sideC(1).reverse();
-  const torsoD = smooth(left) + `L${r(right[0]![0])} ${r(right[0]![1])}` + smooth(right).replace(/^M[^C]*/, '') + 'Z';
-  const clipId = `${id}-torso`;
-  g.append(el('clipPath', { id: clipId }, el('path', { d: torsoD })));
-  g.append(el('path', { d: torsoD, fill: jersey }));
-  const shade = el('g', { 'clip-path': `url(#${clipId})` });
-  // Form shadow on the far side + under the chest.
-  shade.append(el('path', { d: `M${r(cx + sh * 0.35)} ${r(y(1.2))}L${r(cx + sh * 1.3)} ${r(y(1.2))}L${r(cx + sh * 1.3)} ${r(beltY + u)}L${r(cx + sh * 0.2)} ${r(beltY + u)}Z`, fill: jerseyShade, opacity: 0.55 }));
-  if (bl > 0.05) {
-    // Belly: a rounded highlight + the crease beneath it.
-    shade.append(el('ellipse', { cx: cx - u * 0.12, cy: y(3.05), rx: waist * 0.8 + bellyOut * 0.6, ry: u * (0.65 + 0.25 * bl), fill: '#ffffff', opacity: 0.18 }));
-  }
-  if (m > 0.5) {
-    // Pecs and abs hint for the muscle build.
-    for (const s of [-1, 1]) {
-      shade.append(el('path', { d: `M${r(cx + s * u * 0.08)} ${r(y(2.45))}Q${r(cx + s * sh * 0.45)} ${r(y(2.6))} ${r(cx + s * sh * 0.78)} ${r(y(2.0))}`, fill: 'none', stroke: jerseyShade, 'stroke-width': u * 0.07, 'stroke-linecap': 'round' }));
-    }
-  }
-  if (m > 0.85) {
-    // Shredded: the six-pack shows through a tight jersey (3 rows of 2 pads).
-    const padW = u * 0.13;
-    const padH = u * 0.24;
-    for (let row = 0; row < 3; row++) {
-      for (const s of [-1, 1]) {
-        const px = cx + s * (u * 0.035 + padW / 2);
-        const py = y(2.72 + row * 0.3);
-        shade.append(el('rect', { x: px - padW / 2, y: py, width: padW, height: padH, rx: padW * 0.45, fill: jerseyShade, 'fill-opacity': 0.35, stroke: mix(jersey, INK, 0.35), 'stroke-width': u * 0.045 }));
-      }
-    }
-  }
-  g.append(shade);
-  if (look.rabbi) {
-    // White shirt in the V of the open coat, buttoned to the collar.
-    g.append(el('path', { d: `M${r(cx - neck * 1.2)} ${r(y(1.28))}L${r(cx)} ${r(y(2.75))}L${r(cx + neck * 1.2)} ${r(y(1.28))}Z`, fill: trim }));
-    for (let i = 0; i < 3; i++) g.append(el('circle', { cx, cy: y(1.6 + i * 0.35), r: Math.max(0.6, u * 0.03), fill: '#9aa0ad' }));
+  if (look.skeleton) {
+    g.append(skeletonBody(look, cx, feet, u, sh, y, headCy, headRx, headRy));
   } else {
-    // Placket + buttons.
-    g.append(el('path', { d: `M${r(cx)} ${r(y(1.55))}L${r(cx)} ${r(beltY)}`, stroke: trim, 'stroke-width': Math.max(1, u * 0.05), fill: 'none' }));
-    for (let i = 0; i < 4; i++) g.append(el('circle', { cx: cx + u * 0.08, cy: y(1.85 + i * 0.5), r: Math.max(0.6, u * 0.035), fill: mix(jersey, INK, 0.45) }));
-    // V collar.
-    g.append(el('path', { d: `M${r(cx - neck * 1.15)} ${r(y(1.28))}L${r(cx)} ${r(y(1.62))}L${r(cx + neck * 1.15)} ${r(y(1.28))}`, fill: 'none', stroke: trim, 'stroke-width': Math.max(1.2, u * 0.09), 'stroke-linejoin': 'round' }));
-  }
-  // Chest number (lower left of the jersey, like the real thing).
-  if (detail && !look.rabbi) {
+    // ── Legs ──
+    const legX = (side: number, k: number): number => cx + side * (hip * 0.52 + k * u * 0.16);
+    for (const side of [-1, 1]) {
+      const hipJ: Pt = [legX(side, 0), y(4.15)];
+      // Sitting: the thigh comes toward the viewer (short), the shin hangs to the footplate.
+      const knee: Pt = sit ? [legX(side, 0.25) + side * u * 0.12, y(4.15) + u * 0.5] : [legX(side, 0.65), y(6.0)];
+      const ankle: Pt = sit ? [legX(side, 0.45), feet - u * 0.5] : [legX(side, 1.0), y(7.72)];
+      // Sock (calf) then pants (thigh + knee) on top. A rabbi wears plain black trousers.
+      if (look.rabbi) {
+        g.append(limb([hipJ, knee, ankle], legW * 0.92, jersey));
+      } else {
+        g.append(limb([knee, ankle], legW * 0.74, trim));
+        g.append(limb([lerp(knee, ankle, 0.45), ankle], legW * 0.6, mix(trim, INK, 0.25)));
+        g.append(limb([hipJ, knee, lerp(knee, ankle, 0.2)], legW, jersey));
+        // Pant stripe along the outer seam.
+        const off = side * legW * 0.4;
+        g.append(limb([[hipJ[0] + off, hipJ[1]], [knee[0] + off, knee[1]]], Math.max(1, u * 0.06), trim));
+      }
+      // Cleat.
+      g.append(el('ellipse', { cx: ankle[0] + side * u * 0.14, cy: sit ? feet - u * 0.4 : feet - u * 0.1, rx: u * 0.34 + legW * 0.15, ry: u * 0.14, fill: CLEAT }));
+    }
+    // Pants seat between the legs.
     g.append(
-      el('text', {
-        x: cx + sh * 0.4,
-        y: y(2.85),
-        'text-anchor': 'middle',
-        'font-family': "'Bebas Neue', 'Barlow Condensed', Impact, sans-serif",
-        'font-size': u * 0.72,
-        fill: trim,
-        stroke: INK,
-        'stroke-width': u * 0.05,
-        'paint-order': 'stroke',
+      el('path', {
+        d: smooth([
+          [cx - beltHalf, beltY],
+          [cx - hip * 1.02, y(4.35)],
+          [cx, y(4.55)],
+          [cx + hip * 1.02, y(4.35)],
+          [cx + beltHalf, beltY],
+        ]) + 'Z',
+        fill: jersey,
       }),
     );
-    g.lastElementChild!.textContent = look.number;
-  }
-  // Belt.
-  g.append(el('rect', { x: cx - beltHalf, y: beltY - u * 0.06, width: beltHalf * 2, height: u * 0.17, rx: u * 0.05, fill: BELT }));
-  g.append(el('rect', { x: cx - u * 0.13, y: beltY - u * 0.07, width: u * 0.26, height: u * 0.19, rx: u * 0.04, fill: '#c9cfdb' }));
-  if (bl > 0.3) {
-    // A big belly hangs over the belt.
-    const bx = waist * 0.95 + bellyOut * 0.5;
-    const by = y(3.42);
-    const bry = u * (0.42 + 0.22 * bl);
-    // Underside shadow first, then the jersey-covered belly over it.
-    g.append(el('ellipse', { cx, cy: by + bry * 0.12, rx: bx * 1.0, ry: bry * 1.02, fill: jerseyShade }));
-    g.append(el('ellipse', { cx: cx - bx * 0.03, cy: by - bry * 0.04, rx: bx * 0.98, ry: bry * 0.96, fill: jersey }));
-    g.append(el('path', { d: `M${r(cx)} ${r(by - bry)}L${r(cx)} ${r(by + bry * 0.92)}`, stroke: trim, 'stroke-width': Math.max(1, u * 0.05) }));
-  }
 
-  // ── Neck + head ──
-  g.append(el('path', { d: `M${r(cx - neck)} ${r(headCy + headRy * 0.4)}L${r(cx - neck)} ${r(y(1.38))}Q${r(cx)} ${r(y(1.6))} ${r(cx + neck)} ${r(y(1.38))}L${r(cx + neck)} ${r(headCy + headRy * 0.4)}Z`, fill: skin }));
-  g.append(el('path', { d: `M${r(cx - neck)} ${r(y(1.08))}Q${r(cx)} ${r(y(1.22))} ${r(cx + neck)} ${r(y(1.08))}L${r(cx + neck)} ${r(y(1.2))}Q${r(cx)} ${r(y(1.34))} ${r(cx - neck)} ${r(y(1.2))}Z`, fill: skinDark, opacity: 0.55 }));
-  if (look.hair) {
-    // Hair peeking out under the helmet (longer at the back).
-    g.append(el('ellipse', { cx, cy: headCy + headRy * 0.05, rx: headRx * 1.18, ry: headRy * 0.92, fill: look.hair }));
-  }
-  if (look.monkey) {
-    // Monkey head: big round ears, fur crown, light heart-shaped face mask and muzzle, sweatband.
-    const faceC = '#e2b48a';
-    for (const sd of [-1, 1]) {
-      g.append(el('circle', { cx: cx + sd * headRx * 1.05, cy: headCy - headRy * 0.02, r: headRx * 0.42, fill: skin }));
-      g.append(el('circle', { cx: cx + sd * headRx * 1.07, cy: headCy - headRy * 0.0, r: headRx * 0.26, fill: faceC }));
+    if (look.rabbi) {
+      // Skirt of the long black coat down to the knees, with tzitzit fringes at the hips.
+      const hem = y(5.75);
+      const wide = Math.max(beltHalf, hip) * 1.18;
+      g.append(el('path', { d: `M${r(cx - beltHalf)} ${r(beltY)}L${r(cx - wide)} ${r(hem)}Q${r(cx)} ${r(hem + u * 0.12)} ${r(cx + wide)} ${r(hem)}L${r(cx + beltHalf)} ${r(beltY)}Z`, fill: jersey }));
+      g.append(el('path', { d: `M${r(cx)} ${r(beltY)}L${r(cx + u * 0.05)} ${r(hem + u * 0.06)}`, stroke: mix(jersey, '#ffffff', 0.12), 'stroke-width': u * 0.04 }));
+      for (const sd of [-1, 1]) {
+        for (let k = 0; k < 3; k++) {
+          const x0 = cx + sd * (beltHalf * 0.92 - k * u * 0.06);
+          g.append(el('path', { d: `M${r(x0)} ${r(beltY + u * 0.1)}L${r(x0 + sd * u * 0.03)} ${r(beltY + u * (0.95 + 0.08 * k))}`, stroke: '#f4f2ea', 'stroke-width': Math.max(0.7, u * 0.035), 'stroke-linecap': 'round' }));
+        }
+      }
     }
-    g.append(el('ellipse', { cx, cy: headCy, rx: headRx * 1.02, ry: headRy, fill: skin }));
-    for (const sd of [-1, 1]) g.append(el('circle', { cx: cx + sd * headRx * 0.36, cy: headCy - headRy * 0.02, r: headRx * 0.42, fill: faceC }));
-    g.append(el('ellipse', { cx, cy: headCy + headRy * 0.46, rx: headRx * 0.66, ry: headRy * 0.42, fill: faceC }));
-    for (const sd of [-1, 1]) {
-      g.append(el('ellipse', { cx: cx + sd * headRx * 0.36, cy: headCy + headRy * 0.0, rx: u * 0.085, ry: u * 0.075, fill: '#f4f1e8' }));
-      g.append(el('circle', { cx: cx + sd * headRx * 0.36 + u * 0.012, cy: headCy + headRy * 0.01, r: u * 0.05, fill: '#14100e' }));
-      g.append(el('ellipse', { cx: cx + sd * u * 0.05, cy: headCy + headRy * 0.3, rx: u * 0.025, ry: u * 0.018, fill: skinDark }));
+
+    // ── Torso (jersey) ──
+    const sideC = (s: number): Pt[] => [
+      [cx + s * neck * 1.05, y(1.3)],
+      [cx + s * (sh * 0.72 + neck * 0.3), y(1.42)],
+      [cx + s * sh, y(1.68)],
+      [cx + s * (sh * 0.92 - 0.04 * u), y(2.25)],
+      [cx + s * (waist * (1 - 0.15 * m) + bellyOut * 0.8 + (sh - waist) * 0.35 * (1 - m)), y(2.95)],
+      [cx + s * (waist + bellyOut * 0.75), y(3.4)],
+      [cx + s * beltHalf, beltY + u * 0.05],
+    ];
+    const left = sideC(-1);
+    const right = sideC(1).reverse();
+    const torsoD = smooth(left) + `L${r(right[0]![0])} ${r(right[0]![1])}` + smooth(right).replace(/^M[^C]*/, '') + 'Z';
+    const clipId = `${id}-torso`;
+    g.append(el('clipPath', { id: clipId }, el('path', { d: torsoD })));
+    g.append(el('path', { d: torsoD, fill: jersey }));
+    const shade = el('g', { 'clip-path': `url(#${clipId})` });
+    // Form shadow on the far side + under the chest.
+    shade.append(el('path', { d: `M${r(cx + sh * 0.35)} ${r(y(1.2))}L${r(cx + sh * 1.3)} ${r(y(1.2))}L${r(cx + sh * 1.3)} ${r(beltY + u)}L${r(cx + sh * 0.2)} ${r(beltY + u)}Z`, fill: jerseyShade, opacity: 0.55 }));
+    if (bl > 0.05) {
+      // Belly: a rounded highlight + the crease beneath it.
+      shade.append(el('ellipse', { cx: cx - u * 0.12, cy: y(3.05), rx: waist * 0.8 + bellyOut * 0.6, ry: u * (0.65 + 0.25 * bl), fill: '#ffffff', opacity: 0.18 }));
     }
-    // Cheeky grin across the muzzle.
-    g.append(el('path', { d: `M${r(cx - headRx * 0.4)} ${r(headCy + headRy * 0.5)}Q${r(cx)} ${r(headCy + headRy * 0.88)} ${r(cx + headRx * 0.42)} ${r(headCy + headRy * 0.48)}`, fill: 'none', stroke: '#3a1d12', 'stroke-width': u * 0.05, 'stroke-linecap': 'round' }));
-    // Tennis sweatband over the forehead, fur tuft sticking out on top.
-    g.append(el('path', { d: `M${r(cx - headRx * 0.25)} ${r(headCy - headRy * 0.88)}Q${r(cx)} ${r(headCy - headRy * 1.25)} ${r(cx + headRx * 0.3)} ${r(headCy - headRy * 0.9)}Z`, fill: skin }));
-    g.append(el('path', { d: `M${r(cx - headRx * 0.98)} ${r(headCy - headRy * 0.42)}Q${r(cx)} ${r(headCy - headRy * 0.72)} ${r(cx + headRx * 0.98)} ${r(headCy - headRy * 0.42)}L${r(cx + headRx * 0.94)} ${r(headCy - headRy * 0.66)}Q${r(cx)} ${r(headCy - headRy * 0.98)} ${r(cx - headRx * 0.94)} ${r(headCy - headRy * 0.66)}Z`, fill: trim }));
-  } else {
-    // Ear (viewer's left; the right one is under the flap).
-    g.append(el('ellipse', { cx: cx - headRx * 0.98, cy: headCy + headRy * 0.08, rx: headRx * 0.2, ry: headRy * 0.24, fill: skinDark }));
-    g.append(el('ellipse', { cx, cy: headCy, rx: headRx, ry: headRy, fill: skin }));
-    // Shadow cast by the helmet bill.
-    g.append(el('ellipse', { cx, cy: headCy - headRy * 0.2, rx: headRx * 0.98, ry: headRy * 0.3, fill: '#000000', opacity: 0.16 }));
-    // Eyes.
-    for (const s of [-1, 1]) {
-      // White of the eye first so the eyes read on every skin tone.
-      g.append(el('ellipse', { cx: cx + s * headRx * 0.4, cy: headCy + headRy * 0.03, rx: u * 0.085, ry: u * 0.062, fill: '#f4f1e8' }));
-      g.append(el('circle', { cx: cx + s * headRx * 0.4 + u * 0.012, cy: headCy + headRy * 0.04, r: u * 0.045, fill: '#14100e' }));
+    if (m > 0.5) {
+      // Pecs and abs hint for the muscle build.
+      for (const s of [-1, 1]) {
+        shade.append(el('path', { d: `M${r(cx + s * u * 0.08)} ${r(y(2.45))}Q${r(cx + s * sh * 0.45)} ${r(y(2.6))} ${r(cx + s * sh * 0.78)} ${r(y(2.0))}`, fill: 'none', stroke: jerseyShade, 'stroke-width': u * 0.07, 'stroke-linecap': 'round' }));
+      }
     }
-    // Nose.
-    g.append(el('path', { d: `M${r(cx + u * 0.02)} ${r(headCy + headRy * 0.08)}Q${r(cx + u * 0.09)} ${r(headCy + headRy * 0.3)} ${r(cx - u * 0.04)} ${r(headCy + headRy * 0.33)}`, fill: 'none', stroke: skinDark, 'stroke-width': u * 0.045, 'stroke-linecap': 'round' }));
-    if (look.beard) {
-      const bc = look.hair ?? '#15100c';
+    if (m > 0.85) {
+      // Shredded: the six-pack shows through a tight jersey (3 rows of 2 pads).
+      const padW = u * 0.13;
+      const padH = u * 0.24;
+      for (let row = 0; row < 3; row++) {
+        for (const s of [-1, 1]) {
+          const px = cx + s * (u * 0.035 + padW / 2);
+          const py = y(2.72 + row * 0.3);
+          shade.append(el('rect', { x: px - padW / 2, y: py, width: padW, height: padH, rx: padW * 0.45, fill: jerseyShade, 'fill-opacity': 0.35, stroke: mix(jersey, INK, 0.35), 'stroke-width': u * 0.045 }));
+        }
+      }
+    }
+    g.append(shade);
+    if (look.rabbi) {
+      // White shirt in the V of the open coat, buttoned to the collar.
+      g.append(el('path', { d: `M${r(cx - neck * 1.2)} ${r(y(1.28))}L${r(cx)} ${r(y(2.75))}L${r(cx + neck * 1.2)} ${r(y(1.28))}Z`, fill: trim }));
+      for (let i = 0; i < 3; i++) g.append(el('circle', { cx, cy: y(1.6 + i * 0.35), r: Math.max(0.6, u * 0.03), fill: '#9aa0ad' }));
+    } else {
+      // Placket + buttons.
+      g.append(el('path', { d: `M${r(cx)} ${r(y(1.55))}L${r(cx)} ${r(beltY)}`, stroke: trim, 'stroke-width': Math.max(1, u * 0.05), fill: 'none' }));
+      for (let i = 0; i < 4; i++) g.append(el('circle', { cx: cx + u * 0.08, cy: y(1.85 + i * 0.5), r: Math.max(0.6, u * 0.035), fill: mix(jersey, INK, 0.45) }));
+      // V collar.
+      g.append(el('path', { d: `M${r(cx - neck * 1.15)} ${r(y(1.28))}L${r(cx)} ${r(y(1.62))}L${r(cx + neck * 1.15)} ${r(y(1.28))}`, fill: 'none', stroke: trim, 'stroke-width': Math.max(1.2, u * 0.09), 'stroke-linejoin': 'round' }));
+    }
+    // Chest number (lower left of the jersey, like the real thing).
+    if (detail && !look.rabbi) {
       g.append(
-        el('path', {
-          d: smooth([
-            [cx - headRx * 0.97, headCy + headRy * 0.02],
-            [cx - headRx * 0.82, headCy + headRy * 0.62],
-            [cx, headCy + headRy * 1.06],
-            [cx + headRx * 0.82, headCy + headRy * 0.62],
-            [cx + headRx * 0.97, headCy + headRy * 0.02],
-            [cx + headRx * 0.55, headCy + headRy * 0.36],
-            [cx, headCy + headRy * 0.32],
-            [cx - headRx * 0.55, headCy + headRy * 0.36],
-          ], true),
-          fill: bc,
+        el('text', {
+          x: cx + sh * 0.4,
+          y: y(2.85),
+          'text-anchor': 'middle',
+          'font-family': "'Bebas Neue', 'Barlow Condensed', Impact, sans-serif",
+          'font-size': u * 0.72,
+          fill: trim,
+          stroke: INK,
+          'stroke-width': u * 0.05,
+          'paint-order': 'stroke',
         }),
       );
-      if (look.rabbi) {
-        // A long beard down onto the chest.
-        g.append(el('path', { d: smooth([[cx - headRx * 0.8, headCy + headRy * 0.55], [cx - headRx * 0.62, headCy + headRy * 1.45], [cx, headCy + headRy * 2.05], [cx + headRx * 0.62, headCy + headRy * 1.45], [cx + headRx * 0.8, headCy + headRy * 0.55], [cx, headCy + headRy * 0.9]], true), fill: bc }));
-      }
+      g.lastElementChild!.textContent = look.number;
     }
-    if (look.rabbi) {
-      // Peyot: curled sidelocks in front of each ear.
+    // Belt.
+    g.append(el('rect', { x: cx - beltHalf, y: beltY - u * 0.06, width: beltHalf * 2, height: u * 0.17, rx: u * 0.05, fill: BELT }));
+    g.append(el('rect', { x: cx - u * 0.13, y: beltY - u * 0.07, width: u * 0.26, height: u * 0.19, rx: u * 0.04, fill: '#c9cfdb' }));
+    if (bl > 0.3) {
+      // A big belly hangs over the belt.
+      const bx = waist * 0.95 + bellyOut * 0.5;
+      const by = y(3.42);
+      const bry = u * (0.42 + 0.22 * bl);
+      // Underside shadow first, then the jersey-covered belly over it.
+      g.append(el('ellipse', { cx, cy: by + bry * 0.12, rx: bx * 1.0, ry: bry * 1.02, fill: jerseyShade }));
+      g.append(el('ellipse', { cx: cx - bx * 0.03, cy: by - bry * 0.04, rx: bx * 0.98, ry: bry * 0.96, fill: jersey }));
+      g.append(el('path', { d: `M${r(cx)} ${r(by - bry)}L${r(cx)} ${r(by + bry * 0.92)}`, stroke: trim, 'stroke-width': Math.max(1, u * 0.05) }));
+    }
+
+    // ── Neck + head ──
+    g.append(el('path', { d: `M${r(cx - neck)} ${r(headCy + headRy * 0.4)}L${r(cx - neck)} ${r(y(1.38))}Q${r(cx)} ${r(y(1.6))} ${r(cx + neck)} ${r(y(1.38))}L${r(cx + neck)} ${r(headCy + headRy * 0.4)}Z`, fill: skin }));
+    g.append(el('path', { d: `M${r(cx - neck)} ${r(y(1.08))}Q${r(cx)} ${r(y(1.22))} ${r(cx + neck)} ${r(y(1.08))}L${r(cx + neck)} ${r(y(1.2))}Q${r(cx)} ${r(y(1.34))} ${r(cx - neck)} ${r(y(1.2))}Z`, fill: skinDark, opacity: 0.55 }));
+    if (look.hair) {
+      // Hair peeking out under the helmet (longer at the back).
+      g.append(el('ellipse', { cx, cy: headCy + headRy * 0.05, rx: headRx * 1.18, ry: headRy * 0.92, fill: look.hair }));
+    }
+    if (look.monkey) {
+      // Monkey head: big round ears, fur crown, light heart-shaped face mask and muzzle, sweatband.
+      const faceC = '#e2b48a';
       for (const sd of [-1, 1]) {
-        const px = cx + sd * headRx * 1.0;
-        const pts: Pt[] = [];
-        for (let i = 0; i <= 30; i++) {
-          const tt = i / 30;
-          const a = tt * Math.PI * 8;
-          pts.push([px + Math.cos(a) * u * 0.06, headCy - headRy * 0.1 + tt * headRy * 1.15 + Math.sin(a) * u * 0.03]);
-        }
-        g.append(el('path', { d: `M${pts.map((p) => `${r(p[0])} ${r(p[1])}`).join('L')}`, fill: 'none', stroke: look.hair ?? '#2a1d14', 'stroke-width': u * 0.06, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }));
+        g.append(el('circle', { cx: cx + sd * headRx * 1.05, cy: headCy - headRy * 0.02, r: headRx * 0.42, fill: skin }));
+        g.append(el('circle', { cx: cx + sd * headRx * 1.07, cy: headCy - headRy * 0.0, r: headRx * 0.26, fill: faceC }));
       }
-    }
-    // Smile.
-    // Grin: a light crescent outlined in dark lip colour (reads on any skin tone).
-    g.append(el('path', { d: `M${r(cx - headRx * 0.32)} ${r(headCy + headRy * 0.47)}Q${r(cx)} ${r(headCy + headRy * 0.55)} ${r(cx + headRx * 0.34)} ${r(headCy + headRy * 0.45)}Q${r(cx + headRx * 0.05)} ${r(headCy + headRy * 0.8)} ${r(cx - headRx * 0.32)} ${r(headCy + headRy * 0.47)}Z`, fill: '#f4f1e8', stroke: mix(skin, '#3a0d0d', 0.6), 'stroke-width': u * 0.04, 'stroke-linejoin': 'round' }));
-    if (look.rabbi) {
-      // Black wide-brimmed hat with a ribbon band.
-      const brimY = headCy - headRy * 0.42;
-      const crownTop = brimY - u * 0.62;
-      g.append(el('path', { d: `M${r(cx - headRx * 0.98)} ${r(brimY)}L${r(cx - headRx * 0.92)} ${r(crownTop + u * 0.08)}Q${r(cx)} ${r(crownTop - u * 0.06)} ${r(cx + headRx * 0.92)} ${r(crownTop + u * 0.08)}L${r(cx + headRx * 0.98)} ${r(brimY)}Z`, fill: '#121318' }));
-      g.append(el('rect', { x: cx - headRx * 0.97, y: brimY - u * 0.16, width: headRx * 1.94, height: u * 0.12, fill: '#2f3038' }));
-      g.append(el('ellipse', { cx, cy: brimY + u * 0.02, rx: headRx * 1.75, ry: u * 0.11, fill: '#0c0d11' }));
-      g.append(el('path', { d: `M${r(cx - headRx * 0.6)} ${r(crownTop + u * 0.12)}Q${r(cx - headRx * 0.2)} ${r(crownTop + u * 0.02)} ${r(cx + headRx * 0.2)} ${r(crownTop + u * 0.05)}`, fill: 'none', stroke: '#ffffff', 'stroke-width': u * 0.05, 'stroke-linecap': 'round', opacity: 0.18 }));
+      g.append(el('ellipse', { cx, cy: headCy, rx: headRx * 1.02, ry: headRy, fill: skin }));
+      for (const sd of [-1, 1]) g.append(el('circle', { cx: cx + sd * headRx * 0.36, cy: headCy - headRy * 0.02, r: headRx * 0.42, fill: faceC }));
+      g.append(el('ellipse', { cx, cy: headCy + headRy * 0.46, rx: headRx * 0.66, ry: headRy * 0.42, fill: faceC }));
+      for (const sd of [-1, 1]) {
+        g.append(el('ellipse', { cx: cx + sd * headRx * 0.36, cy: headCy + headRy * 0.0, rx: u * 0.085, ry: u * 0.075, fill: '#f4f1e8' }));
+        g.append(el('circle', { cx: cx + sd * headRx * 0.36 + u * 0.012, cy: headCy + headRy * 0.01, r: u * 0.05, fill: '#14100e' }));
+        g.append(el('ellipse', { cx: cx + sd * u * 0.05, cy: headCy + headRy * 0.3, rx: u * 0.025, ry: u * 0.018, fill: skinDark }));
+      }
+      // Cheeky grin across the muzzle.
+      g.append(el('path', { d: `M${r(cx - headRx * 0.4)} ${r(headCy + headRy * 0.5)}Q${r(cx)} ${r(headCy + headRy * 0.88)} ${r(cx + headRx * 0.42)} ${r(headCy + headRy * 0.48)}`, fill: 'none', stroke: '#3a1d12', 'stroke-width': u * 0.05, 'stroke-linecap': 'round' }));
+      // Tennis sweatband over the forehead, fur tuft sticking out on top.
+      g.append(el('path', { d: `M${r(cx - headRx * 0.25)} ${r(headCy - headRy * 0.88)}Q${r(cx)} ${r(headCy - headRy * 1.25)} ${r(cx + headRx * 0.3)} ${r(headCy - headRy * 0.9)}Z`, fill: skin }));
+      g.append(el('path', { d: `M${r(cx - headRx * 0.98)} ${r(headCy - headRy * 0.42)}Q${r(cx)} ${r(headCy - headRy * 0.72)} ${r(cx + headRx * 0.98)} ${r(headCy - headRy * 0.42)}L${r(cx + headRx * 0.94)} ${r(headCy - headRy * 0.66)}Q${r(cx)} ${r(headCy - headRy * 0.98)} ${r(cx - headRx * 0.94)} ${r(headCy - headRy * 0.66)}Z`, fill: trim }));
     } else {
-    // Batting helmet: dome, ear flap (viewer's right), bill and a gloss stripe.
-    const helmet = trim;
-    const hTop = T - u * 0.08;
-    const rim = headCy - headRy * 0.12;
-    g.append(el('path', { d: `M${r(cx + headRx * 0.7)} ${r(rim)}L${r(cx + headRx * 1.2)} ${r(rim)}L${r(cx + headRx * 1.22)} ${r(headCy + headRy * 0.42)}Q${r(cx + headRx * 1.0)} ${r(headCy + headRy * 0.62)} ${r(cx + headRx * 0.78)} ${r(headCy + headRy * 0.4)}Z`, fill: mix(helmet, INK, 0.12) }));
-    g.append(el('path', { d: `M${r(cx - headRx * 1.12)} ${r(rim)}C${r(cx - headRx * 1.16)} ${r(hTop - u * 0.02)} ${r(cx + headRx * 1.16)} ${r(hTop - u * 0.02)} ${r(cx + headRx * 1.22)} ${r(rim)}Z`, fill: helmet }));
-    g.append(el('path', { d: `M${r(cx - headRx * 0.75)} ${r(headCy - headRy * 0.55)}Q${r(cx - headRx * 0.2)} ${r(hTop + u * 0.06)} ${r(cx + headRx * 0.35)} ${r(hTop + u * 0.1)}`, fill: 'none', stroke: '#ffffff', 'stroke-width': u * 0.07, 'stroke-linecap': 'round', opacity: 0.35 }));
-    g.append(el('ellipse', { cx: cx - headRx * 0.05, cy: rim + u * 0.01, rx: headRx * 1.08, ry: u * 0.085, fill: mix(helmet, INK, 0.35) }));
+      // Ear (viewer's left; the right one is under the flap).
+      g.append(el('ellipse', { cx: cx - headRx * 0.98, cy: headCy + headRy * 0.08, rx: headRx * 0.2, ry: headRy * 0.24, fill: skinDark }));
+      g.append(el('ellipse', { cx, cy: headCy, rx: headRx, ry: headRy, fill: skin }));
+      // Shadow cast by the helmet bill.
+      g.append(el('ellipse', { cx, cy: headCy - headRy * 0.2, rx: headRx * 0.98, ry: headRy * 0.3, fill: '#000000', opacity: 0.16 }));
+      // Eyes.
+      for (const s of [-1, 1]) {
+        // White of the eye first so the eyes read on every skin tone.
+        g.append(el('ellipse', { cx: cx + s * headRx * 0.4, cy: headCy + headRy * 0.03, rx: u * 0.085, ry: u * 0.062, fill: '#f4f1e8' }));
+        g.append(el('circle', { cx: cx + s * headRx * 0.4 + u * 0.012, cy: headCy + headRy * 0.04, r: u * 0.045, fill: '#14100e' }));
+      }
+      // Nose.
+      g.append(el('path', { d: `M${r(cx + u * 0.02)} ${r(headCy + headRy * 0.08)}Q${r(cx + u * 0.09)} ${r(headCy + headRy * 0.3)} ${r(cx - u * 0.04)} ${r(headCy + headRy * 0.33)}`, fill: 'none', stroke: skinDark, 'stroke-width': u * 0.045, 'stroke-linecap': 'round' }));
+      if (look.beard) {
+        const bc = look.hair ?? '#15100c';
+        g.append(
+          el('path', {
+            d: smooth([
+              [cx - headRx * 0.97, headCy + headRy * 0.02],
+              [cx - headRx * 0.82, headCy + headRy * 0.62],
+              [cx, headCy + headRy * 1.06],
+              [cx + headRx * 0.82, headCy + headRy * 0.62],
+              [cx + headRx * 0.97, headCy + headRy * 0.02],
+              [cx + headRx * 0.55, headCy + headRy * 0.36],
+              [cx, headCy + headRy * 0.32],
+              [cx - headRx * 0.55, headCy + headRy * 0.36],
+            ], true),
+            fill: bc,
+          }),
+        );
+        if (look.rabbi) {
+          // A long beard down onto the chest.
+          g.append(el('path', { d: smooth([[cx - headRx * 0.8, headCy + headRy * 0.55], [cx - headRx * 0.62, headCy + headRy * 1.45], [cx, headCy + headRy * 2.05], [cx + headRx * 0.62, headCy + headRy * 1.45], [cx + headRx * 0.8, headCy + headRy * 0.55], [cx, headCy + headRy * 0.9]], true), fill: bc }));
+        }
+      }
+      if (look.rabbi) {
+        // Peyot: curled sidelocks in front of each ear.
+        for (const sd of [-1, 1]) {
+          const px = cx + sd * headRx * 1.0;
+          const pts: Pt[] = [];
+          for (let i = 0; i <= 30; i++) {
+            const tt = i / 30;
+            const a = tt * Math.PI * 8;
+            pts.push([px + Math.cos(a) * u * 0.06, headCy - headRy * 0.1 + tt * headRy * 1.15 + Math.sin(a) * u * 0.03]);
+          }
+          g.append(el('path', { d: `M${pts.map((p) => `${r(p[0])} ${r(p[1])}`).join('L')}`, fill: 'none', stroke: look.hair ?? '#2a1d14', 'stroke-width': u * 0.06, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }));
+        }
+      }
+      // Smile.
+      // Grin: a light crescent outlined in dark lip colour (reads on any skin tone).
+      g.append(el('path', { d: `M${r(cx - headRx * 0.32)} ${r(headCy + headRy * 0.47)}Q${r(cx)} ${r(headCy + headRy * 0.55)} ${r(cx + headRx * 0.34)} ${r(headCy + headRy * 0.45)}Q${r(cx + headRx * 0.05)} ${r(headCy + headRy * 0.8)} ${r(cx - headRx * 0.32)} ${r(headCy + headRy * 0.47)}Z`, fill: '#f4f1e8', stroke: mix(skin, '#3a0d0d', 0.6), 'stroke-width': u * 0.04, 'stroke-linejoin': 'round' }));
+      if (look.rabbi) {
+        // Black wide-brimmed hat with a ribbon band.
+        const brimY = headCy - headRy * 0.42;
+        const crownTop = brimY - u * 0.62;
+        g.append(el('path', { d: `M${r(cx - headRx * 0.98)} ${r(brimY)}L${r(cx - headRx * 0.92)} ${r(crownTop + u * 0.08)}Q${r(cx)} ${r(crownTop - u * 0.06)} ${r(cx + headRx * 0.92)} ${r(crownTop + u * 0.08)}L${r(cx + headRx * 0.98)} ${r(brimY)}Z`, fill: '#121318' }));
+        g.append(el('rect', { x: cx - headRx * 0.97, y: brimY - u * 0.16, width: headRx * 1.94, height: u * 0.12, fill: '#2f3038' }));
+        g.append(el('ellipse', { cx, cy: brimY + u * 0.02, rx: headRx * 1.75, ry: u * 0.11, fill: '#0c0d11' }));
+        g.append(el('path', { d: `M${r(cx - headRx * 0.6)} ${r(crownTop + u * 0.12)}Q${r(cx - headRx * 0.2)} ${r(crownTop + u * 0.02)} ${r(cx + headRx * 0.2)} ${r(crownTop + u * 0.05)}`, fill: 'none', stroke: '#ffffff', 'stroke-width': u * 0.05, 'stroke-linecap': 'round', opacity: 0.18 }));
+      } else {
+      // Batting helmet: dome, ear flap (viewer's right), bill and a gloss stripe.
+      const helmet = trim;
+      const hTop = y(0) - u * 0.08;
+      const rim = headCy - headRy * 0.12;
+      g.append(el('path', { d: `M${r(cx + headRx * 0.7)} ${r(rim)}L${r(cx + headRx * 1.2)} ${r(rim)}L${r(cx + headRx * 1.22)} ${r(headCy + headRy * 0.42)}Q${r(cx + headRx * 1.0)} ${r(headCy + headRy * 0.62)} ${r(cx + headRx * 0.78)} ${r(headCy + headRy * 0.4)}Z`, fill: mix(helmet, INK, 0.12) }));
+      g.append(el('path', { d: `M${r(cx - headRx * 1.12)} ${r(rim)}C${r(cx - headRx * 1.16)} ${r(hTop - u * 0.02)} ${r(cx + headRx * 1.16)} ${r(hTop - u * 0.02)} ${r(cx + headRx * 1.22)} ${r(rim)}Z`, fill: helmet }));
+      g.append(el('path', { d: `M${r(cx - headRx * 0.75)} ${r(headCy - headRy * 0.55)}Q${r(cx - headRx * 0.2)} ${r(hTop + u * 0.06)} ${r(cx + headRx * 0.35)} ${r(hTop + u * 0.1)}`, fill: 'none', stroke: '#ffffff', 'stroke-width': u * 0.07, 'stroke-linecap': 'round', opacity: 0.35 }));
+      g.append(el('ellipse', { cx: cx - headRx * 0.05, cy: rim + u * 0.01, rx: headRx * 1.08, ry: u * 0.085, fill: mix(helmet, INK, 0.35) }));
+      }
     }
   }
+  if (chair) g.append(chair.front);
   if (look.horns) {
     // Villain horns: out from the helmet sides, up, then curling inward at the tips.
     for (const sd of [-1, 1]) {
@@ -474,6 +485,12 @@ function figure(look: BatterLook, cx: number, feet: number, H: number, id: strin
   }
 
   const arm = (shoulder: Pt, elbow: Pt, hand: Pt, gloved: boolean): void => {
+    if (look.skeleton) {
+      bone(g, [shoulder, elbow, hand], u * 0.13, look.skin);
+      g.append(el('circle', { cx: elbow[0], cy: elbow[1], r: u * 0.1, fill: look.skin, stroke: mix(look.skin, '#5a4a3a', 0.45), 'stroke-width': u * 0.03 }));
+      g.append(el('circle', { cx: hand[0], cy: hand[1], r: u * 0.12, fill: look.skin, stroke: mix(look.skin, '#5a4a3a', 0.45), 'stroke-width': u * 0.03 }));
+      return;
+    }
     if (look.rabbi) {
       // Long coat sleeves with a white shirt cuff.
       g.append(limb([shoulder, elbow, hand], armW * 1.08, jersey));
@@ -521,6 +538,96 @@ function figure(look: BatterLook, cx: number, feet: number, H: number, id: strin
     arm(shL, [cx - sh - armW * 0.2, y(2.95)], handR, true);
   }
   return { g, hipHalf: beltHalf };
+}
+
+/** A bone: outlined round-capped stroke along `pts`. */
+function bone(g: SVGGElement, pts: Pt[], w: number, color: string): void {
+  g.append(limb(pts, w + Math.max(1, w * 0.35), mix(color, '#5a4a3a', 0.45)));
+  g.append(limb(pts, w, color));
+}
+
+/**
+ * A skeleton facing the viewer: leg bones with knobby knees, pelvis, spine,
+ * ribcage, collarbones and a skull with hollow sockets and glowing red eyes.
+ * Arms, horns and the bat are drawn by `figure` on top.
+ */
+function skeletonBody(look: BatterLook, cx: number, feet: number, u: number, sh: number, y: (k: number) => number, headCy: number, headRx: number, headRy: number): SVGGElement {
+  const g = el('g');
+  const c = look.skin;
+  const dark = mix(c, '#5a4a3a', 0.45);
+  const hole = '#0d0907';
+  for (const side of [-1, 1]) {
+    const hip: Pt = [cx + side * u * 0.3, y(4.05)];
+    const knee: Pt = [cx + side * u * 0.36, y(6.0)];
+    const ankle: Pt = [cx + side * u * 0.42, y(7.7)];
+    bone(g, [hip, knee, ankle], u * 0.15, c);
+    g.append(el('circle', { cx: knee[0], cy: knee[1], r: u * 0.13, fill: c, stroke: dark, 'stroke-width': u * 0.03 }));
+    g.append(el('ellipse', { cx: ankle[0] + side * u * 0.12, cy: feet - u * 0.08, rx: u * 0.28, ry: u * 0.09, fill: c, stroke: dark, 'stroke-width': u * 0.03 }));
+  }
+  // Pelvis: two wings around the sacrum.
+  for (const side of [-1, 1]) g.append(el('ellipse', { cx: cx + side * u * 0.3, cy: y(3.9), rx: u * 0.36, ry: u * 0.26, fill: c, stroke: dark, 'stroke-width': u * 0.035 }));
+  g.append(el('path', { d: `M${r(cx - u * 0.14)} ${r(y(3.7))}L${r(cx + u * 0.14)} ${r(y(3.7))}L${r(cx)} ${r(y(4.25))}Z`, fill: mix(c, hole, 0.15), stroke: dark, 'stroke-width': u * 0.03 }));
+  // Spine.
+  for (let k = 1.3; k <= 3.75; k += 0.2) g.append(el('ellipse', { cx, cy: y(k), rx: u * 0.08, ry: u * 0.065, fill: c, stroke: dark, 'stroke-width': u * 0.025 }));
+  // Ribs: curving out from the spine and back in toward the sternum.
+  for (let i = 0; i < 6; i++) {
+    const yy = y(1.72 + i * 0.27);
+    const w = sh * (0.86 - Math.abs(i - 1.6) * 0.07);
+    for (const side of [-1, 1]) {
+      const pts = curvePts([[cx + side * u * 0.07, yy], [cx + side * w * 0.75, yy - u * 0.06], [cx + side * w, yy + u * 0.16], [cx + side * w * 0.62, yy + u * 0.34]], 10);
+      bone(g, pts, u * 0.075, c);
+    }
+  }
+  g.append(el('rect', { x: cx - u * 0.07, y: y(1.55), width: u * 0.14, height: u * 1.05, rx: u * 0.05, fill: c, stroke: dark, 'stroke-width': u * 0.03 }));
+  for (const side of [-1, 1]) bone(g, [[cx + side * u * 0.08, y(1.45)], [cx + side * sh * 0.9, y(1.62)]], u * 0.08, c);
+  // Neck vertebrae.
+  for (let k = 0; k < 3; k++) g.append(el('ellipse', { cx, cy: headCy + headRy * 0.85 + k * u * 0.13, rx: u * 0.07, ry: u * 0.055, fill: c, stroke: dark, 'stroke-width': u * 0.025 }));
+  // Skull: cranium, jaw, sockets with red eyes, nasal cavity and teeth.
+  g.append(el('rect', { x: cx - headRx * 0.62, y: headCy + headRy * 0.3, width: headRx * 1.24, height: headRy * 0.62, rx: headRx * 0.3, fill: c, stroke: dark, 'stroke-width': u * 0.03 }));
+  g.append(el('ellipse', { cx, cy: headCy - headRy * 0.08, rx: headRx * 1.04, ry: headRy * 0.88, fill: c, stroke: dark, 'stroke-width': u * 0.03 }));
+  for (const side of [-1, 1]) {
+    g.append(el('ellipse', { cx: cx + side * headRx * 0.42, cy: headCy + headRy * 0.04, rx: u * 0.13, ry: u * 0.12, fill: hole }));
+    g.append(el('circle', { cx: cx + side * headRx * 0.42, cy: headCy + headRy * 0.06, r: u * 0.045, fill: '#ff2a1a' }));
+  }
+  g.append(el('path', { d: `M${r(cx)} ${r(headCy + headRy * 0.22)}L${r(cx - u * 0.06)} ${r(headCy + headRy * 0.42)}L${r(cx + u * 0.06)} ${r(headCy + headRy * 0.42)}Z`, fill: hole }));
+  g.append(el('rect', { x: cx - headRx * 0.48, y: headCy + headRy * 0.55, width: headRx * 0.96, height: headRy * 0.2, fill: hole }));
+  for (let k = 0; k <= 6; k++) {
+    const x = cx - headRx * 0.48 + (headRx * 0.96 * k) / 6;
+    g.append(el('path', { d: `M${r(x)} ${r(headCy + headRy * 0.5)}L${r(x)} ${r(headCy + headRy * 0.8)}`, stroke: c, 'stroke-width': u * 0.06 }));
+  }
+  return g;
+}
+
+/**
+ * El Mati's wheelchair, split into what goes behind him (backrest, push
+ * handles, seat) and in front (big wheels at his sides, footplate, casters).
+ */
+function wheelchairParts(cx: number, feet: number, u: number, half: number, y: (k: number) => number): { back: SVGGElement; front: SVGGElement } {
+  const frame = '#2b2f36';
+  const chrome = '#c9ced6';
+  const cloth = '#1d3f8a';
+  const back = el('g');
+  const front = el('g');
+  const w = half + u * 0.3;
+  back.append(el('rect', { x: cx - w, y: y(2.1), width: w * 2, height: y(4.1) - y(2.1), rx: u * 0.12, fill: cloth }));
+  for (const sd of [-1, 1]) {
+    back.append(limb([[cx + sd * w, y(4.3)], [cx + sd * w, y(1.85)], [cx + sd * (w + u * 0.25), y(1.75)]], u * 0.1, frame));
+  }
+  back.append(el('rect', { x: cx - w - u * 0.1, y: y(4.0), width: (w + u * 0.1) * 2, height: u * 0.32, rx: u * 0.08, fill: mix(cloth, '#000000', 0.2) }));
+  const R = u * 1.35;
+  for (const sd of [-1, 1]) {
+    const wx = cx + sd * (half + u * 0.6);
+    const wy = feet - R;
+    // Seen from the front a wheel is a narrow ellipse: tyre, rim and a few spokes.
+    front.append(el('ellipse', { cx: wx, cy: wy, rx: R * 0.34, ry: R, fill: 'none', stroke: '#141518', 'stroke-width': u * 0.16 }));
+    front.append(el('ellipse', { cx: wx + sd * u * 0.07, cy: wy, rx: R * 0.28, ry: R * 0.9, fill: 'none', stroke: chrome, 'stroke-width': u * 0.05 }));
+    for (let k = -2; k <= 2; k++) front.append(el('path', { d: `M${r(wx)} ${r(wy)}L${r(wx + R * 0.25 * Math.sin(k * 0.5))} ${r(wy - R * 0.88 * Math.cos(k * 0.5))}`, stroke: chrome, 'stroke-width': u * 0.025, opacity: 0.8 }));
+    front.append(el('circle', { cx: wx, cy: wy, r: u * 0.1, fill: chrome }));
+    // Front caster.
+    front.append(el('ellipse', { cx: cx + sd * (half + u * 0.05), cy: feet - u * 0.2, rx: u * 0.08, ry: u * 0.2, fill: '#141518' }));
+  }
+  back.append(el('rect', { x: cx - half - u * 0.1, y: feet - u * 0.34, width: (half + u * 0.1) * 2, height: u * 0.1, rx: u * 0.04, fill: frame }));
+  return { back, front };
 }
 
 function draw(svg: SVGSVGElement, look: BatterLook, aspect: number): void {

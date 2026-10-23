@@ -101,6 +101,12 @@ export interface BatterRig {
   forcePeakVisible(v: boolean): void;
   /** Angry: the batter's face turns red (fades in/out). Only Chimon ever gets angry. */
   setAngry(on: boolean): void;
+  /**
+   * Pre-workout (El Mati): a shaker drops on him, he stands up out of the
+   * wheelchair, pumped, with the aura on; off = back into the chair. `instant`
+   * skips the animation. Batters without a wheelchair only toggle the aura.
+   */
+  setPumped(on: boolean, instant?: boolean): void;
   /** Detaches from the scene and frees GPU resources. */
   dispose(): void;
 }

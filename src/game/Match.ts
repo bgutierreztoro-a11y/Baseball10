@@ -153,6 +153,8 @@ export class Match {
   /** Arturek's curse: this pitch is a lit firecracker, and the hit one is going to blow up. */
   private firecracker = false;
   private blowUp = false;
+  /** El Mati's pre-workout: pitches left out of the wheelchair (0 = sitting). */
+  private pumpedLeft = 0;
 
   constructor(mode: MatchMode, deps: MatchDeps, seed: number) {
     this.mode = mode;
@@ -191,6 +193,7 @@ export class Match {
     w.umpire.setGhost(1);
     w.batter.setPeak(false);
     w.batter.setAngry(false);
+    w.batter.setPumped(false, true);
     w.setPenny(null);
     w.stopBlessing();
     w.stopThief();
@@ -203,7 +206,9 @@ export class Match {
   /** Character multipliers, boosted while the ability is active and in the batter's home park. */
   private get mods(): SwingMods {
     const c = this.d.character;
-    let m = this.abilityLeft > 0 && c.ability ? combineMods(c.mods, c.ability.mods) : c.mods;
+    // On pre-workout El Mati bats with a whole different set of ratings.
+    const base = this.pumpedLeft > 0 && c.preWorkout ? c.preWorkout.mods : c.mods;
+    let m = this.abilityLeft > 0 && c.ability ? combineMods(base, c.ability.mods) : base;
     if (this.atHome) m = combineMods(m, c.homeStadium!.mods);
     if (this.blessingLeft > 0 && c.pennyBlessing) m = combineMods(m, pciFillMods(c.pennyBlessing.pciFill, m));
     return m;
@@ -267,7 +272,7 @@ export class Match {
     }
     if (this.atHome) {
       const t = gameText(s.lang);
-      window.setTimeout(() => this.d.ui.showCallout(t.homeBuff(this.d.character.name), 'bonus', t.homeBuffSub), 900);
+      window.setTimeout(() => this.d.ui.showCallout(t.homeBuff(this.d.character.name), 'bonus', this.d.character.homeStadium!.buff[s.lang]), 900);
     }
     const pitcherName = this.d.character.pitcherName;
     if (pitcherName) {
@@ -434,6 +439,7 @@ export class Match {
         this.lastType = this.plan.type;
         this.spawnPenny();
         this.rollFirecracker();
+        this.rollPreWorkout();
         // The catcher sets up near (not exactly at) the target.
         this.catcherTarget = { x: this.plan.plateCross.x + this.rng.gaussian() * 0.05, y: this.plan.plateCross.y + this.rng.gaussian() * 0.05 };
         w.catcher.setTarget(this.catcherTarget.x, this.catcherTarget.y);
@@ -825,6 +831,10 @@ export class Match {
       this.d.world.batter.setPeak(false);
       window.setTimeout(() => this.d.ui.showCallout(gameText(this.d.settings().lang).peakOff, 'info'), 1300);
     }
+    if (this.pumpedLeft > 0 && --this.pumpedLeft === 0) {
+      this.d.world.batter.setPumped(false);
+      window.setTimeout(() => this.d.ui.showCallout(gameText(this.d.settings().lang).preWorkoutOff, 'info'), 1300);
+    }
     if (this.blessingLeft > 0 && --this.blessingLeft === 0) {
       this.d.world.batter.setPeak(false);
       window.setTimeout(() => this.d.ui.showCallout(gameText(this.d.settings().lang).blessingOff, 'info'), 1300);
@@ -933,6 +943,27 @@ export class Match {
       const t = gameText(this.d.settings().lang);
       this.d.ui.showCallout(t.firecrackerOn, 'warning', t.firecrackerSub);
     }
+  }
+
+  /**
+   * El Mati's pre-workout: before each pitch (while he is still in the
+   * wheelchair), with some chance, a shaker of coffee, Monster and horse semen
+   * falls on him and Ronnie Coleman gets up for a few pitches.
+   */
+  private rollPreWorkout(): void {
+    const pw = this.d.character.preWorkout;
+    if (!pw || this.pumpedLeft > 0 || this.rng.next() >= pw.chance) return;
+    this.pumpedLeft = pw.pitches;
+    const s = this.d.settings();
+    const t = gameText(s.lang);
+    this.d.world.batter.setPumped(true);
+    this.d.audio.crowdReaction('roar');
+    this.excitement = 1;
+    this.d.ui.showCallout(t.preWorkoutOn, 'bonus', t.preWorkoutSub);
+    const call = this.rng.pick(t.preWorkoutCalls);
+    const { vision, contact, power } = pw.ratings;
+    window.setTimeout(() => this.d.ui.showCallout(call, 'bonus', t.preWorkoutCallSub(vision, contact, power, pw.pitches)), 1500);
+    this.d.world.stadium.setScoreboard({ title: t.preWorkoutBoard, line1: t.preWorkoutIngredients, line2: 'RONNIE COLEMAN', big: 'YEAH BUDDY', highlight: true });
   }
 
   /**
@@ -1093,6 +1124,9 @@ export class Match {
     if (c.pennyBlessing) {
       const stateText = this.blessingLeft > 0 ? t.pennyBlessed(this.blessingLeft) : this.penny ? t.pennyField : t.pennyWaiting;
       return { label: t.pennyLabel, state: this.blessingLeft > 0 || this.penny ? 'active' : 'idle', pitchesLeft: null, keyHint: '', stateText };
+    }
+    if (c.preWorkout) {
+      return { label: t.preWorkoutLabel, state: this.pumpedLeft > 0 ? 'active' : 'idle', pitchesLeft: null, keyHint: '', stateText: this.pumpedLeft > 0 ? t.preWorkoutActive(this.pumpedLeft) : t.preWorkoutIdle };
     }
     if (c.firecracker) {
       return { label: t.curseLabel, state: this.firecracker ? 'active' : 'idle', pitchesLeft: null, keyHint: '', stateText: this.firecracker ? t.curseLit : t.curseIdle };

@@ -154,9 +154,32 @@ export const STADIUMS: Record<StadiumId, StadiumDef> = {
     features: { lightTowers: false, fireworks: false, sea: false, mountains: false, skyline: false, sandlot: false, southampton: true, rain: true },
     crowdDensity: 0.7,
   },
+  tenis: {
+    id: 'tenis',
+    name: { es: 'Cancha Central', en: 'Centre Court' },
+    subtitle: { es: 'Un estadio de tenis: la cancha dura pintada en el jardín y las gradas pegadas a la pista', en: 'A tennis stadium: a hard court painted on the outfield and the stands right on top of it' },
+    timeOfDay: 'day',
+    altitudeM: 30,
+    airDensity: 1.19,
+    fence: { distancesFt: [310, 350, 375, 350, 310], heightsFt: [8, 8, 8, 8, 8] },
+    palette: {
+      // Green surround of a hard court, clay infield, dark-green screens with purple trim.
+      // Nearly flat: a hard-court surround, not a mown lawn.
+      grass: '#3d8757',
+      grassAlt: '#3b8254',
+      dirt: '#c4673c',
+      wall: '#123f27',
+      wallTrim: '#6a3aa0',
+      seats: ['#1f5a35', '#2a6b40'],
+      crowd: ['#ffffff', '#f4ecd8', '#9fc8ea', '#f2b8c6', '#6a3aa0', '#1f5a35'],
+      accent: '#c9e03a',
+    },
+    features: { lightTowers: false, fireworks: false, sea: false, mountains: false, skyline: false, sandlot: false, tennis: true },
+    crowdDensity: 0.9,
+  },
 };
 
 export const STADIUM_ORDER: StadiumId[] = ['solar', 'malecon', 'metro', 'cumbre', 'final'];
 
 /** Parks outside the campaign: always open in Practice and Home Run Derby. */
-export const EXTRA_STADIUMS: StadiumId[] = ['bratislava', 'southampton'];
+export const EXTRA_STADIUMS: StadiumId[] = ['bratislava', 'southampton', 'tenis'];
