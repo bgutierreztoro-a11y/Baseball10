@@ -433,7 +433,22 @@ function figure(look: BatterLook, cx: number, feet: number, H: number, id: strin
   const batPts: Pt[] = [];
   for (const t of [0, 0.45, 0.75, 1]) batPts.push([knob[0] + dir[0] * len * t + nrm[0] * wAt(t), knob[1] + dir[1] * len * t + nrm[1] * wAt(t)]);
   for (const t of [1, 0.75, 0.45, 0]) batPts.push([knob[0] + dir[0] * len * t - nrm[0] * wAt(t), knob[1] + dir[1] * len * t - nrm[1] * wAt(t)]);
-  if (look.racket) {
+  if (look.dumbbell) {
+    // Dumbbell: chrome handle with dark knurling, a small head at the knob and a big iron head + plate at the top.
+    const at = (t: number): Pt => [knob[0] + dir[0] * len * t, knob[1] + dir[1] * len * t];
+    const ang = (Math.atan2(dir[1], dir[0]) * 180) / Math.PI;
+    const block = (t: number, along: number, across: number, fill: string): void => {
+      const c = at(t);
+      g.append(el('rect', { x: r(c[0] - along / 2), y: r(c[1] - across / 2), width: r(along), height: r(across), rx: u * 0.05, transform: `rotate(${r(ang)} ${r(c[0])} ${r(c[1])})`, fill, stroke: '#0e0f12', 'stroke-width': u * 0.03 }));
+    };
+    g.append(limb([at(0), at(0.98)], u * 0.075, '#cfd3d9'));
+    g.append(limb([at(0.1), at(0.42)], u * 0.085, '#17181b'));
+    block(0.04, len * 0.08, u * 0.42, '#2a2c31');
+    block(0.62, len * 0.035, u * 0.95, '#2a2c31');
+    block(0.74, len * 0.2, u * 0.74, '#2a2c31');
+    block(0.74, len * 0.05, u * 0.76, '#ffc21a');
+    block(0.88, len * 0.05, u * 0.3, '#cfd3d9');
+  } else if (look.racket) {
     // Tennis racket: white grip, dark shaft and an oval strung head at the top.
     const at = (t: number): Pt => [knob[0] + dir[0] * len * t, knob[1] + dir[1] * len * t];
     const head = at(0.78);
@@ -671,7 +686,7 @@ function draw(svg: SVGSVGElement, look: BatterLook, aspect: number): void {
     // A regular 1.85 m batter at his feet, for scale.
     const refH = (H * BASE_M) / look.heightM;
     const refX = cx - fig.hipHalf - refH * 0.62;
-    const ref = figure({ ...look, heightM: BASE_M, build: 1, belly: 0, muscle: 0.2, extraArms: false, beard: false, horns: false, hornBat: false, hair: '#2a1b12', skin: '#c68a5c', number: '1' }, refX, GROUND, refH, `${id}r`, false);
+    const ref = figure({ ...look, heightM: BASE_M, build: 1, belly: 0, muscle: 0.2, extraArms: false, beard: false, horns: false, hornBat: false, dumbbell: false, hair: '#2a1b12', skin: '#c68a5c', number: '1' }, refX, GROUND, refH, `${id}r`, false);
     svg.append(el('ellipse', { cx: refX, cy: GROUND + 0.5, rx: refH * 0.2, ry: 2.2, fill: '#000000', opacity: 0.35 }));
     svg.append(ref.g);
   }

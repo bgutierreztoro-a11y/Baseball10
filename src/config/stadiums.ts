@@ -1,7 +1,7 @@
 import type { StadiumDef, StadiumId } from '../contracts';
 
 /**
- * Five fictional ballparks, one per campaign chapter. Each one changes the
+ * Fictional ballparks, one per campaign chapter. Each one changes the
  * physics (air density), the fence profile and the mood, so progression is
  * felt rather than just read.
  */
@@ -177,9 +177,33 @@ export const STADIUMS: Record<StadiumId, StadiumDef> = {
     features: { lightTowers: false, fireworks: false, sea: false, mountains: false, skyline: false, sandlot: false, tennis: true },
     crowdDensity: 0.9,
   },
+  gimnasio: {
+    id: 'gimnasio',
+    name: { es: 'Gimnasio Iron Paradise', en: 'Iron Paradise Gym' },
+    subtitle: { es: 'El gimnasio de El Mati: máquinas por todos lados y una hinchada que no se salta ni un día de pierna', en: 'El Mati’s gym: machines everywhere and a crowd that never skips leg day' },
+    timeOfDay: 'day',
+    altitudeM: 25,
+    // Warm, thick, sweaty air indoors: the ball carries a little less.
+    airDensity: 1.22,
+    fence: { distancesFt: [315, 360, 390, 360, 315], heightsFt: [9, 9, 9, 9, 9] },
+    palette: {
+      // Black rubber flooring, red rubber infield, black padded wall with a yellow trim.
+      grass: '#2c2e33',
+      grassAlt: '#26282c',
+      dirt: '#8f1d22',
+      wall: '#17181c',
+      wallTrim: '#ffc21a',
+      seats: ['#2a2d33', '#8f1d22'],
+      crowd: ['#111317', '#8f1d22', '#e8e4d8', '#ffc21a', '#2b3a55', '#3b3f46'],
+      accent: '#ffc21a',
+    },
+    features: { lightTowers: false, fireworks: false, sea: false, mountains: false, skyline: false, sandlot: false, gym: true },
+    crowdDensity: 1,
+  },
 };
+
 
 export const STADIUM_ORDER: StadiumId[] = ['solar', 'malecon', 'metro', 'cumbre', 'final'];
 
 /** Parks outside the campaign: always open in Practice and Home Run Derby. */
-export const EXTRA_STADIUMS: StadiumId[] = ['bratislava', 'southampton', 'tenis'];
+export const EXTRA_STADIUMS: StadiumId[] = ['bratislava', 'southampton', 'tenis', 'gimnasio'];

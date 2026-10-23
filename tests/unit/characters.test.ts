@@ -116,11 +116,11 @@ describe('characters', () => {
     const a = characterById('arturek');
     expect(a.homeStadium!.stadium).toBe('bratislava');
     expect(STADIUMS.bratislava.features.bratislava).toBe(true);
-    expect(EXTRA_STADIUMS).toEqual(['bratislava', 'southampton', 'tenis']);
+    expect(EXTRA_STADIUMS).toEqual(['bratislava', 'southampton', 'tenis', 'gimnasio']);
     expect(STADIUM_ORDER).not.toContain('bratislava');
     const home = combineMods(a.mods, a.homeStadium!.mods);
     for (const kind of ['contact', 'power'] as const) expect(ev(hit(home, kind))).toBeGreaterThan(ev(hit(a.mods, kind)) * 1.15);
-    expect(CHARACTERS.filter((c) => c.homeStadium).map((c) => c.id)).toEqual(['arturek', 'chimon']);
+    expect(CHARACTERS.filter((c) => c.homeStadium).map((c) => c.id)).toEqual(['mati', 'arturek', 'chimon']);
   });
 
   it('Chimon gets a 15 % bigger batting eye on the tennis court, a park outside the campaign', () => {
@@ -155,6 +155,24 @@ describe('characters', () => {
       expect(swingProfile(kind, pw.mods).pciHalfWidth).toBeGreaterThan(swingProfile(kind, m.mods).pciHalfWidth);
       expect(ev(hit(pw.mods, kind))).toBeGreaterThan(ev(hit(m.mods, kind)));
     }
+  });
+
+  it('El Mati swings a dumbbell and is boosted at home in his gym, a park outside the campaign', () => {
+    const m = characterById('mati');
+    expect(m.look.dumbbell).toBe(true);
+    expect(CHARACTERS.filter((c) => c.look.dumbbell).map((c) => c.id)).toEqual(['mati']);
+    expect(m.homeStadium!.stadium).toBe('gimnasio');
+    expect(STADIUMS.gimnasio.features.gym).toBe(true);
+    expect(STADIUM_ORDER).not.toContain('gimnasio');
+    expect(EXTRA_STADIUMS).toContain('gimnasio');
+    // Boosted: bigger eye and a harder swing on both swings.
+    const home = combineMods(m.mods, m.homeStadium!.mods);
+    for (const kind of ['contact', 'power'] as const) {
+      expect(swingProfile(kind, home).pciHalfWidth).toBeGreaterThan(swingProfile(kind, m.mods).pciHalfWidth * 1.19);
+      expect(swingProfile(kind, home).batSpeed).toBeGreaterThan(swingProfile(kind, m.mods).batSpeed * 1.19);
+    }
+    // The pre-workout also drops far more often in his gym.
+    expect(m.preWorkout!.homeChance).toBeGreaterThan(m.preWorkout!.chance);
   });
 
   it('Chamo is a horned skeleton', () => {

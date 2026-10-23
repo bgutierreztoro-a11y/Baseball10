@@ -1,4 +1,4 @@
-// Visual QA sandbox: ?id=solar|malecon|metro|cumbre|final|bratislava|southampton|tenis&view=batting|outfield|overview|title|intro&quality=low|medium|high&targets=1
+// Visual QA sandbox: ?id=solar|malecon|metro|cumbre|final|bratislava|southampton|tenis|gimnasio&view=batting|outfield|overview|title|intro|crowd|statue&quality=low|medium|high&targets=1
 import { STADIUMS } from '../src/config/stadiums';
 import { STAGES } from '../src/config/campaign';
 import type { QualityTier, StadiumId } from '../src/contracts';
@@ -25,6 +25,9 @@ const views: Record<string, () => void> = {
   title: () => { cam.fov = 50; cam.position.set(38, 30, -12); cam.lookAt(0, 2, 55); },
   // First frame of the Bratislava intro flyover (castle and UFO bridge).
   intro: () => { cam.fov = 50; cam.position.set(-20, 46, -60); cam.lookAt(10, 60, 520); },
+  // Gym QA: a close look at the muscular crowd and at one of the golden statues.
+  crowd: () => { cam.fov = 45; cam.position.set(-30, 12, 70); cam.lookAt(-70, 12, 125); },
+  statue: () => { cam.fov = 45; cam.position.set(60, 22, 70); cam.lookAt(-70, 32, 160); },
   stands: () => { cam.fov = 55; cam.position.set(0, 25, 160); cam.lookAt(0, 2, 0); },
 };
 (views[view] ?? views.batting!)();

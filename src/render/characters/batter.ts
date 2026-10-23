@@ -236,6 +236,44 @@ function makeRacket(): { group: THREE.Group; wood: THREE.MeshStandardMaterial; g
 }
 
 /**
+ * El Mati's dumbbell. Same axis convention as the bat (knob at 0, along local
+ * +Y): a knurled chrome handle under the hands, a small hex head at the knob
+ * end and a big hex head with a weight plate at the top, centred on the bat's
+ * sweet spot so contact lands on the iron.
+ */
+function makeDumbbell(): { group: THREE.Group; wood: THREE.MeshStandardMaterial; grip: THREE.MeshStandardMaterial } {
+  const iron = new THREE.MeshStandardMaterial({ color: '#2a2c31', roughness: 0.4, metalness: 0.75 });
+  const chrome = new THREE.MeshStandardMaterial({ color: '#cfd3d9', roughness: 0.22, metalness: 0.95 });
+  const paint = new THREE.MeshStandardMaterial({ color: '#ffc21a', roughness: 0.5, metalness: 0.2 });
+  const group = new THREE.Group();
+  const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.0155, 0.0155, BAT_LENGTH, 12), chrome);
+  bar.position.y = BAT_LENGTH / 2;
+  // Knurled grip: dark rings along the handle.
+  const grip = new THREE.MeshStandardMaterial({ color: '#17181b', roughness: 0.9, metalness: 0.3 });
+  for (let k = 0; k < 9; k++) {
+    const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.0168, 0.0168, 0.012, 12), grip);
+    ring.position.y = 0.1 + k * 0.022;
+    group.add(ring);
+  }
+  // Hex heads: a low one at the knob, a big one (plate + head + end cap) around the sweet spot.
+  const head = (r: number, len: number, y: number): THREE.Mesh => {
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 6), iron);
+    m.position.y = y;
+    return m;
+  };
+  const knobHead = head(0.05, 0.08, 0.04);
+  const plate = new THREE.Mesh(new THREE.CylinderGeometry(0.115, 0.115, 0.035, 20), iron);
+  plate.position.y = SWEET - 0.1;
+  const big = head(0.09, 0.2, SWEET + 0.02);
+  const band = new THREE.Mesh(new THREE.CylinderGeometry(0.0915, 0.0915, 0.026, 6), paint);
+  band.position.y = SWEET + 0.02;
+  const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.06, 0.03, 12), chrome);
+  cap.position.y = SWEET + 0.135;
+  group.add(bar, knobHead, plate, big, band, cap);
+  return { group, wood: iron, grip };
+}
+
+/**
  * Monkey parts on top of the humanoid: a light face mask and muzzle, big
  * round ears, a curled tail on the hips and a tennis sweatband. The fur is
  * the humanoid's skin material, so it tints with the rest of the body.
@@ -561,8 +599,8 @@ export class Batter implements BatterRig {
     // A skeleton wears no helmet: the horns grow straight out of the skull.
     if (!look.monkey && !look.rabbi && !look.skeleton) this.addHelmet(look, quality);
     if (look.horns) this.h.head.add(makeHeadHorns(quality));
-    this.hornBat = look.hornBat || !!look.racket;
-    const bat = look.racket ? makeRacket() : look.hornBat ? makeHornBat() : makeBat();
+    this.hornBat = look.hornBat || !!look.racket || !!look.dumbbell;
+    const bat = look.dumbbell ? makeDumbbell() : look.racket ? makeRacket() : look.hornBat ? makeHornBat() : makeBat();
     this.bat = bat.group;
     this.bat.scale.setScalar(this.batScale);
     this.batWood = bat.wood;
@@ -641,7 +679,7 @@ export class Batter implements BatterRig {
   }
 
   setBatColors(wood: string, grip: string): void {
-    // A horn (or a racket) keeps its own colours; only the grip follows the bat skin.
+    // A horn (or a racket, or a dumbbell) keeps its own colours; only the grip follows the bat skin.
     if (!this.hornBat) this.batWood.color.set(wood);
     this.batGrip.color.set(grip);
   }
