@@ -286,6 +286,80 @@ function addMonkey(h: Humanoid, look: BatterLook, quality: QualitySettings): THR
   return face;
 }
 
+/**
+ * El Mati's wheelchair, in body space (+Z toward the plate): seat, backrest
+ * with push handles, two big rear wheels with hand rims and spokes, front
+ * casters and a footplate.
+ */
+function makeWheelchair(quality: QualitySettings): THREE.Group {
+  const frame = new THREE.MeshStandardMaterial({ color: '#2b2f36', roughness: 0.35, metalness: 0.75 });
+  const chrome = new THREE.MeshStandardMaterial({ color: '#c9ced6', roughness: 0.22, metalness: 0.9 });
+  const tire = new THREE.MeshStandardMaterial({ color: '#141518', roughness: 0.85 });
+  const cloth = new THREE.MeshStandardMaterial({ color: '#1d3f8a', roughness: 0.8 });
+  const g = new THREE.Group();
+  g.name = 'wheelchair';
+  const add = (geo: THREE.BufferGeometry, m: THREE.Material, pos: THREE.Vector3, rot?: THREE.Euler): THREE.Mesh => {
+    const x = new THREE.Mesh(geo, m);
+    x.position.copy(pos);
+    if (rot) x.rotation.copy(rot);
+    x.castShadow = quality.shadows;
+    g.add(x);
+    return x;
+  };
+  /** A straight tube between two points. */
+  const tube = (a: THREE.Vector3, b: THREE.Vector3, r: number, m: THREE.Material = frame): void => {
+    const t = add(new THREE.CylinderGeometry(r, r, a.distanceTo(b), 8), m, a.clone().add(b).multiplyScalar(0.5));
+    t.quaternion.setFromUnitVectors(V(0, 1, 0), b.clone().sub(a).normalize());
+  };
+  const SEAT_H = 0.47;
+  add(new THREE.BoxGeometry(0.5, 0.05, 0.46), cloth, V(0, SEAT_H, -0.03));
+  add(new THREE.BoxGeometry(0.48, 0.38, 0.03), cloth, V(0, SEAT_H + 0.27, -0.29), new THREE.Euler(-0.12, 0, 0));
+  add(new THREE.BoxGeometry(0.14, 0.05, 0.12), frame, V(0, 0.1, 0.43));
+  for (const side of [-1, 1]) {
+    const x = side * 0.26;
+    // Side frame: seat rail, back cane with a push handle, and the leg down to the footplate.
+    tube(V(x, SEAT_H - 0.03, -0.27), V(x, SEAT_H - 0.03, 0.22), 0.014);
+    tube(V(x, SEAT_H - 0.05, -0.27), V(x, SEAT_H + 0.5, -0.33), 0.014);
+    tube(V(x, SEAT_H + 0.5, -0.33), V(x, SEAT_H + 0.5, -0.45), 0.018, tire);
+    tube(V(x, SEAT_H - 0.03, 0.22), V(side * 0.12, 0.1, 0.42), 0.013);
+    tube(V(x, 0.12, -0.12), V(x, 0.12, 0.3), 0.012);
+    // Big rear wheel: tyre, rim, hand rim and spokes, on the outside of the frame.
+    const wx = side * 0.33;
+    const hub = V(wx, 0.31, -0.1);
+    add(new THREE.TorusGeometry(0.29, 0.022, 8, 40), tire, hub, new THREE.Euler(0, Math.PI / 2, 0));
+    add(new THREE.TorusGeometry(0.27, 0.008, 6, 40), chrome, hub, new THREE.Euler(0, Math.PI / 2, 0));
+    add(new THREE.TorusGeometry(0.25, 0.007, 6, 40), chrome, V(wx + side * 0.035, 0.31, -0.1), new THREE.Euler(0, Math.PI / 2, 0));
+    add(new THREE.CylinderGeometry(0.03, 0.03, 0.06, 10), chrome, hub, new THREE.Euler(0, 0, Math.PI / 2));
+    for (let k = 0; k < 12; k++) {
+      const a = (k / 12) * Math.PI * 2;
+      tube(hub, V(wx, 0.31 + Math.sin(a) * 0.27, -0.1 + Math.cos(a) * 0.27), 0.003, chrome);
+    }
+    tube(V(x, 0.31, -0.1), V(wx, 0.31, -0.1), 0.01, chrome);
+    // Front caster on a little fork.
+    const cz = 0.3;
+    tube(V(x, 0.12, cz), V(x, 0.07, cz + 0.03), 0.01);
+    add(new THREE.TorusGeometry(0.055, 0.016, 6, 18), tire, V(x, 0.07, cz + 0.03), new THREE.Euler(0, Math.PI / 2, 0));
+  }
+  return g;
+}
+
+/** The pre-workout shaker that falls on El Mati: clear bottle full of green, black screw cap. */
+function makeShaker(quality: QualitySettings): THREE.Group {
+  const g = new THREE.Group();
+  const bottle = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.052, 0.2, 16), new THREE.MeshStandardMaterial({ color: '#e9f2ee', roughness: 0.15, transparent: true, opacity: 0.55 }));
+  const drink = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.046, 0.15, 16), new THREE.MeshStandardMaterial({ color: '#8cff2a', emissive: '#5bd400', emissiveIntensity: 0.8, roughness: 0.4 }));
+  drink.position.y = -0.02;
+  const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.063, 0.063, 0.05, 16), new THREE.MeshStandardMaterial({ color: '#111214', roughness: 0.4 }));
+  cap.position.y = 0.125;
+  const spout = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.024, 0.04, 10), cap.material);
+  spout.position.y = 0.17;
+  for (const m of [bottle, drink, cap, spout]) {
+    m.castShadow = quality.shadows;
+    g.add(m);
+  }
+  return g;
+}
+
 interface BatKey {
   pose: HumanoidPose;
   K: THREE.Vector3;
@@ -384,6 +458,15 @@ export function batterMetrics(look: BatterLook): { scale: number; giant: number;
 
 type BatterState = 'stance' | 'prepare' | 'swing' | 'celebrate' | 'react';
 
+/** Hips height and depth (body units) while sitting in the wheelchair. */
+const SEAT_Y = 0.6;
+const SEAT_Z = -0.06;
+/** Pre-workout: the shaker falls for this long, then he drinks it for SHAKER_DRINK. */
+const SHAKER_FALL = 0.45;
+const SHAKER_DRINK = 0.35;
+/** Body grows this much (uniformly) when pumped. */
+const PUMP_GROWTH = 0.1;
+
 export class Batter implements BatterRig {
   readonly root: THREE.Group;
   readonly stanceOffsetX: number;
@@ -422,6 +505,16 @@ export class Batter implements BatterRig {
   private anger = 0;
   private angryTarget = 0;
   private readonly tintable: { m: THREE.MeshStandardMaterial; color: THREE.Color; emissive: THREE.Color; red: THREE.Color }[] = [];
+  /** El Mati's wheelchair (null for everyone else) and how seated he is (1 = sitting, 0 = standing). */
+  private readonly chair: THREE.Group | null = null;
+  private seat = 0;
+  private seatTarget = 0;
+  /** Pre-workout pump 0..1 (body growth) and the falling shaker (seconds since it started, −1 = none). */
+  private pump = 0;
+  private pumpTarget = 0;
+  private readonly shaker: THREE.Group | null = null;
+  private shakerT = -1;
+  private readonly seated = makePose();
 
   constructor(quality: QualitySettings, look: BatterLook) {
     const m = batterMetrics(look);
@@ -430,20 +523,23 @@ export class Batter implements BatterRig {
     this.sweet = SWEET * m.batScale;
     this.stanceOffsetX = m.stanceX;
     this.extra = look.extraArms;
-    const outfit: Outfit = {
-      skin: look.skin,
-      jersey: look.jersey,
-      trim: look.trim,
-      // A rabbi's coat has long black sleeves and black trousers.
-      sleeve: look.rabbi ? look.jersey : look.trim,
-      pants: look.rabbi ? look.jersey : '#ece8dc',
-      socks: look.rabbi ? '#101014' : mixHex(look.trim, '#0b1426', 0.25),
-      shoes: '#15161a',
-      hat: mixHex(look.trim, '#0b1426', 0.08),
-      gloves: look.monkey ? '#e2b48a' : look.rabbi ? look.skin : look.trim,
-      build: look.build,
-      number: look.number,
-    };
+    const bone = look.skeleton ? look.skin : null;
+    const outfit: Outfit = bone
+      ? { skin: bone, jersey: bone, trim: bone, sleeve: bone, pants: bone, socks: bone, shoes: bone, hat: bone, gloves: bone, build: look.build }
+      : {
+          skin: look.skin,
+          jersey: look.jersey,
+          trim: look.trim,
+          // A rabbi's coat has long black sleeves and black trousers.
+          sleeve: look.rabbi ? look.jersey : look.trim,
+          pants: look.rabbi ? look.jersey : '#ece8dc',
+          socks: look.rabbi ? '#101014' : mixHex(look.trim, '#0b1426', 0.25),
+          shoes: '#15161a',
+          hat: mixHex(look.trim, '#0b1426', 0.08),
+          gloves: look.monkey ? '#e2b48a' : look.rabbi ? look.skin : look.trim,
+          build: look.build,
+          number: look.number,
+        };
     const shape: BodyShape = {
       scale: m.scale,
       belly: look.belly,
@@ -455,13 +551,15 @@ export class Batter implements BatterRig {
       beardStyle: look.hair ? 'full' : 'goatee',
       extraArms: look.extraArms,
       face: true,
+      skeleton: !!look.skeleton,
     };
     this.h = new Humanoid(outfit, quality, shape);
     this.tuneSkin(this.h.materials.skin!);
     this.root = this.h.root;
     const face = look.monkey ? addMonkey(this.h, look, quality) : null;
     if (look.rabbi) addRabbiAttire(this.h, look.hair ?? '#2a1d14', quality, { chestDepth: this.h.chestDepth });
-    if (!look.monkey && !look.rabbi) this.addHelmet(look, quality);
+    // A skeleton wears no helmet: the horns grow straight out of the skull.
+    if (!look.monkey && !look.rabbi && !look.skeleton) this.addHelmet(look, quality);
     if (look.horns) this.h.head.add(makeHeadHorns(quality));
     this.hornBat = look.hornBat || !!look.racket;
     const bat = look.racket ? makeRacket() : look.hornBat ? makeHornBat() : makeBat();
@@ -482,6 +580,14 @@ export class Batter implements BatterRig {
     // A monkey's anger shows on his face (mask, muzzle, inner ears); anyone else reddens all over.
     if (face) tint(face, ANGRY_FACE);
     else tint(this.h.materials.skin, ANGRY_RED);
+    if (look.wheelchair) {
+      this.chair = makeWheelchair(quality);
+      this.h.body.add(this.chair);
+      this.shaker = makeShaker(quality);
+      this.shaker.visible = false;
+      this.h.body.add(this.shaker);
+      this.seat = this.seatTarget = 1;
+    }
     this.contact = key({}, new THREE.Vector3(), new THREE.Vector3(0, 0, 1));
     this.from = key({}, new THREE.Vector3(), new THREE.Vector3(0, 1, 0));
     this.cur = key({}, new THREE.Vector3(), new THREE.Vector3(0, 1, 0));
@@ -555,6 +661,33 @@ export class Batter implements BatterRig {
 
   setAngry(on: boolean): void {
     this.angryTarget = on ? 1 : 0;
+  }
+
+  setPumped(on: boolean, instant = false): void {
+    if (!this.chair) {
+      this.aura.set(on);
+      return;
+    }
+    if (instant) {
+      this.shakerT = -1;
+      this.shaker!.visible = false;
+      this.seat = this.seatTarget = on ? 0 : 1;
+      this.pump = this.pumpTarget = on ? 1 : 0;
+      this.aura.set(on);
+      this.applyCurrent();
+      return;
+    }
+    if (on) {
+      // The shaker falls first; he gets up once he has drunk it (see updatePump).
+      this.shakerT = 0;
+      this.shaker!.visible = true;
+    } else {
+      this.shakerT = -1;
+      this.shaker!.visible = false;
+      this.seatTarget = 1;
+      this.pumpTarget = 0;
+      this.aura.set(false);
+    }
   }
 
   /** Stride/load timed to the pitch (called at release). */
@@ -701,7 +834,7 @@ export class Batter implements BatterRig {
     const K = this.contact.K;
     const D = this.contact.D;
     copyPose(h.pose, this.savedPose);
-    h.applyBones(this.contact.pose);
+    h.applyBones(this.seatPose(copyPose(this.contact.pose, this.seated), this.seat));
     const SL = h.shoulderInBody('L', this.sL);
     const SR = h.shoulderInBody('R', this.sR);
     const R = h.armReach * 0.97;
@@ -757,6 +890,7 @@ export class Batter implements BatterRig {
     this.t += dt;
     this.aura.update(dt);
     this.updateAnger(dt);
+    this.updatePump(dt);
     const u = this.dur > 0 ? this.t / this.dur : 1;
     switch (this.state) {
       case 'stance': {
@@ -798,6 +932,68 @@ export class Batter implements BatterRig {
     this.applyCurrent(dt);
   }
 
+  /**
+   * Pre-workout: the shaker drops from the sky onto his hands, he chugs it,
+   * then gets up out of the chair (which rolls back) and swells. Off: he sits
+   * back down and deflates.
+   */
+  private updatePump(dt: number): void {
+    if (!this.chair) return;
+    if (this.shakerT >= 0) {
+      this.shakerT += dt;
+      const t = this.shakerT;
+      const sh = this.shaker!;
+      // From high above his head down to his face, spinning, then tipped up to drink.
+      const k = Math.min(1, t / SHAKER_FALL);
+      const head = this.tmp.set(0.04, SEAT_Y + 0.72, 0.16);
+      sh.position.set(head.x, head.y + (1 - k * k) * 3.2, head.z);
+      if (t < SHAKER_FALL) sh.rotation.set(t * 9, 0, t * 5);
+      else sh.rotation.set(-2.3, 0, 0);
+      sh.scale.setScalar(t > SHAKER_FALL + SHAKER_DRINK * 0.7 ? Math.max(0.01, 1 - (t - SHAKER_FALL - SHAKER_DRINK * 0.7) / (SHAKER_DRINK * 0.3)) : 1);
+      if (t >= SHAKER_FALL + SHAKER_DRINK) {
+        this.shakerT = -1;
+        sh.visible = false;
+        sh.scale.setScalar(1);
+        this.seatTarget = 0;
+        this.pumpTarget = 1;
+        this.aura.set(true);
+      }
+    }
+    const k = 1 - Math.exp(-dt * 7);
+    this.seat += (this.seatTarget - this.seat) * k;
+    this.pump += (this.pumpTarget - this.pump) * (1 - Math.exp(-dt * 4));
+    if (Math.abs(this.seat - this.seatTarget) < 0.002) this.seat = this.seatTarget;
+    if (Math.abs(this.pump - this.pumpTarget) < 0.002) this.pump = this.pumpTarget;
+    // The chair rolls back behind him while he stands; a flex pulse as he swells.
+    this.chair.position.z = -0.85 * (1 - this.seat);
+    const flex = this.pumpTarget > 0 ? Math.sin(this.time * 6) * 0.012 * this.pump : 0;
+    this.root.scale.setScalar(1 + PUMP_GROWTH * this.pump + flex);
+  }
+
+  /**
+   * Sitting version of a standing pose, blended by `s` (0 = untouched): hips
+   * on the seat with the upper body taking over the twist and lean, knees bent
+   * forward and the feet on the footplate.
+   */
+  private seatPose(p: HumanoidPose, s: number): HumanoidPose {
+    if (s <= 0) return p;
+    const L = THREE.MathUtils.lerp;
+    p.hipsPos.set(L(p.hipsPos.x, 0, s), L(p.hipsPos.y, SEAT_Y + (p.hipsPos.y - 0.93) * 0.3, s), L(p.hipsPos.z, SEAT_Z, s));
+    const yaw = p.hipsYaw * 0.3;
+    p.spineYaw += (p.hipsYaw - yaw) * s;
+    p.hipsYaw = L(p.hipsYaw, yaw, s);
+    p.spineLean += (p.hipsLean + 0.04) * s * 0.8;
+    p.hipsLean = L(p.hipsLean, -0.04, s);
+    p.hipsRoll = L(p.hipsRoll, 0, s);
+    p.footL.lerp(this.tmp3.set(0.17, 0.13, 0.43), s);
+    p.footR.lerp(this.tmp3.set(-0.17, 0.13, 0.43), s);
+    p.footYawL = L(p.footYawL, 0.05, s);
+    p.footYawR = L(p.footYawR, -0.05, s);
+    p.kneePoleL.lerp(this.tmp3.set(0.15, 1, 0.5), s);
+    p.kneePoleR.lerp(this.tmp3.set(-0.15, 1, 0.5), s);
+    return p;
+  }
+
   /** Fades the red tint in/out and makes it throb while angry. */
   private updateAnger(dt: number): void {
     if (this.anger === this.angryTarget && this.anger === 0) return;
@@ -819,6 +1015,7 @@ export class Batter implements BatterRig {
     const p = this.h.pose;
     const h = this.h;
     copyPose(c.pose, p);
+    this.seatPose(p, this.seat);
     if (this.flip) {
       // Bat flies free; hands relax near the hips (the extra pair cheers).
       p.handL.set(0.22, 0.9, 0.22);

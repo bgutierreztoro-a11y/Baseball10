@@ -175,6 +175,23 @@ export function createStructures(def: StadiumDef, quality: QualitySettings, atm:
     }
     const deckMesh = new THREE.Mesh(track(deck.build()), standsMat);
     group.add(deckMesh);
+    if (def.features.tennis) {
+      // Centre Court: a white cantilevered roof over the upper tier, with a purple fascia.
+      const roof = new MeshBuilder(true);
+      const cream = new THREE.Color('#eeeae0');
+      const fascia = new THREE.Color('#5a2d86');
+      const edge = upper.map((p) => {
+        const top = p.h0 + 18 * ROW_RISE;
+        return { ix: p.x - p.nx * 7, iz: p.z - p.nz * 7, ox: p.x + p.nx * (18 * ROW_DEPTH + 1), oz: p.z + p.nz * (18 * ROW_DEPTH + 1), yi: top + 4.2, yo: top + 6 };
+      });
+      for (let i = 0; i < edge.length - 1; i++) {
+        const a = edge[i]!;
+        const b = edge[i + 1]!;
+        roof.quad([a.ix, a.yi, a.iz], [b.ix, b.yi, b.iz], [b.ox, b.yo, b.oz], [a.ox, a.yo, a.oz], cream);
+        roof.quad([a.ix, a.yi - 1.1, a.iz], [b.ix, b.yi - 1.1, b.iz], [b.ix, b.yi, b.iz], [a.ix, a.yi, a.iz], fascia);
+      }
+      group.add(new THREE.Mesh(track(roof.build()), standsMat));
+    }
   }
 
   // Ground gap between the wall and the bleachers (dark) + outer concourse floor.

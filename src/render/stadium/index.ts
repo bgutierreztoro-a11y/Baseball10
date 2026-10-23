@@ -6,6 +6,7 @@ import { createScenery } from './scenery';
 import { createScoreboard } from './scoreboard';
 import { createStructures } from './structures';
 import { createTargets } from './targets';
+import { createTennisCourt } from './tennis';
 
 /**
  * Builds a complete procedural ballpark for a StadiumDef and configures the
@@ -24,6 +25,8 @@ export const createStadium: CreateStadium = (scene, def, quality): StadiumView =
   const scoreboard = createScoreboard(def, atm, structures.cfBack);
   const targets = createTargets();
   root.add(sky.group, field.group, structures.group, scenery.group, scoreboard.group, targets.group);
+  const tennis = def.features.tennis ? createTennisCourt(def, quality) : null;
+  if (tennis) root.add(tennis.group);
 
   // Lighting.
   const hemi = new THREE.HemisphereLight(atm.hemiSky, atm.hemiGround, atm.hemiIntensity);
@@ -74,6 +77,7 @@ export const createStadium: CreateStadium = (scene, def, quality): StadiumView =
       scenery.update(elapsed);
       scoreboard.update(elapsed);
       targets.update(elapsed);
+      tennis?.update(elapsed);
     },
     setScoreboard(data) {
       scoreboard.set(data);
@@ -94,6 +98,7 @@ export const createStadium: CreateStadium = (scene, def, quality): StadiumView =
       scenery.dispose();
       scoreboard.dispose();
       targets.dispose();
+      tennis?.dispose();
     },
   };
 };

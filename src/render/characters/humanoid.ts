@@ -51,6 +51,12 @@ export interface BodyShape {
   extraArms?: boolean;
   /** Simple eyes/brows (close-up readability). */
   face?: boolean;
+  /**
+   * Bare bones: skull, ribcage, spine and pelvis instead of a torso in a
+   * uniform; thin bone limbs with knobby joints. Every outfit colour should be
+   * the bone colour.
+   */
+  skeleton?: boolean;
 }
 
 export interface HumanoidPose {
@@ -236,9 +242,10 @@ export class Humanoid {
       belt: mat('#1b1b1f', 0.5),
     };
     const M = this.materials;
+    const skel = !!shape.skeleton;
     const build = outfit.build ?? 1;
-    const mus = shape.muscle ?? 0;
-    const belly = shape.belly ?? 0;
+    const mus = skel ? 0 : (shape.muscle ?? 0);
+    const belly = skel ? 0 : (shape.belly ?? 0);
     // Stock bodies (no shape) keep the original proportions exactly: `build`
     // simply widens the torso, nothing else changes.
     const custom = shape.scale !== undefined;
@@ -252,11 +259,13 @@ export class Humanoid {
     const waistW = build * (1 - 0.24 * mus);
     const waistD = 1 + heavy * 0.45;
     const shoulderX = 0.21 * (1 + heavy * 0.3) * (1 + 0.24 * mus);
-    const armT = (1 + 0.65 * mus) * (1 + 0.42 * heavy);
-    const foreT = (1 + 0.5 * mus) * (1 + 0.34 * heavy);
-    const thighT = (1 + 0.2 * mus) * (1 + 0.5 * heavy);
-    const shinT = (1 + 0.1 * mus) * (1 + 0.34 * heavy);
-    const neckT = (1 + 0.5 * mus) * (1 + 0.35 * heavy);
+    // Bones are much thinner than limbs in a uniform.
+    const boneK = skel ? 0.38 : 1;
+    const armT = (1 + 0.65 * mus) * (1 + 0.42 * heavy) * boneK;
+    const foreT = (1 + 0.5 * mus) * (1 + 0.34 * heavy) * boneK;
+    const thighT = (1 + 0.2 * mus) * (1 + 0.5 * heavy) * boneK;
+    const shinT = (1 + 0.1 * mus) * (1 + 0.34 * heavy) * boneK;
+    const neckT = (1 + 0.5 * mus) * (1 + 0.35 * heavy) * (skel ? 0.42 : 1);
     this.chestDepth = 0.17 * 0.74 * chestD;
     const shadow = quality.shadows;
     const mesh = (g: THREE.BufferGeometry, m: THREE.Material): THREE.Mesh => {
@@ -280,79 +289,83 @@ export class Humanoid {
 
     // Pelvis + belt.
     const pelvis = mesh(geo(`pelvis${S}`, () => new THREE.CapsuleGeometry(0.15, 0.08, 4, S)), M.pants!);
-    pelvis.scale.set(1.15 * build * (1 - 0.1 * mus), 1, 0.8 * waistD);
+    pelvis.scale.set(1.15 * build * (1 - 0.1 * mus), skel ? 0.62 : 1, 0.8 * waistD * (skel ? 0.75 : 1));
     pelvis.rotation.z = Math.PI / 2;
     this.hips.add(pelvis);
-    const belt = mesh(geo(`belt${S}`, () => new THREE.CylinderGeometry(0.165, 0.165, 0.05, S * 2)), M.belt!);
-    belt.scale.set(build * (1 - 0.1 * mus), 1, 0.82 * waistD);
-    belt.position.y = 0.09;
-    this.hips.add(belt);
+    if (skel) {
+      this.addBones(mesh);
+    } else {
+      const belt = mesh(geo(`belt${S}`, () => new THREE.CylinderGeometry(0.165, 0.165, 0.05, S * 2)), M.belt!);
+      belt.scale.set(build * (1 - 0.1 * mus), 1, 0.82 * waistD);
+      belt.position.y = 0.09;
+      this.hips.add(belt);
 
-    // Torso: abdomen + chest (jersey) with trim piping.
-    const abdomen = mesh(geo(`abd${S}`, () => new THREE.CapsuleGeometry(0.145, 0.12, 4, S)), M.jersey!);
-    abdomen.scale.set(1.05 * waistW, 1, 0.78 * waistD);
-    abdomen.position.y = 0.06;
-    this.spine.add(abdomen);
-    const torso = mesh(geo(`torso${S}`, () => new THREE.CapsuleGeometry(0.17, 0.16, 6, S)), M.jersey!);
-    torso.scale.set(1.12 * chestW, 1, 0.74 * chestD);
-    torso.position.y = 0.05;
-    this.chest.add(torso);
-    if (belly > 0) {
-      // Round belly pushing the jersey forward, carried by the spine bone; a
-      // second, smaller curve overhangs the belt. Both stay inside the back.
-      const bg = geo(`belly${S}`, () => new THREE.SphereGeometry(0.17, S * 2, S));
-      const b = mesh(bg, M.jersey!);
-      b.scale.set(0.86 * waistW * (0.75 + 0.25 * belly), 0.95 + 0.55 * belly, 0.95 + 0.95 * belly);
-      b.position.set(0, 0.05, 0.05 + 0.19 * belly);
-      this.spine.add(b);
-      const lb = mesh(bg, M.jersey!);
-      lb.scale.set(0.76 * waistW * (0.75 + 0.25 * belly), 0.85, 0.8 + 0.75 * belly);
-      lb.position.set(0, -0.06, 0.06 + 0.17 * belly);
-      this.spine.add(lb);
-    }
-    if (mus > 0.5) {
-      // Lats/pecs for the V-taper and trapezius sloping into a thick neck.
-      const k = (mus - 0.5) * 2;
-      const lats = mesh(geo(`lats${S}`, () => new THREE.SphereGeometry(0.17, S * 2, S)), M.jersey!);
-      lats.scale.set(1.12 * chestW * (1 + 0.12 * k), 0.62, 0.74 * chestD * 1.04);
-      lats.position.set(0, 0.11, 0.005);
-      this.chest.add(lats);
-      const traps = mesh(geo(`traps${S}`, () => new THREE.SphereGeometry(0.1, S, S / 2)), M.jersey!);
-      traps.scale.set(1.9 + 0.4 * k, 0.75, 0.95);
-      traps.position.set(0, 0.2, -0.025);
-      this.chest.add(traps);
-    }
-    if (mus > 0.85) {
-      // Shredded: pecs and a six-pack pushing through the jersey.
-      const pad = geo(`abpad${S}`, () => new THREE.SphereGeometry(0.03, S, S / 2));
-      const absZ = 0.145 * 0.78 * waistD - 0.012;
-      for (let row = 0; row < 3; row++) {
+      // Torso: abdomen + chest (jersey) with trim piping.
+      const abdomen = mesh(geo(`abd${S}`, () => new THREE.CapsuleGeometry(0.145, 0.12, 4, S)), M.jersey!);
+      abdomen.scale.set(1.05 * waistW, 1, 0.78 * waistD);
+      abdomen.position.y = 0.06;
+      this.spine.add(abdomen);
+      const torso = mesh(geo(`torso${S}`, () => new THREE.CapsuleGeometry(0.17, 0.16, 6, S)), M.jersey!);
+      torso.scale.set(1.12 * chestW, 1, 0.74 * chestD);
+      torso.position.y = 0.05;
+      this.chest.add(torso);
+      if (belly > 0) {
+        // Round belly pushing the jersey forward, carried by the spine bone; a
+        // second, smaller curve overhangs the belt. Both stay inside the back.
+        const bg = geo(`belly${S}`, () => new THREE.SphereGeometry(0.17, S * 2, S));
+        const b = mesh(bg, M.jersey!);
+        b.scale.set(0.86 * waistW * (0.75 + 0.25 * belly), 0.95 + 0.55 * belly, 0.95 + 0.95 * belly);
+        b.position.set(0, 0.05, 0.05 + 0.19 * belly);
+        this.spine.add(b);
+        const lb = mesh(bg, M.jersey!);
+        lb.scale.set(0.76 * waistW * (0.75 + 0.25 * belly), 0.85, 0.8 + 0.75 * belly);
+        lb.position.set(0, -0.06, 0.06 + 0.17 * belly);
+        this.spine.add(lb);
+      }
+      if (mus > 0.5) {
+        // Lats/pecs for the V-taper and trapezius sloping into a thick neck.
+        const k = (mus - 0.5) * 2;
+        const lats = mesh(geo(`lats${S}`, () => new THREE.SphereGeometry(0.17, S * 2, S)), M.jersey!);
+        lats.scale.set(1.12 * chestW * (1 + 0.12 * k), 0.62, 0.74 * chestD * 1.04);
+        lats.position.set(0, 0.11, 0.005);
+        this.chest.add(lats);
+        const traps = mesh(geo(`traps${S}`, () => new THREE.SphereGeometry(0.1, S, S / 2)), M.jersey!);
+        traps.scale.set(1.9 + 0.4 * k, 0.75, 0.95);
+        traps.position.set(0, 0.2, -0.025);
+        this.chest.add(traps);
+      }
+      if (mus > 0.85) {
+        // Shredded: pecs and a six-pack pushing through the jersey.
+        const pad = geo(`abpad${S}`, () => new THREE.SphereGeometry(0.03, S, S / 2));
+        const absZ = 0.145 * 0.78 * waistD - 0.012;
+        for (let row = 0; row < 3; row++) {
+          for (const side of [-1, 1]) {
+            const p = mesh(pad, M.jersey!);
+            p.scale.set(1.0 * waistW, 0.72, 0.55);
+            p.position.set(side * 0.034 * waistW, 0.11 - row * 0.045, absZ);
+            this.spine.add(p);
+          }
+        }
+        const pec = geo(`pec${S}`, () => new THREE.SphereGeometry(0.07, S, S / 2));
         for (const side of [-1, 1]) {
-          const p = mesh(pad, M.jersey!);
-          p.scale.set(1.0 * waistW, 0.72, 0.55);
-          p.position.set(side * 0.034 * waistW, 0.11 - row * 0.045, absZ);
-          this.spine.add(p);
+          const p = mesh(pec, M.jersey!);
+          p.scale.set(1.25, 0.8, 0.5);
+          p.position.set(side * 0.07 * chestW, 0.08, 0.17 * 0.74 * chestD - 0.012);
+          this.chest.add(p);
         }
       }
-      const pec = geo(`pec${S}`, () => new THREE.SphereGeometry(0.07, S, S / 2));
-      for (const side of [-1, 1]) {
-        const p = mesh(pec, M.jersey!);
-        p.scale.set(1.25, 0.8, 0.5);
-        p.position.set(side * 0.07 * chestW, 0.08, 0.17 * 0.74 * chestD - 0.012);
-        this.chest.add(p);
+      const piping = mesh(geo('piping', () => new THREE.BoxGeometry(0.02, 0.4, 0.02)), M.trim!);
+      piping.position.set(0, -0.05, 0.128);
+      this.chest.add(piping);
+      if (outfit.number) {
+        const tex = numberTexture(outfit.number, outfit.trim);
+        const back = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.2), new THREE.MeshStandardMaterial({ map: tex, transparent: true, roughness: 0.8, polygonOffset: true, polygonOffsetFactor: -2 }));
+        back.position.set(0, 0.07, -(this.chestDepth + 0.005));
+        if (custom) back.scale.setScalar(Math.min(1.5, Math.sqrt(chestW)));
+        this.backNumber = back;
+        back.rotation.y = Math.PI;
+        this.chest.add(back);
       }
-    }
-    const piping = mesh(geo('piping', () => new THREE.BoxGeometry(0.02, 0.4, 0.02)), M.trim!);
-    piping.position.set(0, -0.05, 0.128);
-    this.chest.add(piping);
-    if (outfit.number) {
-      const tex = numberTexture(outfit.number, outfit.trim);
-      const back = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.2), new THREE.MeshStandardMaterial({ map: tex, transparent: true, roughness: 0.8, polygonOffset: true, polygonOffsetFactor: -2 }));
-      back.position.set(0, 0.07, -(this.chestDepth + 0.005));
-      if (custom) back.scale.setScalar(Math.min(1.5, Math.sqrt(chestW)));
-      this.backNumber = back;
-      back.rotation.y = Math.PI;
-      this.chest.add(back);
     }
     const neckMesh = mesh(geo(`neck${S}`, () => new THREE.CylinderGeometry(0.055, 0.065, 0.12, S)), M.skin!);
     neckMesh.position.y = -0.06;
@@ -362,11 +375,15 @@ export class Humanoid {
     headMesh.scale.set(0.92, 1.05, 1);
     if (heavy > 0) this.head.scale.setScalar(1 + heavy * 0.08);
     this.head.add(headMesh);
-    // Nose hint so facing direction reads.
-    const nose = mesh(geo('nose', () => new THREE.SphereGeometry(0.022, 6, 4)), M.skin!);
-    nose.position.set(0, -0.005, 0.11);
-    this.head.add(nose);
-    if (shape.face) this.addFace(shape, mesh);
+    if (skel) {
+      this.addSkull(mesh);
+    } else {
+      // Nose hint so facing direction reads.
+      const nose = mesh(geo('nose', () => new THREE.SphereGeometry(0.022, 6, 4)), M.skin!);
+      nose.position.set(0, -0.005, 0.11);
+      this.head.add(nose);
+    }
+    if (shape.face && !skel) this.addFace(shape, mesh);
     if (shape.hair) this.addHair(shape.hair, !!shape.longHair, mesh);
     if (shape.beard) this.addBeard(shape.beard, shape.beardStyle ?? 'full', mesh);
 
@@ -377,7 +394,7 @@ export class Humanoid {
     this.shoulderL.position.set(sx, 0.14, 0);
     this.shoulderR.position.set(-sx, 0.14, 0);
     const deltoid = geo(`delt${S}`, () => new THREE.SphereGeometry(0.075, S, S / 2));
-    const deltS = (1 + 0.5 * mus) * (1 + 0.42 * heavy);
+    const deltS = (1 + 0.5 * mus) * (1 + 0.42 * heavy) * (skel ? 0.5 : 1);
     this.shoulderL.add(mesh(deltoid, M.jersey!)).children[0]!.scale.setScalar(deltS);
     this.shoulderR.add(mesh(deltoid, M.jersey!)).children[0]!.scale.setScalar(deltS);
     this.hips.add(this.hipJointL, this.hipJointR);
@@ -421,6 +438,11 @@ export class Humanoid {
     // Short jersey sleeve over the upper arm.
     for (const arm of [this.armL, this.armR, this.armL2, this.armR2]) {
       if (!arm) continue;
+      if (skel) {
+        // Knobby elbow at the top of the forearm.
+        this.addKnob(arm.lower, FOREARM, foreT, 0.03, mesh);
+        continue;
+      }
       const sleeve = mesh(geo(`slv${S}`, () => new THREE.CylinderGeometry(0.07, 0.066, 0.13, S)), M.jersey!);
       sleeve.position.y = 0.06;
       arm.upper.add(sleeve);
@@ -437,6 +459,10 @@ export class Humanoid {
     this.legR = limb(M.pants!, M.pants!, new THREE.Mesh(), THIGH, SHIN, thighG, shinG, thighT, shinT);
     // Socks on the lower shin.
     for (const leg of [this.legL, this.legR]) {
+      if (skel) {
+        this.addKnob(leg.lower, SHIN, shinT, 0.04, mesh);
+        continue;
+      }
       const sock = mesh(geo(`sock${S}`, () => new THREE.CylinderGeometry(0.062, 0.058, 0.2, S)), M.socks!);
       sock.position.y = -0.12;
       leg.lower.add(sock);
@@ -448,9 +474,119 @@ export class Humanoid {
       this.footMeshL.scale.set(f, 1, f);
       this.footMeshR.scale.set(f, 1, f);
     }
+    if (skel) {
+      // Bony feet: narrow and flat.
+      this.footMeshL.scale.set(0.6, 0.55, 0.92);
+      this.footMeshR.scale.set(0.6, 0.55, 0.92);
+    }
     this.body.add(this.footMeshL, this.footMeshR);
     this.handL = this.armL.end;
     this.handR = this.armR.end;
+  }
+
+  /**
+   * Skeleton torso: the spinal column from the pelvis up to the neck, a
+   * ribcage open at the front around the sternum, and the collarbones.
+   */
+  private addBones(mesh: (g: THREE.BufferGeometry, m: THREE.Material) => THREE.Mesh): void {
+    const bone = this.materials.skin!;
+    const S = this.segs;
+    const vert = geo(`vert${S}`, () => new THREE.CylinderGeometry(0.026, 0.026, 0.026, S));
+    // Vertebrae: on the hips (lumbar), the spine and the chest (thoracic).
+    const column: [THREE.Object3D, number[]][] = [
+      [this.hips, [0.05, 0.085]],
+      [this.spine, [0.0, 0.04, 0.08, 0.12, 0.16, 0.2]],
+      [this.chest, [0.0, 0.04, 0.08, 0.12, 0.16, 0.2]],
+    ];
+    for (const [bone_, ys] of column) {
+      for (const y of ys) {
+        const v = mesh(vert, bone);
+        v.position.set(0, y, -0.035);
+        v.scale.set(1, 1, 1.15);
+        bone_.add(v);
+      }
+    }
+    const cord = geo(`cord${S}`, () => new THREE.CylinderGeometry(0.014, 0.014, 0.26, 6));
+    for (const [bone_, y] of [[this.spine, 0.11], [this.chest, 0.11]] as const) {
+      const c = mesh(cord, bone);
+      c.position.set(0, y, -0.035);
+      bone_.add(c);
+    }
+    // Ribs: elliptical hoops, gap at the front, shrinking toward the bottom.
+    for (let i = 0; i < 6; i++) {
+      const r = 0.15 - Math.abs(i - 1.6) * 0.012;
+      const g = geo(`rib${i}${S}`, () => {
+        const t = new THREE.TorusGeometry(r, 0.011, 5, S * 2, Math.PI * 1.72);
+        t.rotateZ(Math.PI / 2 + Math.PI * 0.14);
+        t.rotateX(Math.PI / 2);
+        return t;
+      });
+      const rib = mesh(g, bone);
+      rib.scale.set(1.02, 1, 0.66);
+      rib.position.set(0, 0.17 - i * 0.05, 0.0);
+      // Ribs slope down toward the front.
+      rib.rotation.x = 0.22;
+      this.chest.add(rib);
+    }
+    const sternum = mesh(geo('sternum', () => new THREE.BoxGeometry(0.03, 0.2, 0.018)), bone);
+    sternum.position.set(0, 0.09, 0.105);
+    sternum.rotation.x = -0.12;
+    this.chest.add(sternum);
+    const clav = geo(`clav${S}`, () => new THREE.CapsuleGeometry(0.011, 0.16, 2, 6));
+    for (const side of [-1, 1]) {
+      const c = mesh(clav, bone);
+      c.position.set(side * 0.1, 0.2, 0.04);
+      c.rotation.set(0, side * 0.35, side * (Math.PI / 2 - 0.12));
+      this.chest.add(c);
+    }
+  }
+
+  /** Skull details: hollow eye sockets with glowing red pupils, nasal cavity, jaw and teeth. */
+  private addSkull(mesh: (g: THREE.BufferGeometry, m: THREE.Material) => THREE.Mesh): void {
+    const bone = this.materials.skin!;
+    const hole = (this.materials.socket = new THREE.MeshStandardMaterial({ color: '#0d0907', roughness: 1 }));
+    const glow = (this.materials.glow = new THREE.MeshStandardMaterial({ color: '#ff2a1a', emissive: '#ff2a1a', emissiveIntensity: 1.6, roughness: 0.4 }));
+    for (const side of [-1, 1]) {
+      const socket = mesh(geo('socket', () => new THREE.SphereGeometry(0.032, 12, 8)), hole);
+      socket.position.set(side * 0.04, 0.012, 0.085);
+      socket.scale.set(1, 0.95, 0.6);
+      this.head.add(socket);
+      const pupil = mesh(geo('pupil', () => new THREE.SphereGeometry(0.009, 8, 6)), glow);
+      pupil.position.set(side * 0.038, 0.01, 0.1);
+      this.head.add(pupil);
+      // Cheekbones.
+      const cheek = mesh(geo('cheek', () => new THREE.SphereGeometry(0.03, 10, 6)), bone);
+      cheek.position.set(side * 0.062, -0.03, 0.065);
+      cheek.scale.set(1, 0.6, 0.8);
+      this.head.add(cheek);
+    }
+    const nasal = mesh(geo('nasal', () => new THREE.ConeGeometry(0.014, 0.03, 3)), hole);
+    nasal.position.set(0, -0.03, 0.104);
+    nasal.rotation.set(-0.3, 0, Math.PI);
+    this.head.add(nasal);
+    // Jaw, narrower than the cranium, with a row of teeth.
+    const jaw = mesh(geo('jaw', () => new THREE.BoxGeometry(0.11, 0.045, 0.08)), bone);
+    jaw.position.set(0, -0.1, 0.04);
+    this.head.add(jaw);
+    const gap = mesh(geo('teethGap', () => new THREE.BoxGeometry(0.08, 0.018, 0.01)), hole);
+    gap.position.set(0, -0.072, 0.098);
+    this.head.add(gap);
+    const tooth = geo('tooth', () => new THREE.BoxGeometry(0.009, 0.02, 0.008));
+    for (let i = 0; i < 7; i++) {
+      for (const row of [-0.064, -0.081]) {
+        const t = mesh(tooth, bone);
+        t.position.set(-0.033 + i * 0.011, row, 0.1);
+        this.head.add(t);
+      }
+    }
+  }
+
+  /** A joint knob at the top end of a lower limb segment (thickness `t` is undone so it stays round). */
+  private addKnob(segment: THREE.Mesh, length: number, t: number, radius: number, mesh: (g: THREE.BufferGeometry, m: THREE.Material) => THREE.Mesh): void {
+    const k = mesh(geo(`knob${radius}`, () => new THREE.SphereGeometry(radius, 10, 8)), this.materials.skin!);
+    k.position.y = -length / 2 + 0.01;
+    k.scale.set(1 / t, 1, 1 / t);
+    segment.add(k);
   }
 
   private addFace(shape: BodyShape, mesh: (g: THREE.BufferGeometry, m: THREE.Material) => THREE.Mesh): void {

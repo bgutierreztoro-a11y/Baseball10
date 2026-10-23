@@ -61,7 +61,7 @@ export interface QualitySettings {
 
 // ───────────────────────────── Content definitions ─────────────────────────────
 
-export type StadiumId = 'solar' | 'malecon' | 'metro' | 'cumbre' | 'final' | 'bratislava' | 'southampton';
+export type StadiumId = 'solar' | 'malecon' | 'metro' | 'cumbre' | 'final' | 'bratislava' | 'southampton' | 'tenis';
 export type TimeOfDay = 'day' | 'sunset' | 'night';
 
 /** Fence distances (ft) and wall heights (ft) at LF line, LCF, CF, RCF, RF line. */
@@ -109,6 +109,12 @@ export interface StadiumDef {
     southampton?: boolean;
     /** Constant rain falling over the park. */
     rain?: boolean;
+    /**
+     * Tennis venue: a giant hard court (lines and net) painted over the
+     * outfield, a clay infield, and tennis-stadium trimmings around it (green
+     * screens, umpire's high chair, line judges and ball kids).
+     */
+    tennis?: boolean;
   };
   /** 0..1 how full the stands are. */
   crowdDensity: number;
@@ -377,6 +383,10 @@ export interface BatterLook {
    * curled sidelocks (peyot).
    */
   rabbi?: boolean;
+  /** A skeleton: bare bones (skull, ribcage, spine) instead of a body in a uniform. */
+  skeleton?: boolean;
+  /** Bats sitting in a wheelchair (until something gets him out of it, see CharacterDef.preWorkout). */
+  wheelchair?: boolean;
   jersey: string;
   trim: string;
   number: string;
@@ -418,8 +428,8 @@ export interface CharacterDef {
    * the PCI to `pciFill` of the strike zone for the next `pitches` pitches.
    */
   pennyBlessing?: { spawnChance: number; pciFill: number; pitches: number };
-  /** Swing multipliers applied on top of `mods` when batting in his home park. */
-  homeStadium?: { stadium: StadiumId; mods: SwingMods };
+  /** Swing multipliers applied on top of `mods` when batting in his home park (`buff` is the callout line). */
+  homeStadium?: { stadium: StadiumId; mods: SwingMods; buff: LocalizedText };
   /** Passive trait shown on the batter card (characters without an activated ability). */
   trait?: { name: LocalizedText; description: LocalizedText };
   /**
@@ -448,6 +458,13 @@ export interface CharacterDef {
    * guaranteed home run.
    */
   firecracker?: { chance: number; explodeChance: number };
+  /**
+   * Preentreno: before each pitch, with probability `chance`, a pre-workout
+   * shaker falls on him. He gets out of the wheelchair and, for `pitches`
+   * pitches, bats with `ratings` (and the `mods` derived from them) instead
+   * of his own.
+   */
+  preWorkout?: { chance: number; pitches: number; ratings: BatterRatings; mods: SwingMods };
 }
 
 /** Club crests that can hover over the pitcher. */
