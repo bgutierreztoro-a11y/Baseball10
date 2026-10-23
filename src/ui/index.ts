@@ -5,6 +5,7 @@ import type {
   CalloutStyle,
   CampaignHandlers,
   CampaignVM,
+  CharacterCardVM,
   CharactersVM,
   CreateUI,
   DerbySetupVM,
@@ -142,6 +143,7 @@ class DomUI implements UI {
   private tipEl: HTMLElement | null = null;
   private hintTimer = 0;
   private pickedId: CharacterId | null = null;
+  private viewId: CharacterId | null = null;
 
   constructor(mount: HTMLElement, lang: Lang) {
     this.root = mount;
@@ -333,21 +335,46 @@ class DomUI implements UI {
   }
 
   // ── Batter select ──
+  // Master–detail: a strip of small tiles (preview) and one big panel with the
+  // previewed batter's full card. Previewing never changes the pick; only the
+  // "Elegir" button does.
   showCharacters(vm: CharactersVM, hd: { onSelect(id: CharacterId): void; onBack(): void }): void {
-    // The game re-calls this after onSelect: keep scroll position and focus.
+    // The game re-calls this after onSelect: keep the previewed batter and focus.
     const prevRoster = this.screenLayer.querySelector<HTMLElement>('.roster');
-    const prevScroll = prevRoster ? { left: prevRoster.scrollLeft, top: prevRoster.scrollTop } : null;
+    const prevScroll = prevRoster ? prevRoster.scrollLeft : null;
     const active = document.activeElement as HTMLElement | null;
-    const prevFocusId = prevRoster && active && prevRoster.contains(active) ? active.closest<HTMLElement>('.bcard')?.dataset.id ?? null : null;
+    const prevFocus: 'tile' | 'pick' | null = !prevRoster || !active ? null : prevRoster.contains(active) ? 'tile' : active.closest('.bpick') ? 'pick' : null;
     const prevPicked = this.pickedId;
+    const picked = vm.items.find((c) => c.selected);
+    let viewId: CharacterId = (prevRoster && this.viewId && vm.items.some((c) => c.id === this.viewId) ? this.viewId : picked?.id) ?? vm.items[0]!.id;
     this.clear();
 
     const n = vm.items.length;
-    const roster = h('ul', { class: 'roster', 'aria-label': this.t('batters') });
-    const dots = h('div', { class: 'roster-dots', 'aria-hidden': 'true' });
-    let focusBtn: HTMLButtonElement | null = null;
-    let selectedCard: HTMLElement | null = null;
-    vm.items.forEach((c, i) => {
+    const roster = h('div', { class: 'roster', role: 'tablist', 'aria-label': this.t('batters'), 'aria-orientation': 'horizontal' });
+    const panel = h('section', { class: 'bpanel', id: 'bpanel', role: 'tabpanel' });
+    const tiles = new Map<CharacterId, HTMLButtonElement>();
+
+    for (const c of vm.items) {
+      const tile = h(
+        'button',
+        {
+          class: `bpreview ${c.selected ? 'is-picked' : ''}`,
+          id: `btab-${c.id}`,
+          role: 'tab',
+          'aria-controls': 'bpanel',
+          'aria-label': c.selected ? this.t('pickedAria', { name: c.name }) : c.name,
+          style: `--accent:${c.look.trim}`,
+          onclick: this.click(() => show(c.id, false)),
+        },
+        h('span', { class: 'bpreview-art', 'aria-hidden': 'true' }, batterPortrait(c.look)),
+        h('span', { class: 'bpreview-name', 'aria-hidden': 'true' }, c.name),
+        c.selected ? h('span', { class: 'bpreview-check', 'aria-hidden': 'true' }, checkIcon()) : null,
+      );
+      tiles.set(c.id, tile);
+      roster.append(tile);
+    }
+
+    const renderPanel = (c: CharacterCardVM, i: number): void => {
       const nameId = `bcard-${c.id}-name`;
       const stats = h('dl', { class: 'bstats' });
       for (const st of c.stats) {
@@ -367,7 +394,6 @@ class DomUI implements UI {
           class: `btn bpick ${c.selected ? 'is-picked' : ''}`,
           'aria-pressed': c.selected ? 'true' : 'false',
           'aria-label': c.selected ? this.t('pickedAria', { name: c.name }) : this.t('pickAria', { name: c.name }),
-          'data-autofocus': c.selected,
           onclick: this.click(() => {
             if (!c.selected) hd.onSelect(c.id);
           }),
@@ -375,80 +401,66 @@ class DomUI implements UI {
         c.selected ? checkIcon() : null,
         c.selected ? this.t('picked') : this.t('pick'),
       );
-      if (c.id === prevFocusId) focusBtn = btn;
-      const art = h(
-        'div',
-        { class: 'bcard-art' },
-        batterPortrait(c.look),
-        // Read once, after the name (sr-only line in the body).
-        h('span', { class: 'bcard-height', 'aria-hidden': 'true' }, h('small', null, this.t('height')), h('b', null, c.height)),
-        c.selected ? h('span', { class: 'bcard-badge', 'aria-hidden': 'true' }, checkIcon(), this.t('picked')) : null,
-      );
-      const card = h(
-        'li',
-        {
-          class: `bcard ${c.selected ? 'is-selected' : ''}`,
-          'data-id': c.id,
-          style: `--accent:${c.look.trim}`,
-          'aria-labelledby': nameId,
-        },
-        art,
+      panel.setAttribute('aria-labelledby', `btab-${c.id}`);
+      panel.style.setProperty('--accent', c.look.trim);
+      panel.classList.toggle('is-selected', c.selected);
+      panel.replaceChildren(
         h(
           'div',
-          { class: 'bcard-main' },
-          h(
-            'div',
-            // Scrollable when space is short: browsers make it a tab stop, so give it a name.
-            { class: 'bcard-body', role: 'group', 'aria-labelledby': nameId },
-            h('header', { class: 'bcard-head' }, h('h3', { id: nameId }, c.name), h('p', null, c.title)),
-            h('span', { class: 'sr-only' }, `${this.t('rosterPos', { i: i + 1, n })}. ${this.t('height')}: ${c.height}`),
-            stats,
-            c.ability
-              ? h(
-                  'section',
-                  { class: 'bability', 'aria-label': this.t('ability') },
-                  boltIcon('ico bability-ico'),
-                  h('div', null, h('div', { class: 'eyebrow' }, this.t('ability')), h('div', { class: 'bability-name' }, c.ability.name), h('p', null, c.ability.description)),
-                )
-              : null,
-            h('p', { class: 'bcard-bio' }, c.bio),
-          ),
-          h('div', { class: 'bcard-foot' }, btn),
+          { class: 'bpanel-art' },
+          batterPortrait(c.look),
+          h('span', { class: 'bcard-height', 'aria-hidden': 'true' }, h('small', null, this.t('height')), h('b', null, c.height)),
+          c.selected ? h('span', { class: 'bcard-badge', 'aria-hidden': 'true' }, checkIcon(), this.t('picked')) : null,
         ),
+        h(
+          'div',
+          // Scrollable when space is short: browsers make it a tab stop, so give it a name.
+          { class: 'bpanel-info', role: 'group', 'aria-labelledby': nameId },
+          h('header', { class: 'bcard-head' }, h('h3', { id: nameId }, c.name), h('p', null, c.title)),
+          h('span', { class: 'sr-only' }, `${this.t('rosterPos', { i: i + 1, n })}. ${this.t('height')}: ${c.height}`),
+          stats,
+          c.ability
+            ? h(
+                'section',
+                { class: 'bability', 'aria-label': this.t('ability') },
+                boltIcon('ico bability-ico'),
+                h('div', null, h('div', { class: 'eyebrow' }, this.t('ability')), h('div', { class: 'bability-name' }, c.ability.name), h('p', null, c.ability.description)),
+              )
+            : null,
+          h('p', { class: 'bcard-bio' }, c.bio),
+        ),
+        h('div', { class: 'bpanel-foot' }, btn),
       );
-      if (c.selected) selectedCard = card;
-      roster.append(card);
-      dots.append(h('i', { class: c.selected ? 'on' : '' }));
-    });
+    };
 
-    const buttons = (): HTMLButtonElement[] => Array.from(roster.querySelectorAll<HTMLButtonElement>('.bpick'));
-    // ←/→ (and gamepad d-pad mapped to arrows) hop between cards.
+    const show = (id: CharacterId, focus: boolean): void => {
+      const i = vm.items.findIndex((c) => c.id === id);
+      if (i < 0) return;
+      viewId = id;
+      this.viewId = id;
+      tiles.forEach((t, tid) => {
+        const on = tid === id;
+        t.setAttribute('aria-selected', on ? 'true' : 'false');
+        t.tabIndex = on ? 0 : -1;
+        t.classList.toggle('is-view', on);
+      });
+      renderPanel(vm.items[i]!, i);
+      const tile = tiles.get(id)!;
+      if (focus) tile.focus({ preventScroll: true });
+      if (roster.scrollWidth > roster.clientWidth + 4) tile.scrollIntoView({ block: 'nearest', inline: 'center', behavior: this.calm() ? 'auto' : 'smooth' });
+    };
+
+    // ←/→/↑/↓ (and gamepad d-pad mapped to arrows) hop between batters.
     roster.addEventListener('keydown', (e) => {
-      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
-      const list = buttons();
-      const idx = list.findIndex((b) => b === document.activeElement || b.closest('.bcard')!.contains(document.activeElement));
-      if (idx < 0) return;
-      const next = list[Math.max(0, Math.min(list.length - 1, idx + (e.key === 'ArrowRight' ? 1 : -1)))]!;
+      const dir = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
+      const edge = e.key === 'Home' ? 0 : e.key === 'End' ? n - 1 : -1;
+      if (!dir && edge < 0) return;
+      const i = vm.items.findIndex((c) => c.id === viewId);
+      const next = vm.items[edge >= 0 ? edge : Math.max(0, Math.min(n - 1, i + dir))]!;
       e.preventDefault();
       e.stopPropagation();
-      next.focus({ preventScroll: true });
-      next.closest('.bcard')!.scrollIntoView({ block: 'nearest', inline: 'center', behavior: this.calm() ? 'auto' : 'smooth' });
+      show(next.id, true);
     });
-    // Keep the card that receives focus in view (Tab / gamepad).
-    roster.addEventListener('focusin', (e) => {
-      const card = (e.target as HTMLElement).closest<HTMLElement>('.bcard');
-      if (card && roster.scrollWidth > roster.clientWidth + 4) card.scrollIntoView({ block: 'nearest', inline: 'center' });
-    });
-    const syncDots = (): void => {
-      const cards = Array.from(roster.children) as HTMLElement[];
-      const mid = roster.scrollLeft + roster.clientWidth / 2;
-      let best = 0;
-      cards.forEach((c, i) => {
-        if (Math.abs(c.offsetLeft + c.offsetWidth / 2 - mid) < Math.abs(cards[best]!.offsetLeft + cards[best]!.offsetWidth / 2 - mid)) best = i;
-      });
-      Array.from(dots.children).forEach((d, i) => d.classList.toggle('on', i === best));
-    };
-    roster.addEventListener('scroll', syncDots, { passive: true });
 
     const screen = h(
       'section',
@@ -463,24 +475,16 @@ class DomUI implements UI {
           h('div', { class: 'topbar-title' }, h('div', { class: 'eyebrow' }, this.t('chooseBatter')), h('h2', { id: 'chars-title' }, this.t('batters'))),
         ),
         roster,
-        dots,
+        panel,
       ),
     );
     this.setScreen(screen, hd.onBack);
+    show(viewId, false);
+    if (prevScroll !== null) roster.scrollLeft = prevScroll;
 
-    if (prevScroll) {
-      roster.scrollLeft = prevScroll.left;
-      roster.scrollTop = prevScroll.top;
-    } else if (selectedCard) {
-      const sc = selectedCard as HTMLElement;
-      roster.scrollLeft = Math.max(0, sc.offsetLeft - (roster.clientWidth - sc.offsetWidth) / 2);
-    }
-    syncDots();
-    if (focusBtn) {
-      const fb = focusBtn as HTMLButtonElement;
-      window.setTimeout(() => fb.focus({ preventScroll: true }), 0);
-    }
-    const picked = vm.items.find((c) => c.selected);
+    if (prevFocus === 'tile') tiles.get(viewId)?.focus({ preventScroll: true });
+    else if (prevFocus === 'pick') window.setTimeout(() => panel.querySelector<HTMLElement>('.bpick')?.focus({ preventScroll: true }), 0);
+    else if (!this.touch) window.setTimeout(() => tiles.get(viewId)?.focus({ preventScroll: true }), 60);
     this.pickedId = picked?.id ?? null;
     if (picked && prevPicked && prevRoster && prevPicked !== picked.id) this.announce(this.t('batterPicked', { name: picked.name }));
   }
