@@ -56,7 +56,8 @@ export function createScoreboard(def: StadiumDef, atm: Atmosphere, at: { r: numb
     ctx.font = `bold ${Math.round(h * 0.11)}px "Barlow Condensed", Arial, sans-serif`;
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'left';
-    ctx.fillText(current.title, w * 0.03, h * 0.08);
+    // Long park names squeeze instead of running into the logo.
+    ctx.fillText(current.title, w * 0.03, h * 0.08, w * 0.7);
     ctx.textAlign = 'right';
     ctx.fillText('JONRÓN', w * 0.97, h * 0.08);
     ctx.textAlign = 'center';

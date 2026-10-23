@@ -36,7 +36,9 @@ const rated = (vision: number, contact: number, power: number) => {
  * - El Moro: the base model, plus a once-per-match "peak" boost.
  * - El Mati: all-rounder with a bit more pop; his size blocks more of the view.
  * - Arturek: huge vision → much bigger PCI for both swings, but almost no power.
- * - Chamo: the strongest power swing, average vision, below-average contact.
+ *   Vikokotor pitches to him and sometimes throws a firecracker (firecracker).
+ * - Chamo: the strongest power swing, average vision, below-average contact;
+ *   his first home run in Southampton is always stolen (homeRunThief).
  * - Chimon: a monkey with a tennis racket — the big string bed is easy to hit
  *   with. Three whiffs in a row make him angry (temper): until he hits a home
  *   run every ball he touches leaves at max power, 50 % home runs and 50 %
@@ -94,12 +96,17 @@ export const CHARACTERS: readonly CharacterDef[] = [
     // At home in Bratislava his swing gets a big power boost (+25 % bat speed on both swings).
     homeStadium: { stadium: 'bratislava', mods: mods(1, 1, 1.25, 1.25) },
     trait: {
-      name: { es: 'En casa, en Bratislava', en: 'At home in Bratislava' },
+      name: { es: 'La maldición de Bubenik', en: 'The Curse of Bubenik' },
       description: {
-        es: 'En el Estadio del Danubio, con el castillo y el puente OVNI de fondo, batea con mucha más potencia: +25 % de velocidad de bate en ambos swings.',
-        en: 'At the Danube Ballpark, with the castle and the UFO bridge behind the fence, he hits much harder: +25 % bat speed on both swings.',
+        es: 'Le lanza Vikokotor, bajito y gordito, del MŠK Žilina: antes de cada lanzamiento hay un 20 % de que tire un petardo encendido. Si lo bateas, 50 % explota, mata a Arturek y quema todo el estadio (se acaba el partido), y 50 % es jonrón seguro. En el Estadio del Danubio (Bratislava) batea con +25 % de velocidad de bate.',
+        en: 'Vikokotor, short and chubby, from MŠK Žilina pitches to him: before each pitch there is a 20 % chance he throws a lit firecracker. Hit it and 50 % of the time it explodes, kills Arturek and burns the whole park (match over); the other 50 % it is a sure home run. At the Danube Ballpark (Bratislava) he hits with +25 % bat speed.',
       },
     },
+    firecracker: { chance: 0.2, explodeChance: 0.5 },
+    // Vikokotor: short, overweight, in MŠK Žilina's yellow and green, with the club crest floating over him.
+    pitcherName: 'Vikokotor',
+    pitcherKit: { skin: '#f0c9a8', jersey: '#f7d117', jerseyTrim: '#0a7a3b', pants: '#0a7a3b', cap: '#0a7a3b', socks: '#f7d117', build: 1.45, scale: 0.8, belly: 1 },
+    pitcherBadge: 'zilina',
   },
   {
     id: 'chamo',
@@ -112,9 +119,17 @@ export const CHARACTERS: readonly CharacterDef[] = [
     look: { skin: '#f0cdb4', hair: null, heightM: 1.9, build: 1.12, belly: 0, muscle: 1, extraArms: false, beard: false, horns: true, hornBat: true, jersey: '#f4f1e8', trim: '#f28c28', number: '25' },
     ...rated(10, 5, 24),
     ability: null,
+    trait: {
+      name: { es: 'Nerf en Southampton', en: 'Nerfed in Southampton' },
+      description: {
+        es: 'En el Estadio de Southampton, su primer intento de jonrón nunca llega: un eslovaco de los «mandem», con su Nike Tech, atrapa la pelota detrás de la cerca, se escapa con ella y se va con Valentina, la ex de Chamo y ahora su novia. Cuenta como out.',
+        en: 'At the Southampton Ballpark his first home-run attempt never lands: a Slovak "mandem" in a Nike Tech tracksuit catches the ball beyond the fence, runs off with it and leaves with Valentina, Chamo’s ex and now his girlfriend. It counts as an out.',
+      },
+    },
+    homeRunThief: { stadium: 'southampton' },
     // The pitcher facing Chamo wears a Southampton FC home kit (red/white stripes, black shorts).
     pitcherKit: { jersey: '#d71920', jerseyStripe: '#ffffff', jerseyTrim: '#111111', pants: '#141414', cap: '#d71920', socks: '#ffffff' },
-    pitcherBadge: true,
+    pitcherBadge: 'southampton',
   },
   {
     id: 'chimon',

@@ -156,6 +156,8 @@ export interface BallView {
   /** Trail: 'off' | 'pitch' (subtle) | 'hit' (bright, colored by exit velocity 0..1). */
   setTrail(mode: 'off' | 'pitch' | 'hit', heat?: number): void;
   clearTrail(): void;
+  /** Shows a lit firecracker instead of the ball (Arturek's curse). */
+  setFirecracker(on: boolean): void;
   update(dt: number): void;
 }
 

@@ -6,11 +6,13 @@ import { seeded, windowsTexture } from '../textures';
 import { MeshBuilder } from './geom';
 import type { Atmosphere } from './atmosphere';
 import { mergeSimple } from './structures';
+import { createRain } from './weather';
 
 /**
  * Backdrop outside the ballpark: terrain, sea (Malecón), mountains (Cumbre),
  * skyline (Metro/Final), trees and houses (El Solar), the Danube with
- * Bratislava Castle and the UFO bridge (Bratislava).
+ * Bratislava Castle and the UFO bridge (Bratislava), the rainy town, its
+ * port cranes and a cruise ship (Southampton).
  */
 export interface Scenery {
   group: THREE.Group;
@@ -30,7 +32,7 @@ export function createScenery(def: StadiumDef, quality: QualitySettings, atm: At
   const updaters: ((t: number) => void)[] = [];
 
   // Outer terrain.
-  const terrainColor = atm.night ? '#0d1410' : def.id === 'malecon' ? '#3b3330' : def.id === 'cumbre' ? '#6e7c55' : '#5a7a3a';
+  const terrainColor = atm.night ? '#0d1410' : def.id === 'malecon' ? '#3b3330' : def.id === 'cumbre' ? '#6e7c55' : def.id === 'southampton' ? '#44523d' : '#5a7a3a';
   const terrain = new THREE.Mesh(track(new THREE.CircleGeometry(2300, 48)), track(new THREE.MeshLambertMaterial({ color: terrainColor })));
   terrain.rotation.x = -Math.PI / 2;
   terrain.position.y = -0.08;
@@ -129,6 +131,16 @@ export function createScenery(def: StadiumDef, quality: QualitySettings, atm: At
 
   if (def.features.bratislava) {
     group.add(createBratislava(rnd, track));
+  }
+
+  if (def.features.southampton) {
+    group.add(createSouthampton(rnd, track));
+  }
+
+  if (def.features.rain) {
+    const rain = track(createRain(quality));
+    group.add(rain.points);
+    updaters.push((t) => rain.update(t));
   }
 
   return {
@@ -413,6 +425,135 @@ function createBratislava(rnd: () => number, track: <T extends { dispose(): void
   dome.position.copy(ufo.position).add(new THREE.Vector3(0, 5, 0));
   const mast = add(new THREE.CylinderGeometry(0.6, 0.9, 16, 6), steel);
   mast.position.copy(dome.position).add(new THREE.Vector3(0, 14, 0));
+  return g;
+}
+
+/**
+ * Southampton beyond the houses: more terraced streets all round, a church
+ * spire, and behind centre field the docks on Southampton Water with
+ * container cranes and a moored cruise ship.
+ */
+function createSouthampton(rnd: () => number, track: <T extends { dispose(): void }>(x: T) => T): THREE.Group {
+  const g = new THREE.Group();
+  g.name = 'southampton';
+  const lambert = (color: string, extra: THREE.MeshLambertMaterialParameters = {}): THREE.MeshLambertMaterial => track(new THREE.MeshLambertMaterial({ color, ...extra }));
+  const add = (geo: THREE.BufferGeometry, mat: THREE.Material): THREE.Mesh => {
+    const m = new THREE.Mesh(track(geo), mat);
+    g.add(m);
+    return m;
+  };
+
+  // Distant terraced streets: long brick blocks with slate gable roofs.
+  const walls = new MeshBuilder(true);
+  const roofs: THREE.BufferGeometry[] = [];
+  const bricks = ['#7d4334', '#8f5241', '#6b3a2e', '#a26450', '#cfc4b0'].map((c) => new THREE.Color(c));
+  for (let i = 0; i < 70; i++) {
+    const a = rnd() * Math.PI * 2;
+    // Keep the docks clear behind centre field.
+    if (Math.abs(Math.atan2(Math.cos(a), Math.sin(a))) < 0.5) continue;
+    const r = 240 + rnd() * 260;
+    const cx = Math.cos(a) * r;
+    const cz = Math.sin(a) * r;
+    const w = 30 + rnd() * 40;
+    const d = 8;
+    const h = 6 + rnd() * 2;
+    const rot = a + Math.PI / 2;
+    const c = Math.cos(rot);
+    const sn = Math.sin(rot);
+    const P = (x: number, y: number, z: number): [number, number, number] => [cx + x * c - z * sn, y, cz + x * sn + z * c];
+    const col = bricks[Math.floor(rnd() * bricks.length)]!;
+    const hw = w / 2;
+    const hd = d / 2;
+    walls.quad(P(-hw, 0, hd), P(hw, 0, hd), P(hw, h, hd), P(-hw, h, hd), col);
+    walls.quad(P(hw, 0, -hd), P(-hw, 0, -hd), P(-hw, h, -hd), P(hw, h, -hd), col);
+    walls.quad(P(hw, 0, hd), P(hw, 0, -hd), P(hw, h, -hd), P(hw, h, hd), col);
+    walls.quad(P(-hw, 0, -hd), P(-hw, 0, hd), P(-hw, h, hd), P(-hw, h, -hd), col);
+    // Gable roof: a triangular prism along the block.
+    const roof = new THREE.CylinderGeometry(hd * 1.15, hd * 1.15, w, 3, 1);
+    roof.rotateZ(Math.PI / 2);
+    roof.rotateX(Math.PI / 2);
+    roof.scale(1, 0.55, 1);
+    roof.rotateY(-rot);
+    roof.translate(cx, h + hd * 0.3, cz);
+    roofs.push(roof);
+  }
+  add(walls.build(), lambert('#ffffff', { vertexColors: true }));
+  add(mergeSimple(roofs), lambert('#3b4149', { flatShading: true }));
+  roofs.forEach((r) => r.dispose());
+
+  // Church: stone tower with a slate spire, off to the left of the view.
+  const church = new THREE.Group();
+  const stone = lambert('#8c8a83');
+  const tower = new THREE.Mesh(track(new THREE.BoxGeometry(12, 34, 12)), stone);
+  tower.position.y = 17;
+  const spire = new THREE.Mesh(track(new THREE.ConeGeometry(8, 30, 4)), lambert('#3e454d', { flatShading: true }));
+  spire.position.y = 34 + 15;
+  spire.rotation.y = Math.PI / 4;
+  const nave = new THREE.Mesh(track(new THREE.BoxGeometry(16, 16, 40)), stone);
+  nave.position.set(0, 8, -24);
+  church.add(tower, spire, nave);
+  church.position.set(260, 0, 330);
+  church.rotation.y = -0.6;
+  g.add(church);
+
+  // Southampton Water behind centre field, with the quay.
+  const WATER = 560;
+  const water = add(new THREE.PlaneGeometry(4000, 1600), track(new THREE.MeshStandardMaterial({ color: '#48606d', roughness: 0.3, metalness: 0.2 })));
+  water.rotation.x = -Math.PI / 2;
+  water.position.set(0, 0.1, WATER + 800);
+  const quay = add(new THREE.BoxGeometry(900, 3, 30), lambert('#6f716f'));
+  quay.position.set(0, 1.5, WATER - 10);
+
+  // Container cranes along the quay (A-frame legs, a boom reaching over the water).
+  const craneMat = lambert('#d9a521');
+  const parts: THREE.BufferGeometry[] = [];
+  for (let i = 0; i < 6; i++) {
+    const x = -260 + i * 70 + (rnd() - 0.5) * 12;
+    for (const lx of [-9, 9]) {
+      for (const lz of [-8, 8]) {
+        const leg = new THREE.BoxGeometry(1.6, 42, 1.6);
+        leg.translate(x + lx, 21, WATER - 10 + lz);
+        parts.push(leg);
+      }
+    }
+    const beam = new THREE.BoxGeometry(22, 3, 20);
+    beam.translate(x, 42, WATER - 10);
+    parts.push(beam);
+    const boom = new THREE.BoxGeometry(3.2, 3.2, 90);
+    boom.translate(x, 46, WATER + 20);
+    parts.push(boom);
+    const cab = new THREE.BoxGeometry(6, 5, 7);
+    cab.translate(x, 40, WATER + 6);
+    parts.push(cab);
+  }
+  add(mergeSimple(parts), craneMat);
+  parts.forEach((p) => p.dispose());
+
+  // A cruise ship moored at the quay: white hull with a blue band, decks and a red funnel.
+  const ship = new THREE.Group();
+  const white = lambert('#f1f2ee');
+  const hull = new THREE.Mesh(track(new THREE.BoxGeometry(240, 22, 34)), white);
+  hull.position.y = 11;
+  const band = new THREE.Mesh(track(new THREE.BoxGeometry(241, 4, 35)), lambert('#1d2b4f'));
+  band.position.y = 4;
+  ship.add(hull, band);
+  for (let k = 0; k < 5; k++) {
+    const deck = new THREE.Mesh(track(new THREE.BoxGeometry(200 - k * 26, 6, 30 - k * 2)), white);
+    deck.position.set(-8 - k * 4, 25 + k * 6, 0);
+    ship.add(deck);
+    const windows = new THREE.Mesh(track(new THREE.BoxGeometry(200 - k * 26 + 0.2, 1.4, 30 - k * 2 + 0.2)), lambert('#2a3a4a'));
+    windows.position.set(-8 - k * 4, 25 + k * 6, 0);
+    ship.add(windows);
+  }
+  const funnel = new THREE.Mesh(track(new THREE.CylinderGeometry(7, 8, 18, 16)), lambert('#c8102e'));
+  funnel.position.set(-40, 62, 0);
+  funnel.scale.set(1.6, 1, 1);
+  const funnelTop = new THREE.Mesh(track(new THREE.CylinderGeometry(7.2, 7.2, 3, 16)), lambert('#15161b'));
+  funnelTop.position.set(-40, 72, 0);
+  funnelTop.scale.set(1.6, 1, 1);
+  ship.add(funnel, funnelTop);
+  ship.position.set(120, 0, WATER + 45);
+  g.add(ship);
   return g;
 }
 

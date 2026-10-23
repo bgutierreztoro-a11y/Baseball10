@@ -32,8 +32,8 @@ describe('characters', () => {
   it('only Chamo makes the pitcher wear the Southampton striped kit', () => {
     expect(CHARACTERS.filter((c) => c.pitcherKit?.jerseyStripe).map((c) => c.id)).toEqual(['chamo']);
     expect(characterById('chamo').pitcherKit).toMatchObject({ jersey: '#d71920', jerseyStripe: '#ffffff' });
-    // The crest hovering over that pitcher is Chamo's only too.
-    expect(CHARACTERS.filter((c) => c.pitcherBadge).map((c) => c.id)).toEqual(['chamo']);
+    // The crests hovering over the pitcher: Southampton for Chamo, MŠK Žilina over Arturek's Vikokotor.
+    expect(Object.fromEntries(CHARACTERS.filter((c) => c.pitcherBadge).map((c) => [c.id, c.pitcherBadge]))).toEqual({ arturek: 'zilina', chamo: 'southampton' });
   });
 
   it('Chimon is a monkey with a racket, facing a chicken pitcher', () => {
@@ -116,7 +116,7 @@ describe('characters', () => {
     const a = characterById('arturek');
     expect(a.homeStadium!.stadium).toBe('bratislava');
     expect(STADIUMS.bratislava.features.bratislava).toBe(true);
-    expect(EXTRA_STADIUMS).toEqual(['bratislava']);
+    expect(EXTRA_STADIUMS).toEqual(['bratislava', 'southampton']);
     expect(STADIUM_ORDER).not.toContain('bratislava');
     const home = combineMods(a.mods, a.homeStadium!.mods);
     for (const kind of ['contact', 'power'] as const) expect(ev(hit(home, kind))).toBeGreaterThan(ev(hit(a.mods, kind)) * 1.15);

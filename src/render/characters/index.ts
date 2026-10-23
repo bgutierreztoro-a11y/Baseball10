@@ -178,7 +178,7 @@ class Pitcher implements PitcherRig {
         number: '',
       },
       this.quality,
-      look.rabbi ? { beard: '#2a1d14', hair: '#2a1d14', face: true } : {},
+      look.rabbi ? { beard: '#2a1d14', hair: '#2a1d14', face: true } : look.scale !== undefined || look.belly ? { scale: look.scale ?? 1, belly: look.belly ?? 0, face: true } : {},
     );
     h.setMirrored(hand === 'L');
     if (look.chicken) {

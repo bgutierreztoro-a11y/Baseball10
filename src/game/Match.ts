@@ -9,11 +9,12 @@ import { coachLine, dist, gameText, pitchLine, speed } from '../i18n/game';
 import type { InputManager } from '../input/InputManager';
 import type { CameraDirector } from '../render/CameraDirector';
 import { combineMods, pciFillMods } from '../config/characters';
-import { BLESSING_DURATION } from '../render/fx';
+import { BLESSING_DURATION, ESCAPE_DURATION } from '../render/fx';
 import { polarToXZ } from '../sim/field';
 import { trajectoryTouches } from '../sim/penny';
 import { assistAim, landingHint } from '../sim/assist';
-import { HOME_RUN_UNDERCUT, SWING_PROFILES, evaluateSwing, swingProfile, wildSwing } from '../sim/contact';
+import { HOME_RUN_UNDERCUT, SWING_PROFILES, evaluateSwing, forcedHomeRun, swingProfile, wildSwing } from '../sim/contact';
+import { robHomeRun } from '../sim/thief';
 import { choosePitch, type PitchSelectorConfig } from '../sim/pitcher';
 import { planPitch, pitchPosition, timeAtZ } from '../sim/pitch';
 import { DERBY_RULES, PRACTICE_RULES, Session, rulesForStage, type PitchResult, type SessionEvent } from '../sim/session';
@@ -56,13 +57,15 @@ export interface MatchDeps {
   character: CharacterDef;
 }
 
-type Phase = 'intro' | 'ready' | 'windup' | 'pitch' | 'contact' | 'flight' | 'result' | 'blessing' | 'ended';
+type Phase = 'intro' | 'ready' | 'windup' | 'pitch' | 'contact' | 'flight' | 'result' | 'blessing' | 'robbery' | 'explosion' | 'ended';
 
 const WINDUP = 1.05;
 const CATCH_Z = -0.42;
 const FLIGHT_SPEED = 1.35;
 /** Benjamin's penny: a batted ball within this distance (m) of its centre touches it. */
 const PENNY_HIT_RADIUS = 4.2;
+/** Arturek's curse: seconds of the blast and the burning park before the match ends. */
+const EXPLOSION_DURATION = 6.5;
 
 export function stadiumFor(mode: MatchMode): StadiumDef {
   if (mode.kind === 'campaign') return STADIUMS[mode.stage.stadium];
@@ -141,6 +144,15 @@ export class Match {
   private welcoming = false;
   private welcomed = false;
   private blessingLeft = 0;
+  /**
+   * Chamo's nerf: whether the mandem already stole this match's home run,
+   * and the theft in progress (flight sample where he catches it).
+   */
+  private thiefUsed = false;
+  private theft: { catchIndex: number; caught: boolean } | null = null;
+  /** Arturek's curse: this pitch is a lit firecracker, and the hit one is going to blow up. */
+  private firecracker = false;
+  private blowUp = false;
 
   constructor(mode: MatchMode, deps: MatchDeps, seed: number) {
     this.mode = mode;
@@ -181,6 +193,9 @@ export class Match {
     w.batter.setAngry(false);
     w.setPenny(null);
     w.stopBlessing();
+    w.stopThief();
+    w.stopInferno();
+    w.ball.setFirecracker(false);
     this.abilityUses = deps.character.ability?.uses ?? 0;
     this.updateScoreboard(null);
   }
@@ -254,6 +269,11 @@ export class Match {
       const t = gameText(s.lang);
       window.setTimeout(() => this.d.ui.showCallout(t.homeBuff(this.d.character.name), 'bonus', t.homeBuffSub), 900);
     }
+    const pitcherName = this.d.character.pitcherName;
+    if (pitcherName) {
+      const t = gameText(s.lang);
+      window.setTimeout(() => this.d.ui.showCallout(t.pitcherIntro(pitcherName), 'info', t.pitcherIntroSub), this.atHome ? 2600 : 900);
+    }
     // Benjamin's welcome cinematic comes first: the tip would cover the kippah.
     if (this.d.firstTime && !this.d.character.pennyBlessing) this.showFirstTip();
   }
@@ -295,12 +315,17 @@ export class Match {
     if (this.phase === 'flight' && this.flight && this.flight.t > 0.5) this.endFlight();
     else if (this.phase === 'result' && this.phaseT > 0.35) this.phaseT = this.resultDuration;
     else if (this.phase === 'blessing' && this.phaseT > 1.5) this.finishBlessing();
+    else if (this.phase === 'robbery' && this.phaseT > 1.2) this.finishRobbery();
+    else if (this.phase === 'explosion' && this.phaseT > 2.5) this.phaseT = EXPLOSION_DURATION;
   }
 
   dispose(): void {
     this.d.world.setMatchActive(false);
     this.d.world.setPenny(null);
     this.d.world.stopBlessing();
+    this.d.world.stopThief();
+    this.d.world.stopInferno();
+    this.d.world.ball.setFirecracker(false);
     this.d.input.enabled = false;
     this.d.ui.showTip(null);
   }
@@ -330,6 +355,23 @@ export class Match {
     const wild = this.d.character.wildSwing;
     // Chimon's wild racket only fires while he is angry.
     if (wild && this.angry) evaluation = wildSwing(evaluation, this.plan, ctx, wild.homeRunChance);
+    // Arturek's firecracker: a hit one either blows up at the plate or flies out of the park.
+    const cracker = this.d.character.firecracker;
+    if (cracker && this.firecracker && evaluation.kind === 'contact') {
+      this.blowUp = this.rng.next() < cracker.explodeChance;
+      if (!this.blowUp) evaluation = forcedHomeRun(evaluation, this.plan, ctx);
+    }
+    // Chamo in Southampton: the first home run is stolen beyond the wall.
+    const thief = this.d.character.homeRunThief;
+    if (thief?.stadium === this.stadium.id && !this.thiefUsed && evaluation.kind === 'contact') {
+      const robbed = robHomeRun(evaluation.ball, this.stadium);
+      if (robbed) {
+        this.thiefUsed = true;
+        this.theft = { catchIndex: robbed.catchIndex, caught: false };
+        this.d.world.prepareThief(robbed.feet);
+        evaluation = { ...evaluation, ball: robbed.ball };
+      }
+    }
     this.pennyTouchAt = this.penny && evaluation.kind === 'contact' ? trajectoryTouches(evaluation.ball, this.penny, PENNY_HIT_RADIUS) : -1;
     const now = performance.now();
     const contactAtMs = timeStamp + prof.swingTime * 1000;
@@ -391,6 +433,7 @@ export class Match {
         if (!this.plan) this.plan = planPitch(choosePitch(this.rng, this.selector, this.lastType));
         this.lastType = this.plan.type;
         this.spawnPenny();
+        this.rollFirecracker();
         // The catcher sets up near (not exactly at) the target.
         this.catcherTarget = { x: this.plan.plateCross.x + this.rng.gaussian() * 0.05, y: this.plan.plateCross.y + this.rng.gaussian() * 0.05 };
         w.catcher.setTarget(this.catcherTarget.x, this.catcherTarget.y);
@@ -408,6 +451,19 @@ export class Match {
         this.d.camera.shot(cam, { x: -sd * 0.8, y: 3.9, z: 0.9 }, 62);
         if (this.welcoming) this.d.audio.havaNagila();
         w.playBlessing(cam, () => (this.welcoming ? this.greet() : this.giveBlessing()));
+        break;
+      }
+      case 'robbery': {
+        // The mandem runs off with the ball to Valentina.
+        this.d.input.enabled = false;
+        w.zone.setVisible(false, false);
+        w.ball.setVisible(false);
+        w.ball.setTrail('off');
+        const shot = w.thiefEscape();
+        this.d.camera.shot(shot.pos, shot.look, 48);
+        const t = gameText(this.d.settings().lang);
+        this.d.ui.showCallout(t.thiefEscape, 'warning', t.thiefEscapeSub);
+        this.d.audio.crowdReaction('groan');
         break;
       }
       case 'windup':
@@ -438,7 +494,8 @@ export class Match {
     this.phaseT += dt;
     const w = this.d.world;
     const aim = this.currentAim();
-    if (this.phase !== 'flight' && this.phase !== 'result' && this.phase !== 'contact' && this.phase !== 'blessing') {
+    const cinematic = this.phase === 'blessing' || this.phase === 'robbery' || this.phase === 'explosion';
+    if (this.phase !== 'flight' && this.phase !== 'result' && this.phase !== 'contact' && !cinematic) {
       w.zone.setAim(aim.x, aim.y);
       if (!this.swing) w.batter.setAim(aim.x, aim.y);
       w.zone.setPower(this.d.input.power || this.powerToggle);
@@ -484,6 +541,15 @@ export class Match {
         break;
       case 'blessing':
         if (!w.blessingPlaying || this.phaseT > BLESSING_DURATION + 0.5) this.finishBlessing();
+        break;
+      case 'robbery':
+        if (!w.thiefPlaying || this.phaseT > ESCAPE_DURATION + 0.5) this.finishRobbery();
+        break;
+      case 'explosion':
+        if (this.phaseT >= EXPLOSION_DURATION) {
+          this.session.forfeit();
+          this.endMatchSoon();
+        }
         break;
       case 'ended':
         break;
@@ -541,6 +607,13 @@ export class Match {
       w.fx.mittPop(this.ballPos);
       this.d.audio.mittPop();
       w.ball.setVisible(false);
+      if (this.firecracker) {
+        // Nobody hit it: it just goes pop in the catcher's mitt.
+        w.fx.contact(this.ballPos, 0.6, false);
+        w.fx.dust(this.ballPos, 0.8);
+        this.d.audio.explosion(0.3);
+        this.d.ui.showCallout(gameText(this.d.settings().lang).firecrackerPop, 'info');
+      }
       if (sw) {
         this.resolve({ kind: 'whiff' }, sw.evaluation);
         w.batter.react('whiff');
@@ -556,6 +629,10 @@ export class Match {
   private contact(): void {
     const sw = this.swing!;
     if (sw.evaluation.kind !== 'contact') return;
+    if (this.blowUp) {
+      this.explode();
+      return;
+    }
     const ball = sw.evaluation.ball;
     const w = this.d.world;
     const s = this.d.settings();
@@ -608,6 +685,38 @@ export class Match {
     if (ball.outcome === 'homeRun') window.setTimeout(() => this.d.world.batter.celebrate(), 450);
   }
 
+  /**
+   * The Curse of Bubenik: the firecracker Arturek hit blows up at the plate.
+   * He is killed, the whole park burns, and after the cinematic the match is
+   * lost (the pitch is never recorded).
+   */
+  private explode(): void {
+    const w = this.d.world;
+    const s = this.d.settings();
+    const t = gameText(s.lang);
+    const at = this.plan!.plateCross;
+    this.blowUp = false;
+    this.phase = 'explosion';
+    this.phaseT = 0;
+    this.d.input.enabled = false;
+    w.ball.setVisible(false);
+    w.zone.setVisible(false, false);
+    w.zone.hideHint();
+    this.d.ui.showPitchLabel(null);
+    w.fx.contact(at, 1, true);
+    w.fx.fireworks({ x: at.x, y: at.y + 3, z: at.z }, 2);
+    w.blowUp(at);
+    this.d.audio.explosion(1);
+    this.d.audio.crowdReaction('ooh');
+    if (!s.reducedMotion) this.d.camera.shake(0.35);
+    // Wide shot from behind the mound: the plate, the fallen giant and the burning stands.
+    this.d.camera.shot({ x: 6, y: 11, z: 30 }, { x: 0, y: 3.5, z: 0 }, 58);
+    this.excitement = 1;
+    this.d.ui.showCallout(t.boom, 'warning', t.boomSub);
+    window.setTimeout(() => this.d.ui.showCallout(t.dead, 'warning', t.deadSub), 2200);
+    this.d.world.stadium.setScoreboard({ title: this.stadium.name[s.lang].toUpperCase(), line1: t.curseLabel.toUpperCase(), line2: t.deadSub.toUpperCase(), big: t.boom, highlight: true });
+  }
+
   private updateFlight(dt: number): void {
     const f = this.flight!;
     const w = this.d.world;
@@ -631,7 +740,7 @@ export class Match {
       f.fenceDone = true;
       if (f.ball.outcome === 'homeRun') {
         const distTxt = dist(f.ball.projectedDistance, s.units);
-        this.d.ui.showCallout(this.rng.pick(t.hrCalls), 'homeRun', `${distTxt} · ${speed(f.ball.exitVelocity, s.units)}`);
+        this.d.ui.showCallout(this.firecracker ? t.firecrackerHomeRun : this.rng.pick(t.hrCalls), 'homeRun', `${distTxt} · ${speed(f.ball.exitVelocity, s.units)}`);
         this.d.audio.crowdReaction('roar');
         this.d.audio.homeRunJingle();
         this.excitement = 1;
@@ -663,6 +772,17 @@ export class Match {
         this.d.ui.showCallout(t.target, 'target');
         this.d.audio.crowdReaction('cheer');
       }
+    }
+    const theft = this.theft;
+    if (theft && !theft.caught && (f.idx >= theft.catchIndex - 1 || f.t >= f.ball.hangTime)) {
+      // The mandem snatches it out of the air: the flight ends in his hands.
+      theft.caught = true;
+      f.landed = true;
+      w.thiefCatch();
+      w.ball.setVisible(false);
+      this.d.ui.showCallout(t.thiefCatch, 'warning', t.thiefCatchSub);
+      this.d.audio.crowdReaction('ooh');
+      this.excitement = 1;
     }
     const landT = f.ball.outcome === 'homeRun' ? traj[traj.length - 1]!.t : f.ball.hangTime;
     if (!f.landed && f.t >= landT) {
@@ -774,12 +894,45 @@ export class Match {
     w.fx.clearMarkers();
     this.d.ui.hideHitCard();
     this.plan = null;
+    // The escape plays even if that was the last out.
+    if (this.theft) {
+      this.enter('robbery');
+      return;
+    }
     if (this.session.finished) {
       this.blessingPending = false;
       this.endMatchSoon();
       return;
     }
     this.enter(this.blessingPending ? 'blessing' : 'ready');
+  }
+
+  /** The mandem and Valentina are gone: back to batting (or the end of the match). */
+  private finishRobbery(): void {
+    if (this.phase !== 'robbery') return;
+    this.theft = null;
+    this.d.world.stopThief();
+    if (this.session.finished) {
+      this.blessingPending = false;
+      this.endMatchSoon();
+      return;
+    }
+    this.enter('ready');
+  }
+
+  /**
+   * Arturek's curse: before each pitch, with some chance, Vikokotor throws a
+   * lit firecracker instead of the ball.
+   */
+  private rollFirecracker(): void {
+    const cracker = this.d.character.firecracker;
+    this.blowUp = false;
+    this.firecracker = !!cracker && this.rng.next() < cracker.chance;
+    this.d.world.ball.setFirecracker(this.firecracker);
+    if (this.firecracker) {
+      const t = gameText(this.d.settings().lang);
+      this.d.ui.showCallout(t.firecrackerOn, 'warning', t.firecrackerSub);
+    }
   }
 
   /**
@@ -941,6 +1094,14 @@ export class Match {
       const stateText = this.blessingLeft > 0 ? t.pennyBlessed(this.blessingLeft) : this.penny ? t.pennyField : t.pennyWaiting;
       return { label: t.pennyLabel, state: this.blessingLeft > 0 || this.penny ? 'active' : 'idle', pitchesLeft: null, keyHint: '', stateText };
     }
+    if (c.firecracker) {
+      return { label: t.curseLabel, state: this.firecracker ? 'active' : 'idle', pitchesLeft: null, keyHint: '', stateText: this.firecracker ? t.curseLit : t.curseIdle };
+    }
+    if (c.homeRunThief?.stadium === this.stadium.id) {
+      // Not "done" until he actually has the ball (no spoilers mid-flight).
+      const done = this.thiefUsed && !(this.theft && !this.theft.caught);
+      return { label: t.thiefLabel, state: done ? 'idle' : 'active', pitchesLeft: null, keyHint: '', stateText: done ? t.thiefDone : t.thiefArmed };
+    }
     return null;
   }
 
@@ -963,7 +1124,9 @@ export class Match {
     const d = b.outcome === 'homeRun' ? b.projectedDistance : b.distance;
     const badges: string[] = [];
     const wild = !!this.d.character.wildSwing && this.angry;
+    const robbed = !!this.theft;
     if (b.targetsHit.length) badges.push(t.target);
+    if (robbed) badges.push(t.thiefBadge);
     return {
       result: b.outcome,
       title: t.result[b.outcome],
@@ -975,7 +1138,7 @@ export class Match {
       ],
       timing,
       quality: { label: t.quality[b.quality], tone: b.isBarrel ? 'barrel' : b.quality === 'solid' ? 'solid' : 'weak' },
-      coach: wild ? (b.outcome === 'homeRun' ? t.wildHomeRunCoach : t.wildCoach) : ev ? coachLine(ev, plan, s.lang, this.hand) : null,
+      coach: robbed ? t.thiefCoach : this.firecracker ? t.firecrackerCoach : wild ? (b.outcome === 'homeRun' ? t.wildHomeRunCoach : t.wildCoach) : ev ? coachLine(ev, plan, s.lang, this.hand) : null,
       pitch,
       badges,
     };

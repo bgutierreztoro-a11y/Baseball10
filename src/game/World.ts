@@ -1,10 +1,11 @@
 import * as THREE from 'three';
-import type { CharacterDef, CharacterId, CharacterLook, Hand, QualitySettings, StadiumDef } from '../contracts';
+import type { CharacterDef, CharacterId, CharacterLook, Hand, QualitySettings, StadiumDef, Vec3 } from '../contracts';
 import { MOUND, RUBBER_Z } from '../config/constants';
 import { characterById, DEFAULT_CHARACTER } from '../config/characters';
 import type { BallView, BatterRig, CatcherRig, Effects, PitcherRig, StadiumView, UmpireRig } from '../render/api';
 import { characters, DEFAULT_PITCHER_LOOK } from '../render/characters';
-import { createBallView, createEffects, KippahUfo, PennyView, PitcherBadge } from '../render/fx';
+import { createBallView, createEffects, HomeRunThief, Inferno, KippahUfo, PennyView, PitcherBadge } from '../render/fx';
+import { sprayOf, standHeight } from '../sim/field';
 import type { Renderer } from '../render/Renderer';
 import { createStadium } from '../render/stadium';
 import { ZoneOverlay } from '../render/ZoneOverlay';
@@ -37,6 +38,13 @@ export class World {
   /** Benjamin's lucky penny and the flying kippah that answers it. */
   private readonly penny = new PennyView();
   private readonly kippah: KippahUfo;
+  /** Chamo's nerf in Southampton: the Slovak mandem and Valentina. */
+  private readonly thief: HomeRunThief;
+  /** Arturek's curse: the firecracker blast and the park on fire. */
+  private readonly inferno: Inferno;
+  /** Seconds since the batter was knocked down by the blast (−1 = standing), and his original colours. */
+  private batterDown = -1;
+  private charred: { m: THREE.MeshStandardMaterial; color: THREE.Color }[] = [];
 
   constructor(renderer: Renderer, def: StadiumDef) {
     this.renderer = renderer;
@@ -57,8 +65,10 @@ export class World {
     this.fx = createEffects(this.quality);
     this.zone = new ZoneOverlay();
     this.kippah = new KippahUfo(this.quality);
+    this.thief = new HomeRunThief(this.quality);
+    this.inferno = new Inferno(this.quality);
     this.pitcherBadge.setAnchor(0, MOUND.height, RUBBER_Z);
-    this.group.add(this.penny.root, this.kippah.root, this.pitcherBadge.root, this.batter.root, this.pitcher.root, this.catcher.root, this.umpire.root, this.ball.root, this.fx.root, this.zone.group);
+    this.group.add(this.penny.root, this.kippah.root, this.thief.root, this.inferno.root, this.pitcherBadge.root, this.batter.root, this.pitcher.root, this.catcher.root, this.umpire.root, this.ball.root, this.fx.root, this.zone.group);
     scene.add(this.group);
     this.setHandedness('R');
     this.ball.setVisible(false);
@@ -80,6 +90,7 @@ export class World {
    */
   setCharacter(def: CharacterDef): void {
     if (def.id === this.characterId) return;
+    this.reviveBatter();
     this.characterId = def.id;
     this.dressPitcher();
     this.syncPitcherBadge();
@@ -106,7 +117,9 @@ export class World {
   }
 
   private syncPitcherBadge(): void {
-    this.pitcherBadge.setVisible(this.matchActive && this.playersVisible && !!characterById(this.characterId).pitcherBadge);
+    const badge = characterById(this.characterId).pitcherBadge;
+    if (badge) this.pitcherBadge.setBadge(badge);
+    this.pitcherBadge.setVisible(this.matchActive && this.playersVisible && !!badge);
   }
 
   private dressPitcher(): void {
@@ -215,6 +228,79 @@ export class World {
     return this.kippah.playing;
   }
 
+  /** Height of the ground (the outfield stands / hill surface beyond the wall) at a point. */
+  groundAt(x: number, z: number): number {
+    return standHeight(this.def, sprayOf(x, z), Math.hypot(x, z));
+  }
+
+  /** The Slovak mandem waits at `feet` beyond the wall for Chamo's home run. */
+  prepareThief(feet: Vec3): void {
+    this.thief.prepare(feet, (x, z) => this.groundAt(x, z));
+  }
+
+  /** He catches it. */
+  thiefCatch(): void {
+    this.thief.catchBall();
+  }
+
+  /**
+   * He runs off with the ball to Valentina. Returns a camera shot framing
+   * them from the field side.
+   */
+  thiefEscape(): { pos: Vec3; look: Vec3 } {
+    this.thief.escape();
+    const look = this.thief.focus(new THREE.Vector3());
+    const out = new THREE.Vector3(look.x, 0, look.z).normalize();
+    const pos = new THREE.Vector3(look.x - out.x * 17, look.y + 3.5, look.z - out.z * 17);
+    return { pos: { x: pos.x, y: pos.y, z: pos.z }, look: { x: look.x, y: look.y, z: look.z } };
+  }
+
+  get thiefPlaying(): boolean {
+    return this.thief.playing;
+  }
+
+  stopThief(): void {
+    this.thief.stop();
+  }
+
+  /**
+   * The firecracker explodes at `at`: fireball, the batter is blown over and
+   * charred, the whole park catches fire and his ghost floats away.
+   */
+  blowUp(at: Vec3): void {
+    const feet = this.batter.root.position;
+    this.inferno.blast(at, this.def, { x: feet.x, y: characterById(this.characterId).look.heightM * 0.6, z: feet.z });
+    this.knockOutBatter();
+  }
+
+  stopInferno(): void {
+    this.inferno.stop();
+    this.reviveBatter();
+  }
+
+  private knockOutBatter(): void {
+    if (this.batterDown >= 0) return;
+    this.batterDown = 0;
+    const seen = new Set<THREE.Material>();
+    this.batter.root.traverse((o) => {
+      if (!(o instanceof THREE.Mesh)) return;
+      for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
+        if (!(m instanceof THREE.MeshStandardMaterial) || seen.has(m)) continue;
+        seen.add(m);
+        this.charred.push({ m, color: m.color.clone() });
+        m.color.lerp(new THREE.Color('#1a1512'), 0.85);
+      }
+    });
+  }
+
+  private reviveBatter(): void {
+    if (this.batterDown < 0) return;
+    this.batterDown = -1;
+    for (const { m, color } of this.charred) m.color.copy(color);
+    this.charred = [];
+    this.setHandedness(this.hand);
+  }
+
   /** Characters + ball visible only while batting (hidden on the title orbit). */
   setPlayersVisible(v: boolean): void {
     this.playersVisible = v;
@@ -226,6 +312,15 @@ export class World {
   update(dt: number, elapsed: number, excitement: number, camera: THREE.Camera): void {
     this.stadium.update(dt, elapsed, excitement);
     this.batter.update(dt);
+    if (this.batterDown >= 0) {
+      // Blown flat on his back, away from the plate.
+      this.batterDown += dt;
+      const k = Math.min(1, this.batterDown / 0.7);
+      const fall = k * k * (Math.PI / 2) * 0.96;
+      const side = this.hand === 'R' ? 1 : -1;
+      this.batter.root.rotation.set(0, -side * (Math.PI / 2), 0);
+      this.batter.root.rotateX(-fall);
+    }
     this.pitcher.update(dt);
     this.catcher.update(dt);
     this.umpire.update(dt);
@@ -235,6 +330,8 @@ export class World {
     this.pitcherBadge.update(elapsed);
     this.penny.update(dt);
     this.kippah.update(dt);
+    this.thief.update(dt);
+    this.inferno.update(dt);
   }
 
   dispose(): void {
@@ -244,6 +341,8 @@ export class World {
     this.pitcherBadge.dispose();
     this.penny.dispose();
     this.kippah.dispose();
+    this.thief.dispose();
+    this.inferno.dispose();
     this.group.traverse((o) => {
       if (o instanceof THREE.Mesh || o instanceof THREE.Points || o instanceof THREE.Sprite) {
         o.geometry?.dispose();
