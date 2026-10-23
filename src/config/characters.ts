@@ -34,8 +34,9 @@ const rated = (vision: number, contact: number, power: number) => {
  * PCI size (how forgiving the aim is) and bat speed (exit velocity).
  * Balance intent:
  * - El Moro: the base model, plus a once-per-match "peak" boost.
- * - El Mati: Ronnie Coleman in a wheelchair, an all-rounder with a bit more pop;
- *   a random pre-workout (preWorkout) gets him up with much better ratings.
+ * - El Mati: Ronnie Coleman in a wheelchair, an all-rounder with a bit more pop,
+ *   who swings a dumbbell; a random pre-workout (preWorkout) gets him up with
+ *   much better ratings. At home in the gym he is boosted and gets it more often.
  * - Arturek: huge vision → much bigger PCI for both swings, but almost no power.
  *   Vikokotor pitches to him and sometimes throws a firecracker (firecracker).
  * - Chamo: a horned skeleton with the strongest power swing, average vision, below-average contact;
@@ -77,20 +78,22 @@ export const CHARACTERS: readonly CharacterDef[] = [
     name: 'El Mati',
     title: { es: 'Lightweight, Baby', en: 'Lightweight, Baby' },
     bio: {
-      es: 'Es Ronnie Coleman, el fisicoculturista más famoso de la historia… pero en silla de ruedas. Batea sentado y aun así le pega bien de contacto y de poder. A veces le cae del cielo un preentreno y vuelve el Ronnie de los buenos tiempos.',
-      en: 'He is Ronnie Coleman, the most famous bodybuilder ever… but in a wheelchair. He bats sitting down and still hits well for contact and power. Sometimes a pre-workout falls from the sky and the Ronnie of the glory days is back.',
+      es: 'Es Ronnie Coleman, el fisicoculturista más famoso de la historia… pero en silla de ruedas. Batea sentado, con una mancuerna en vez de bate, y aun así le pega bien de contacto y de poder. A veces le cae del cielo un preentreno y vuelve el Ronnie de los buenos tiempos.',
+      en: 'He is Ronnie Coleman, the most famous bodybuilder ever… but in a wheelchair. He bats sitting down, swinging a dumbbell instead of a bat, and still hits well for contact and power. Sometimes a pre-workout falls from the sky and the Ronnie of the glory days is back.',
     },
-    look: { skin: '#3a2318', hair: null, heightM: 1.8, build: 1.5, belly: 0.1, muscle: 1, extraArms: false, beard: true, horns: false, hornBat: false, wheelchair: true, jersey: '#f4f1e8', trim: '#2563c9', number: '8' },
+    look: { skin: '#3a2318', hair: null, heightM: 1.8, build: 1.5, belly: 0.1, muscle: 1, extraArms: false, beard: true, horns: false, hornBat: false, wheelchair: true, dumbbell: true, jersey: '#f4f1e8', trim: '#2563c9', number: '8' },
     ...rated(10, 14, 17),
     ability: null,
+    // It is his gym: the crowd of bodybuilders pumps him up (+20 % eye and bat speed) and the pre-workout drops far more often.
+    homeStadium: { stadium: 'gimnasio', mods: mods(1.2, 1.2, 1.2, 1.2), buff: { es: 'En su gimnasio: +20 % de ojo y de velocidad de bate, y el preentreno cae el 35 % de las veces', en: 'In his gym: +20 % eye and bat speed, and the pre-workout drops 35 % of the time' } },
     trait: {
       name: { es: 'Preentreno', en: 'Pre-Workout' },
       description: {
-        es: 'Antes de cada lanzamiento hay un 10 % de que le caiga un preentreno con café, Monster y semen de caballo: se levanta de la silla de ruedas convertido en el Ronnie Coleman de sus mejores años y, durante 3 lanzamientos, batea con visión 15, contacto 20 y poder 25. Después vuelve a la silla, con sus estadísticas de siempre.',
-        en: 'Before each pitch there is a 10 % chance a pre-workout of coffee, Monster and horse semen lands on him: he gets out of the wheelchair as the Ronnie Coleman of his prime and, for 3 pitches, bats with vision 15, contact 20 and power 25. Then it is back to the chair, with his usual ratings.',
+        es: 'Antes de cada lanzamiento hay un 10 % de que le caiga un preentreno con café, Monster y semen de caballo: se levanta de la silla de ruedas convertido en el Ronnie Coleman de sus mejores años y, durante 3 lanzamientos, batea con visión 15, contacto 20 y poder 25. Después vuelve a la silla, con sus estadísticas de siempre. Batea con una mancuerna. En el Gimnasio Iron Paradise juega en casa: +20 % de ojo y de velocidad de bate, y el preentreno cae el 35 % de las veces.',
+        en: 'Before each pitch there is a 10 % chance a pre-workout of coffee, Monster and horse semen lands on him: he gets out of the wheelchair as the Ronnie Coleman of his prime and, for 3 pitches, bats with vision 15, contact 20 and power 25. Then it is back to the chair, with his usual ratings. He swings a dumbbell. At Iron Paradise Gym he is at home: +20 % eye and bat speed, and the pre-workout drops 35 % of the time.',
       },
     },
-    preWorkout: { chance: 0.1, pitches: 3, ...rated(15, 20, 25) },
+    preWorkout: { chance: 0.1, homeChance: 0.35, pitches: 3, ...rated(15, 20, 25) },
   },
   {
     id: 'arturek',

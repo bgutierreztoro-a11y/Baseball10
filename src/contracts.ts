@@ -61,7 +61,7 @@ export interface QualitySettings {
 
 // ───────────────────────────── Content definitions ─────────────────────────────
 
-export type StadiumId = 'solar' | 'malecon' | 'metro' | 'cumbre' | 'final' | 'bratislava' | 'southampton' | 'tenis';
+export type StadiumId = 'solar' | 'malecon' | 'metro' | 'cumbre' | 'final' | 'bratislava' | 'southampton' | 'tenis' | 'gimnasio';
 export type TimeOfDay = 'day' | 'sunset' | 'night';
 
 /** Fence distances (ft) and wall heights (ft) at LF line, LCF, CF, RCF, RF line. */
@@ -115,6 +115,12 @@ export interface StadiumDef {
      * screens, umpire's high chair, line judges and ball kids).
      */
     tennis?: boolean;
+    /**
+     * Gym venue (El Mati's home): an indoor hall with rubber flooring, weight
+     * machines, racks and mirrors around the field, a roof of trusses and
+     * strip lights, and a crowd made only of bodybuilders.
+     */
+    gym?: boolean;
   };
   /** 0..1 how full the stands are. */
   crowdDensity: number;
@@ -377,6 +383,8 @@ export interface BatterLook {
   monkey?: boolean;
   /** Bats with a tennis racket instead of a wooden bat. */
   racket?: boolean;
+  /** Bats with a dumbbell (El Mati) instead of a wooden bat. */
+  dumbbell?: boolean;
   /**
    * Rabbi attire: long black coat over a white shirt with tzitzit fringes,
    * black wide-brimmed hat over a kippah instead of a helmet, long beard and
@@ -462,9 +470,9 @@ export interface CharacterDef {
    * Preentreno: before each pitch, with probability `chance`, a pre-workout
    * shaker falls on him. He gets out of the wheelchair and, for `pitches`
    * pitches, bats with `ratings` (and the `mods` derived from them) instead
-   * of his own.
+   * of his own. `homeChance` replaces `chance` in his home park.
    */
-  preWorkout?: { chance: number; pitches: number; ratings: BatterRatings; mods: SwingMods };
+  preWorkout?: { chance: number; homeChance?: number; pitches: number; ratings: BatterRatings; mods: SwingMods };
 }
 
 /** Club crests that can hover over the pitcher. */

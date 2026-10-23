@@ -214,7 +214,7 @@ export class Match {
     return m;
   }
 
-  /** Arturek in Bratislava. */
+  /** The batter in his home park (Arturek in Bratislava, El Mati in his gym...). */
   private get atHome(): boolean {
     return this.d.character.homeStadium?.stadium === this.stadium.id;
   }
@@ -952,7 +952,7 @@ export class Match {
    */
   private rollPreWorkout(): void {
     const pw = this.d.character.preWorkout;
-    if (!pw || this.pumpedLeft > 0 || this.rng.next() >= pw.chance) return;
+    if (!pw || this.pumpedLeft > 0 || this.rng.next() >= (this.atHome && pw.homeChance !== undefined ? pw.homeChance : pw.chance)) return;
     this.pumpedLeft = pw.pitches;
     const s = this.d.settings();
     const t = gameText(s.lang);
@@ -1126,7 +1126,7 @@ export class Match {
       return { label: t.pennyLabel, state: this.blessingLeft > 0 || this.penny ? 'active' : 'idle', pitchesLeft: null, keyHint: '', stateText };
     }
     if (c.preWorkout) {
-      return { label: t.preWorkoutLabel, state: this.pumpedLeft > 0 ? 'active' : 'idle', pitchesLeft: null, keyHint: '', stateText: this.pumpedLeft > 0 ? t.preWorkoutActive(this.pumpedLeft) : t.preWorkoutIdle };
+      return { label: t.preWorkoutLabel, state: this.pumpedLeft > 0 ? 'active' : 'idle', pitchesLeft: null, keyHint: '', stateText: this.pumpedLeft > 0 ? t.preWorkoutActive(this.pumpedLeft) : t.preWorkoutIdle(Math.round(100 * (this.atHome && c.preWorkout.homeChance !== undefined ? c.preWorkout.homeChance : c.preWorkout.chance))) };
     }
     if (c.firecracker) {
       return { label: t.curseLabel, state: this.firecracker ? 'active' : 'idle', pitchesLeft: null, keyHint: '', stateText: this.firecracker ? t.curseLit : t.curseIdle };

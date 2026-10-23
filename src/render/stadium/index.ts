@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { CreateStadium, StadiumView } from '../api';
 import { atmosphereFor, createSky } from './atmosphere';
 import { createField } from './field';
+import { createGym } from './gym';
 import { createScenery } from './scenery';
 import { createScoreboard } from './scoreboard';
 import { createStructures } from './structures';
@@ -27,6 +28,8 @@ export const createStadium: CreateStadium = (scene, def, quality): StadiumView =
   root.add(sky.group, field.group, structures.group, scenery.group, scoreboard.group, targets.group);
   const tennis = def.features.tennis ? createTennisCourt(def, quality) : null;
   if (tennis) root.add(tennis.group);
+  const gym = def.features.gym ? createGym(def, quality) : null;
+  if (gym) root.add(gym.group);
 
   // Lighting.
   const hemi = new THREE.HemisphereLight(atm.hemiSky, atm.hemiGround, atm.hemiIntensity);
@@ -78,6 +81,7 @@ export const createStadium: CreateStadium = (scene, def, quality): StadiumView =
       scoreboard.update(elapsed);
       targets.update(elapsed);
       tennis?.update(elapsed);
+      gym?.update(elapsed);
     },
     setScoreboard(data) {
       scoreboard.set(data);
@@ -99,6 +103,7 @@ export const createStadium: CreateStadium = (scene, def, quality): StadiumView =
       scoreboard.dispose();
       targets.dispose();
       tennis?.dispose();
+      gym?.dispose();
     },
   };
 };

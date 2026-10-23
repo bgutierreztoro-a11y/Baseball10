@@ -32,7 +32,7 @@ export function createScenery(def: StadiumDef, quality: QualitySettings, atm: At
   const updaters: ((t: number) => void)[] = [];
 
   // Outer terrain.
-  const terrainColor = atm.night ? '#0d1410' : def.id === 'malecon' ? '#3b3330' : def.id === 'cumbre' ? '#6e7c55' : def.id === 'southampton' ? '#44523d' : '#5a7a3a';
+  const terrainColor = atm.night ? '#0d1410' : def.id === 'malecon' ? '#3b3330' : def.id === 'cumbre' ? '#6e7c55' : def.id === 'southampton' ? '#44523d' : def.id === 'gimnasio' ? '#17181b' : '#5a7a3a';
   const terrain = new THREE.Mesh(track(new THREE.CircleGeometry(2300, 48)), track(new THREE.MeshLambertMaterial({ color: terrainColor })));
   terrain.rotation.x = -Math.PI / 2;
   terrain.position.y = -0.08;

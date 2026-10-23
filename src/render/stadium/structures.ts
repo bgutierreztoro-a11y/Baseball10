@@ -219,6 +219,7 @@ export function createStructures(def: StadiumDef, quality: QualitySettings, atm:
   const crowd = createCrowd(def, quality, crowdSlots, rnd, !!houses);
   if (crowd) {
     group.add(crowd.mesh);
+    if (crowd.skin) group.add(crowd.skin);
     disposables.push(crowd);
   }
 
@@ -381,6 +382,8 @@ function off(p: PathPoint, d: number, _radial: boolean): { x: number; z: number 
 
 interface Crowd {
   mesh: THREE.InstancedMesh;
+  /** Second instanced layer (skin of the muscular gym crowd: shirts are `mesh`). */
+  skin?: THREE.InstancedMesh;
   update(elapsed: number, excitement: number): void;
   dispose(): void;
 }
@@ -388,30 +391,62 @@ interface Crowd {
 /**
  * Instanced spectators animated entirely in the vertex shader. `busts`: only
  * head and shoulders (fans looking out of windows), with small hops so they
- * never jump out of the frame.
+ * never jump out of the frame. The gym crowd is made only of bodybuilders:
+ * broad tank-top torsos on one layer, bulging arms, traps and shaved heads on a
+ * second (skin) layer.
  */
 function createCrowd(def: StadiumDef, quality: QualitySettings, slots: { x: number; y: number; z: number; face: number }[], rnd: () => number, busts = false): Crowd | null {
   const wanted = Math.min(slots.length, Math.round(quality.crowdCount * def.crowdDensity));
   if (wanted <= 0) return null;
+  const gym = !!def.features.gym;
   // Spectator: torso + head, ~24 triangles.
-  const body = new THREE.BoxGeometry(0.44, busts ? 0.36 : 0.62, 0.3);
-  body.translate(0, busts ? 0.18 : 0.31, 0);
-  const head = new THREE.OctahedronGeometry(0.15, 0);
-  head.translate(0, busts ? 0.52 : 0.78, 0);
-  const geo = mergeSimple([body, head]);
-  body.dispose();
-  head.dispose();
+  let geo: THREE.BufferGeometry;
+  let skinGeo: THREE.BufferGeometry | null = null;
+  if (gym) {
+    const at = (g: THREE.BufferGeometry, x: number, y: number, z: number, sx = 1, sy = 1, sz = 1): THREE.BufferGeometry => {
+      g.scale(sx, sy, sz);
+      g.translate(x, y, z);
+      return g;
+    };
+    // Tank top: a wide chest tapering to the waist.
+    const chest = at(new THREE.BoxGeometry(0.6, 0.34, 0.34), 0, 0.5, 0);
+    const waist = at(new THREE.BoxGeometry(0.38, 0.3, 0.26), 0, 0.17, 0);
+    geo = mergeSimple([chest, waist]);
+    chest.dispose();
+    waist.dispose();
+    // Skin: boulder shoulders, big arms bent at the elbow, thick neck, traps and a shaved head.
+    const parts: THREE.BufferGeometry[] = [];
+    for (const sd of [-1, 1]) {
+      parts.push(at(new THREE.SphereGeometry(0.13, 6, 4), sd * 0.34, 0.6, 0));
+      parts.push(at(new THREE.BoxGeometry(0.17, 0.3, 0.17), sd * 0.4, 0.42, 0.02));
+      parts.push(at(new THREE.BoxGeometry(0.14, 0.1, 0.2), sd * 0.4, 0.22, 0.1));
+    }
+    parts.push(at(new THREE.BoxGeometry(0.34, 0.1, 0.22), 0, 0.7, -0.02));
+    parts.push(at(new THREE.BoxGeometry(0.15, 0.1, 0.15), 0, 0.74, 0));
+    parts.push(at(new THREE.OctahedronGeometry(0.15, 0), 0, 0.88, 0.01));
+    skinGeo = mergeSimple(parts);
+    parts.forEach((g) => g.dispose());
+  } else {
+    const body = new THREE.BoxGeometry(0.44, busts ? 0.36 : 0.62, 0.3);
+    body.translate(0, busts ? 0.18 : 0.31, 0);
+    const head = new THREE.OctahedronGeometry(0.15, 0);
+    head.translate(0, busts ? 0.52 : 0.78, 0);
+    geo = mergeSimple([body, head]);
+    body.dispose();
+    head.dispose();
+  }
 
   const uniforms = { uTime: { value: 0 }, uExcite: { value: 0 } };
-  const mat = new THREE.MeshLambertMaterial({ vertexColors: false });
-  mat.onBeforeCompile = (shader) => {
-    shader.uniforms.uTime = uniforms.uTime;
-    shader.uniforms.uExcite = uniforms.uExcite;
-    shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nuniform float uTime;\nuniform float uExcite;')
-      .replace(
-        '#include <begin_vertex>',
-        `#include <begin_vertex>
+  const makeMat = (): THREE.MeshLambertMaterial => {
+    const mat = new THREE.MeshLambertMaterial({ vertexColors: false });
+    mat.onBeforeCompile = (shader) => {
+      shader.uniforms.uTime = uniforms.uTime;
+      shader.uniforms.uExcite = uniforms.uExcite;
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', '#include <common>\nuniform float uTime;\nuniform float uExcite;')
+        .replace(
+          '#include <begin_vertex>',
+          `#include <begin_vertex>
         #ifdef USE_INSTANCING
           float ph = fract(sin(dot(instanceMatrix[3].xz, vec2(12.9898, 78.233))) * 43758.5453);
           float idle = sin(uTime * (1.2 + ph) + ph * 6.2831) * 0.025;
@@ -419,32 +454,51 @@ function createCrowd(def: StadiumDef, quality: QualitySettings, slots: { x: numb
           transformed.y += idle + jump;
           transformed.x += sin(uTime * 2.0 + ph * 10.0) * 0.03 * uExcite;
         #endif`,
-      );
+        );
+    };
+    return mat;
   };
+  const mat = makeMat();
+  const skinMat = skinGeo ? makeMat() : null;
   const mesh = new THREE.InstancedMesh(geo, mat, wanted);
+  const skin = skinGeo && skinMat ? new THREE.InstancedMesh(skinGeo, skinMat, wanted) : undefined;
   const m = new THREE.Matrix4();
   const q = new THREE.Quaternion();
   const s = new THREE.Vector3();
   const color = new THREE.Color();
   const palette = def.palette.crowd.map((c) => new THREE.Color(c));
-  const skin = ['#f1c27d', '#c68642', '#8d5524', '#e0ac69', '#ffdbac'].map((c) => new THREE.Color(c));
+  const skinTones = ['#f1c27d', '#c68642', '#8d5524', '#e0ac69', '#ffdbac'].map((c) => new THREE.Color(c));
+  // Bodybuilders run darker and tanned, with the odd pale one.
+  const gymSkin = ['#8d5524', '#5c3a1e', '#c68642', '#3e2514', '#e0ac69', '#a8683a'].map((c) => new THREE.Color(c));
   // Uniformly sample `wanted` slots.
   const step = slots.length / wanted;
   for (let i = 0; i < wanted; i++) {
     const slot = slots[Math.min(slots.length - 1, Math.floor(i * step + rnd() * step))]!;
     q.setFromAxisAngle(THREE.Object3D.DEFAULT_UP, slot.face);
-    const k = 0.85 + rnd() * 0.3;
+    const k = gym ? 0.95 + rnd() * 0.3 : 0.85 + rnd() * 0.3;
     s.set(k, k, k);
     m.compose(new THREE.Vector3(slot.x, slot.y, slot.z), q, s);
     mesh.setMatrixAt(i, m);
-    color.copy(rnd() < 0.82 ? palette[Math.floor(rnd() * palette.length)]! : skin[Math.floor(rnd() * skin.length)]!);
+    if (skin) {
+      skin.setMatrixAt(i, m);
+      mesh.setColorAt(i, palette[Math.floor(rnd() * palette.length)]!);
+      skin.setColorAt(i, gymSkin[Math.floor(rnd() * gymSkin.length)]!);
+      continue;
+    }
+    color.copy(rnd() < 0.82 ? palette[Math.floor(rnd() * palette.length)]! : skinTones[Math.floor(rnd() * skinTones.length)]!);
     mesh.setColorAt(i, color);
   }
   mesh.instanceMatrix.needsUpdate = true;
   if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   mesh.frustumCulled = false;
+  if (skin) {
+    skin.instanceMatrix.needsUpdate = true;
+    if (skin.instanceColor) skin.instanceColor.needsUpdate = true;
+    skin.frustumCulled = false;
+  }
   return {
     mesh,
+    skin,
     update(elapsed, excitement) {
       uniforms.uTime.value = elapsed;
       uniforms.uExcite.value += (excitement - uniforms.uExcite.value) * 0.08;
@@ -453,6 +507,9 @@ function createCrowd(def: StadiumDef, quality: QualitySettings, slots: { x: numb
       geo.dispose();
       mat.dispose();
       mesh.dispose();
+      skinGeo?.dispose();
+      skinMat?.dispose();
+      skin?.dispose();
     },
   };
 }
