@@ -34,7 +34,7 @@ const rated = (vision: number, contact: number, power: number, speed = BASE_RATI
  * PCI size (how forgiving the aim is) and bat speed (exit velocity).
  * Balance intent:
  * - El Moro: the base model, plus a once-per-match "peak" boost.
- * - El Mati: Ronnie Coleman in a wheelchair, an all-rounder with a bit more pop,
+ * - El Mati: Ronnie Colamano in a wheelchair, an all-rounder with a bit more pop,
  *   who swings a dumbbell; a random pre-workout (preWorkout) gets him up with
  *   much better ratings. At home in the gym he is boosted and gets it more often.
  * - Arturek: huge vision → much bigger PCI for both swings, but almost no power.
@@ -78,8 +78,8 @@ export const CHARACTERS: readonly CharacterDef[] = [
     name: 'El Mati',
     title: { es: 'Lightweight, Baby', en: 'Lightweight, Baby' },
     bio: {
-      es: 'Es Ronnie Coleman, el fisicoculturista más famoso de la historia… pero en silla de ruedas. Batea sentado, con una mancuerna en vez de bate, y aun así le pega bien de contacto y de poder. A veces le cae del cielo un preentreno y vuelve el Ronnie de los buenos tiempos.',
-      en: 'He is Ronnie Coleman, the most famous bodybuilder ever… but in a wheelchair. He bats sitting down, swinging a dumbbell instead of a bat, and still hits well for contact and power. Sometimes a pre-workout falls from the sky and the Ronnie of the glory days is back.',
+      es: 'Es Ronnie Colamano, el fisicoculturista más famoso de la historia… pero en silla de ruedas. Batea sentado, con una mancuerna en vez de bate, y aun así le pega bien de contacto y de poder. A veces le cae del cielo un preentreno y vuelve el Ronnie de los buenos tiempos.',
+      en: 'He is Ronnie Colamano, the most famous bodybuilder ever… but in a wheelchair. He bats sitting down, swinging a dumbbell instead of a bat, and still hits well for contact and power. Sometimes a pre-workout falls from the sky and the Ronnie of the glory days is back.',
     },
     look: { skin: '#3a2318', hair: null, heightM: 1.8, build: 1.5, belly: 0.1, muscle: 1, extraArms: false, beard: true, horns: false, hornBat: false, wheelchair: true, dumbbell: true, jersey: '#f4f1e8', trim: '#2563c9', number: '8' },
     // The wheelchair is surprisingly quick on the base paths.
@@ -90,8 +90,8 @@ export const CHARACTERS: readonly CharacterDef[] = [
     trait: {
       name: { es: 'Preentreno', en: 'Pre-Workout' },
       description: {
-        es: 'Antes de cada lanzamiento hay un 10 % de que le caiga un preentreno con café, Monster y semen de caballo: se levanta de la silla de ruedas convertido en el Ronnie Coleman de sus mejores años y, durante 3 lanzamientos, batea con visión 15, contacto 20 y poder 25. Después vuelve a la silla, con sus estadísticas de siempre. Batea con una mancuerna. En el Gimnasio Iron Paradise juega en casa: +20 % de ojo y de velocidad de bate, y el preentreno cae el 35 % de las veces.',
-        en: 'Before each pitch there is a 10 % chance a pre-workout of coffee, Monster and horse semen lands on him: he gets out of the wheelchair as the Ronnie Coleman of his prime and, for 3 pitches, bats with vision 15, contact 20 and power 25. Then it is back to the chair, with his usual ratings. He swings a dumbbell. At Iron Paradise Gym he is at home: +20 % eye and bat speed, and the pre-workout drops 35 % of the time.',
+        es: 'Antes de cada lanzamiento hay un 10 % de que le caiga un preentreno con café, Monster y semen de caballo: se levanta de la silla de ruedas convertido en el Ronnie Colamano de sus mejores años y, durante 3 lanzamientos, batea con visión 15, contacto 20 y poder 25. Después vuelve a la silla, con sus estadísticas de siempre. Batea con una mancuerna. En el Gimnasio Iron Paradise juega en casa: +20 % de ojo y de velocidad de bate, y el preentreno cae el 35 % de las veces.',
+        en: 'Before each pitch there is a 10 % chance a pre-workout of coffee, Monster and horse semen lands on him: he gets out of the wheelchair as the Ronnie Colamano of his prime and, for 3 pitches, bats with vision 15, contact 20 and power 25. Then it is back to the chair, with his usual ratings. He swings a dumbbell. At Iron Paradise Gym he is at home: +20 % eye and bat speed, and the pre-workout drops 35 % of the time.',
       },
     },
     preWorkout: { chance: 0.1, homeChance: 0.35, pitches: 3, ...rated(15, 20, 25, 18) },
@@ -177,8 +177,8 @@ export const CHARACTERS: readonly CharacterDef[] = [
     name: 'Benjamin Gutenberg',
     title: { es: 'El Rabino Bateador', en: 'The Batting Rabbi' },
     bio: {
-      es: 'Rabino de barba larga, sombrero negro y peyot rizados que batea con su traje de sinagoga. A veces aparece un centavo flotando en el campo: si la pelota lo toca, Benjamín Netanyahu baja del cielo en un kipá volador al ritmo de Hava Nagila y le llena el ojo de bateo. Con él al bate, el lanzador también viste de rabino.',
-      en: 'A long-bearded rabbi with a black hat and curly peyot who bats in his synagogue suit. Sometimes a penny floats over the field: if the ball touches it, Benjamin Netanyahu comes down from the sky in a flying kippah to the beat of Hava Nagila and fills his batting eye. When he bats, the pitcher dresses as a rabbi too.',
+      es: 'Rabino de barba larga, sombrero negro y peyot rizados que batea con su traje de sinagoga. A veces aparece un centavo flotando en el campo: si la pelota lo toca, Benjamín Nitanllaju baja del cielo en un kipá volador al ritmo de Hava Nagila y le llena el ojo de bateo. Con él al bate, el lanzador también viste de rabino.',
+      en: 'A long-bearded rabbi with a black hat and curly peyot who bats in his synagogue suit. Sometimes a penny floats over the field: if the ball touches it, Benjamin Nitanllaju comes down from the sky in a flying kippah to the beat of Hava Nagila and fills his batting eye. When he bats, the pitcher dresses as a rabbi too.',
     },
     look: { skin: '#eac7a8', hair: '#5b3b22', heightM: 1.78, build: 1.02, belly: 0.2, muscle: 0.1, extraArms: false, beard: true, horns: false, hornBat: false, rabbi: true, jersey: '#15161b', trim: '#f4f1e8', number: '18' },
     // The long coat does not help on the bases.
@@ -187,8 +187,8 @@ export const CHARACTERS: readonly CharacterDef[] = [
     trait: {
       name: { es: 'El centavo de la suerte', en: 'The Lucky Penny' },
       description: {
-        es: 'Antes de cada lanzamiento hay un 25 % de que aparezca un centavo gigante en el campo. Si tu batazo lo toca, Netanyahu baja en su kipá volador y, durante 3 lanzamientos, el ojo de bateo cubre el 85 % de la zona de strike.',
-        en: 'Before each pitch there is a 25 % chance a giant penny appears over the field. If your batted ball touches it, Netanyahu comes down in his flying kippah and, for 3 pitches, the batting eye covers 85 % of the strike zone.',
+        es: 'Antes de cada lanzamiento hay un 25 % de que aparezca un centavo gigante en el campo. Si tu batazo lo toca, Nitanllaju baja en su kipá volador y, durante 3 lanzamientos, el ojo de bateo cubre el 85 % de la zona de strike.',
+        en: 'Before each pitch there is a 25 % chance a giant penny appears over the field. If your batted ball touches it, Nitanllaju comes down in his flying kippah and, for 3 pitches, the batting eye covers 85 % of the strike zone.',
       },
     },
     pennyBlessing: { spawnChance: 0.25, pciFill: 0.85, pitches: 3 },

@@ -179,5 +179,5 @@ Ordenadas por impacto/esfuerzo:
 | Los anuncios espantan jugadores | Políticas más estrictas que las de las plataformas (§4.1), medir abandono tras intersticial y bajar frecuencia si sube |
 | AdSense no aprueba el sitio | Empezar por Poki/CrazyGames, que ya traen anunciantes |
 | Rendimiento con 7 fildeadores + corredores en móviles de gama baja | Solo en el Partido; rigs ligeros; futura reducción a fildeadores activos en calidad baja |
-| Humor sobre personas reales (Netanyahu, Ronnie Coleman) en portales con normas de contenido | Revisar las políticas de cada portal antes de publicar; tener una build «familiar» con esos personajes renombrados si hiciera falta |
+| Humor que parodia a personas reales en portales con normas de contenido | Los personajes ya usan nombres paródicos (Nitanllaju, Ronnie Colamano); igualmente revisar las políticas de cada portal antes de publicar |
 | Inflación de Fichas | Precios en `config/economy.ts` y `config/creator.ts`, fáciles de ajustar; tope en práctica |

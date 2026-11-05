@@ -500,7 +500,7 @@ export interface CharacterDef {
   /**
    * Lucky penny: before each pitch, with probability `spawnChance`, a giant
    * penny floats somewhere in the outfield. A batted ball that touches it
-   * brings Netanyahu down in a flying-kippah UFO (to Hava Nagila), who fills
+   * brings Nitanllaju down in a flying-kippah UFO (to Hava Nagila), who fills
    * the PCI to `pciFill` of the strike zone for the next `pitches` pitches.
    */
   pennyBlessing?: { spawnChance: number; pciFill: number; pitches: number };

@@ -222,7 +222,7 @@ export class World {
   }
 
   /**
-   * The flying kippah lands Netanyahu beside home plate (on the side away
+   * The flying kippah lands Nitanllaju beside home plate (on the side away
    * from the batter, facing him and the camera, the kippah tilted toward
    * `camera` so its dome shows); `onGive` fires as he blesses.
    */

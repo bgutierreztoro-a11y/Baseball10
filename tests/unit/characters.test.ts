@@ -140,7 +140,7 @@ describe('characters', () => {
     expect(c.homeStadium!.buff.es).toContain('15 %');
   });
 
-  it('El Mati is Ronnie Coleman in a wheelchair, with a 10 % pre-workout that gets him up', () => {
+  it('El Mati is Ronnie Colamano in a wheelchair, with a 10 % pre-workout that gets him up', () => {
     const m = characterById('mati');
     expect(m.look).toMatchObject({ wheelchair: true, muscle: 1 });
     // Sitting he keeps his usual ratings.

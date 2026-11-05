@@ -545,7 +545,7 @@ export class Match {
         break;
       }
       case 'blessing': {
-        // Netanyahu's flying kippah: a side shot of the plate while he comes down.
+        // Nitanllaju's flying kippah: a side shot of the plate while he comes down.
         const sd = this.hand === 'R' ? 1 : -1;
         this.blessingPending = false;
         this.d.input.enabled = false;
@@ -1095,7 +1095,7 @@ export class Match {
   /**
    * El Mati's pre-workout: before each pitch (while he is still in the
    * wheelchair), with some chance, a shaker of coffee, Monster and horse semen
-   * falls on him and Ronnie Coleman gets up for a few pitches.
+   * falls on him and Ronnie Colamano gets up for a few pitches.
    */
   private rollPreWorkout(): void {
     const pw = this.d.character.preWorkout;
@@ -1110,7 +1110,7 @@ export class Match {
     const call = this.rng.pick(t.preWorkoutCalls);
     const { vision, contact, power } = pw.ratings;
     window.setTimeout(() => this.d.ui.showCallout(call, 'bonus', t.preWorkoutCallSub(vision, contact, power, pw.pitches)), 1500);
-    this.d.world.stadium.setScoreboard({ title: t.preWorkoutBoard, line1: t.preWorkoutIngredients, line2: 'RONNIE COLEMAN', big: 'YEAH BUDDY', highlight: true });
+    this.d.world.stadium.setScoreboard({ title: t.preWorkoutBoard, line1: t.preWorkoutIngredients, line2: 'RONNIE COLAMANO', big: 'YEAH BUDDY', highlight: true });
   }
 
   /**
@@ -1131,7 +1131,7 @@ export class Match {
     this.d.ui.showCallout(t.pennyOn, 'info');
   }
 
-  /** Netanyahu blesses the batter: the PCI fills most of the zone for a few pitches. */
+  /** Nitanllaju blesses the batter: the PCI fills most of the zone for a few pitches. */
   private giveBlessing(): void {
     const pb = this.d.character.pennyBlessing;
     if (!pb || this.blessingLeft > 0) return;
@@ -1144,7 +1144,7 @@ export class Match {
 
   /**
    * Whoever brings the penny blessing (Benjamin) is welcomed into the match
-   * by Netanyahu in his flying kippah, once, right after the camera intro.
+   * by Nitanllaju in his flying kippah, once, right after the camera intro.
    */
   private afterIntro(): void {
     if (this.d.character.pennyBlessing && !this.welcomed) {
@@ -1156,12 +1156,12 @@ export class Match {
     }
   }
 
-  /** Netanyahu raises his arms and welcomes the player to the game. */
+  /** Nitanllaju raises his arms and welcomes the player to the game. */
   private greet(): void {
     if (!this.welcoming) return;
     this.welcoming = false;
     const t = gameText(this.d.settings().lang);
-    this.d.ui.showCallout(t.welcomeNetanyahu, 'bonus', t.welcomeSub);
+    this.d.ui.showCallout(t.welcomeNitanllaju, 'bonus', t.welcomeSub);
     this.d.audio.crowdReaction('cheer');
   }
 
