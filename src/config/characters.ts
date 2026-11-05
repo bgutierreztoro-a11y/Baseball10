@@ -24,8 +24,8 @@ export function modsFromRatings(r: BatterRatings): SwingMods {
   return mods(vision * (1 + 0.02 * contact), vision, 1 + 0.01 * contact, 1 + 0.01 * (r.power - BASE_RATING));
 }
 
-const rated = (vision: number, contact: number, power: number) => {
-  const ratings = { vision, contact, power };
+const rated = (vision: number, contact: number, power: number, speed = BASE_RATING) => {
+  const ratings = { vision, contact, power, speed };
   return { ratings, mods: modsFromRatings(ratings) };
 };
 
@@ -34,7 +34,7 @@ const rated = (vision: number, contact: number, power: number) => {
  * PCI size (how forgiving the aim is) and bat speed (exit velocity).
  * Balance intent:
  * - El Moro: the base model, plus a once-per-match "peak" boost.
- * - El Mati: Ronnie Coleman in a wheelchair, an all-rounder with a bit more pop,
+ * - El Mati: Ronnie Colamano in a wheelchair, an all-rounder with a bit more pop,
  *   who swings a dumbbell; a random pre-workout (preWorkout) gets him up with
  *   much better ratings. At home in the gym he is boosted and gets it more often.
  * - Arturek: huge vision → much bigger PCI for both swings, but almost no power.
@@ -59,7 +59,7 @@ export const CHARACTERS: readonly CharacterDef[] = [
       en: 'A perfectly ordinary hitter… until his online girlfriend, "iluvkiwiss", cheers from the stands. He has no idea that behind iluvkiwiss’s profile is a guy named Ramiro.',
     },
     look: { skin: '#b07a4f', hair: '#1c130d', heightM: 1.85, build: 1, belly: 0, muscle: 0.2, extraArms: false, beard: true, horns: false, hornBat: false, jersey: '#f4f1e8', trim: '#d7263d', number: '7' },
-    ratings: { vision: BASE_RATING, contact: BASE_RATING, power: BASE_RATING },
+    ratings: { vision: BASE_RATING, contact: BASE_RATING, power: BASE_RATING, speed: BASE_RATING },
     mods: BASE_MODS,
     ability: {
       kind: 'peak',
@@ -78,22 +78,23 @@ export const CHARACTERS: readonly CharacterDef[] = [
     name: 'El Mati',
     title: { es: 'Lightweight, Baby', en: 'Lightweight, Baby' },
     bio: {
-      es: 'Es Ronnie Coleman, el fisicoculturista más famoso de la historia… pero en silla de ruedas. Batea sentado, con una mancuerna en vez de bate, y aun así le pega bien de contacto y de poder. A veces le cae del cielo un preentreno y vuelve el Ronnie de los buenos tiempos.',
-      en: 'He is Ronnie Coleman, the most famous bodybuilder ever… but in a wheelchair. He bats sitting down, swinging a dumbbell instead of a bat, and still hits well for contact and power. Sometimes a pre-workout falls from the sky and the Ronnie of the glory days is back.',
+      es: 'Es Ronnie Colamano, el fisicoculturista más famoso de la historia… pero en silla de ruedas. Batea sentado, con una mancuerna en vez de bate, y aun así le pega bien de contacto y de poder. A veces le cae del cielo un preentreno y vuelve el Ronnie de los buenos tiempos.',
+      en: 'He is Ronnie Colamano, the most famous bodybuilder ever… but in a wheelchair. He bats sitting down, swinging a dumbbell instead of a bat, and still hits well for contact and power. Sometimes a pre-workout falls from the sky and the Ronnie of the glory days is back.',
     },
     look: { skin: '#3a2318', hair: null, heightM: 1.8, build: 1.5, belly: 0.1, muscle: 1, extraArms: false, beard: true, horns: false, hornBat: false, wheelchair: true, dumbbell: true, jersey: '#f4f1e8', trim: '#2563c9', number: '8' },
-    ...rated(10, 14, 17),
+    // The wheelchair is surprisingly quick on the base paths.
+    ...rated(10, 14, 17, 15),
     ability: null,
     // It is his gym: the crowd of bodybuilders pumps him up (+20 % eye and bat speed) and the pre-workout drops far more often.
     homeStadium: { stadium: 'gimnasio', mods: mods(1.2, 1.2, 1.2, 1.2), buff: { es: 'En su gimnasio: +20 % de ojo y de velocidad de bate, y el preentreno cae el 35 % de las veces', en: 'In his gym: +20 % eye and bat speed, and the pre-workout drops 35 % of the time' } },
     trait: {
       name: { es: 'Preentreno', en: 'Pre-Workout' },
       description: {
-        es: 'Antes de cada lanzamiento hay un 10 % de que le caiga un preentreno con café, Monster y semen de caballo: se levanta de la silla de ruedas convertido en el Ronnie Coleman de sus mejores años y, durante 3 lanzamientos, batea con visión 15, contacto 20 y poder 25. Después vuelve a la silla, con sus estadísticas de siempre. Batea con una mancuerna. En el Gimnasio Iron Paradise juega en casa: +20 % de ojo y de velocidad de bate, y el preentreno cae el 35 % de las veces.',
-        en: 'Before each pitch there is a 10 % chance a pre-workout of coffee, Monster and horse semen lands on him: he gets out of the wheelchair as the Ronnie Coleman of his prime and, for 3 pitches, bats with vision 15, contact 20 and power 25. Then it is back to the chair, with his usual ratings. He swings a dumbbell. At Iron Paradise Gym he is at home: +20 % eye and bat speed, and the pre-workout drops 35 % of the time.',
+        es: 'Antes de cada lanzamiento hay un 10 % de que le caiga un preentreno con café, Monster y semen de caballo: se levanta de la silla de ruedas convertido en el Ronnie Colamano de sus mejores años y, durante 3 lanzamientos, batea con visión 15, contacto 20 y poder 25. Después vuelve a la silla, con sus estadísticas de siempre. Batea con una mancuerna. En el Gimnasio Iron Paradise juega en casa: +20 % de ojo y de velocidad de bate, y el preentreno cae el 35 % de las veces.',
+        en: 'Before each pitch there is a 10 % chance a pre-workout of coffee, Monster and horse semen lands on him: he gets out of the wheelchair as the Ronnie Colamano of his prime and, for 3 pitches, bats with vision 15, contact 20 and power 25. Then it is back to the chair, with his usual ratings. He swings a dumbbell. At Iron Paradise Gym he is at home: +20 % eye and bat speed, and the pre-workout drops 35 % of the time.',
       },
     },
-    preWorkout: { chance: 0.1, homeChance: 0.35, pitches: 3, ...rated(15, 20, 25) },
+    preWorkout: { chance: 0.1, homeChance: 0.35, pitches: 3, ...rated(15, 20, 25, 18) },
   },
   {
     id: 'arturek',
@@ -104,7 +105,8 @@ export const CHARACTERS: readonly CharacterDef[] = [
       en: 'Blond, Slovak and almost 8 metres tall. From up there he sees everything, and with four arms he reaches almost any pitch: his circle is much bigger. He just doesn’t hit it very hard.',
     },
     look: { skin: '#f1d2bd', hair: '#f2d16b', heightM: 7.8, build: 1, belly: 0, muscle: 0.2, extraArms: true, beard: false, horns: false, hornBat: false, jersey: '#f4f1e8', trim: '#2fa36b', number: '99' },
-    ...rated(20, 5, 2),
+    // Eight-metre strides: a handful of steps from base to base.
+    ...rated(20, 5, 2, 22),
     ability: null,
     // At home in Bratislava his swing gets a big power boost (+25 % bat speed on both swings).
     homeStadium: { stadium: 'bratislava', mods: mods(1, 1, 1.25, 1.25), buff: { es: 'Bratislava le da +25 % de potencia', en: 'Bratislava gives him +25 % power' } },
@@ -130,7 +132,7 @@ export const CHARACTERS: readonly CharacterDef[] = [
       en: 'A 1.90 m skeleton with a pair of villain horns on his skull and glowing red eyes. He doesn’t use a wooden bat: he hits the ball with a giant horn. His swing is modelled on Barry Bonds’s and is the most powerful in the game, though his contact is weak.',
     },
     look: { skin: '#ebe4cf', hair: null, heightM: 1.9, build: 1, belly: 0, muscle: 0, extraArms: false, beard: false, horns: true, hornBat: true, skeleton: true, jersey: '#f4f1e8', trim: '#f28c28', number: '25' },
-    ...rated(10, 5, 24),
+    ...rated(10, 5, 24, 12),
     ability: null,
     trait: {
       name: { es: 'Nerf en Southampton', en: 'Nerfed in Southampton' },
@@ -153,7 +155,8 @@ export const CHARACTERS: readonly CharacterDef[] = [
       en: 'A monkey who snuck into the ballpark with his tennis racket and refuses to let go of it. With that string bed he hits almost anything. Miss too many in a row and he gets angry, his face turns red as a tomato and he starts hitting as hard as he can… but with no direction at all. When he bats, the pitcher is a chicken.',
     },
     look: { skin: '#7a4a2a', hair: null, heightM: 1.6, build: 1, belly: 0.25, muscle: 0.3, extraArms: false, beard: false, horns: false, hornBat: false, monkey: true, racket: true, jersey: '#fdfcf7', trim: '#c9d82b', number: '1' },
-    ...rated(15, 12, 25),
+    // Runs the bases on all fours.
+    ...rated(15, 12, 25, 20),
     ability: null,
     trait: {
       name: { es: 'Raquetazo salvaje', en: 'Wild Racket' },
@@ -174,17 +177,18 @@ export const CHARACTERS: readonly CharacterDef[] = [
     name: 'Benjamin Gutenberg',
     title: { es: 'El Rabino Bateador', en: 'The Batting Rabbi' },
     bio: {
-      es: 'Rabino de barba larga, sombrero negro y peyot rizados que batea con su traje de sinagoga. A veces aparece un centavo flotando en el campo: si la pelota lo toca, Benjamín Netanyahu baja del cielo en un kipá volador al ritmo de Hava Nagila y le llena el ojo de bateo. Con él al bate, el lanzador también viste de rabino.',
-      en: 'A long-bearded rabbi with a black hat and curly peyot who bats in his synagogue suit. Sometimes a penny floats over the field: if the ball touches it, Benjamin Netanyahu comes down from the sky in a flying kippah to the beat of Hava Nagila and fills his batting eye. When he bats, the pitcher dresses as a rabbi too.',
+      es: 'Rabino de barba larga, sombrero negro y peyot rizados que batea con su traje de sinagoga. A veces aparece un centavo flotando en el campo: si la pelota lo toca, Benjamín Nitanllaju baja del cielo en un kipá volador al ritmo de Hava Nagila y le llena el ojo de bateo. Con él al bate, el lanzador también viste de rabino.',
+      en: 'A long-bearded rabbi with a black hat and curly peyot who bats in his synagogue suit. Sometimes a penny floats over the field: if the ball touches it, Benjamin Nitanllaju comes down from the sky in a flying kippah to the beat of Hava Nagila and fills his batting eye. When he bats, the pitcher dresses as a rabbi too.',
     },
     look: { skin: '#eac7a8', hair: '#5b3b22', heightM: 1.78, build: 1.02, belly: 0.2, muscle: 0.1, extraArms: false, beard: true, horns: false, hornBat: false, rabbi: true, jersey: '#15161b', trim: '#f4f1e8', number: '18' },
-    ...rated(12, 12, 11),
+    // The long coat does not help on the bases.
+    ...rated(12, 12, 11, 6),
     ability: null,
     trait: {
       name: { es: 'El centavo de la suerte', en: 'The Lucky Penny' },
       description: {
-        es: 'Antes de cada lanzamiento hay un 25 % de que aparezca un centavo gigante en el campo. Si tu batazo lo toca, Netanyahu baja en su kipá volador y, durante 3 lanzamientos, el ojo de bateo cubre el 85 % de la zona de strike.',
-        en: 'Before each pitch there is a 25 % chance a giant penny appears over the field. If your batted ball touches it, Netanyahu comes down in his flying kippah and, for 3 pitches, the batting eye covers 85 % of the strike zone.',
+        es: 'Antes de cada lanzamiento hay un 25 % de que aparezca un centavo gigante en el campo. Si tu batazo lo toca, Nitanllaju baja en su kipá volador y, durante 3 lanzamientos, el ojo de bateo cubre el 85 % de la zona de strike.',
+        en: 'Before each pitch there is a 25 % chance a giant penny appears over the field. If your batted ball touches it, Nitanllaju comes down in his flying kippah and, for 3 pitches, the batting eye covers 85 % of the strike zone.',
       },
     },
     pennyBlessing: { spawnChance: 0.25, pciFill: 0.85, pitches: 3 },
@@ -208,8 +212,24 @@ export function pciFillMods(fill: number, base: SwingMods): SwingMods {
   return mods(k('contact'), k('power'), 1, 1);
 }
 
+/** Players made in the character creator (registered by the app from the save). */
+let customDefs: readonly CharacterDef[] = [];
+
+export function setCustomCharacterDefs(defs: readonly CharacterDef[]): void {
+  customDefs = defs;
+}
+
+export function customCharacterDefs(): readonly CharacterDef[] {
+  return customDefs;
+}
+
+/** Roster plus created players. */
+export function allCharacters(): readonly CharacterDef[] {
+  return [...CHARACTERS, ...customDefs];
+}
+
 export function characterById(id: string): CharacterDef {
-  return CHARACTERS.find((c) => c.id === id) ?? CHARACTERS.find((c) => c.id === DEFAULT_CHARACTER)!;
+  return CHARACTERS.find((c) => c.id === id) ?? customDefs.find((c) => c.id === id) ?? CHARACTERS.find((c) => c.id === DEFAULT_CHARACTER)!;
 }
 
 /** Combines two sets of multipliers (e.g. character × active ability). */

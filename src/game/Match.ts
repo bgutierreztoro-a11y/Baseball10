@@ -1,4 +1,8 @@
-import type { BattedBall, CharacterDef, Hand, PitchPlan, PitchTypeId, PitcherDef, Settings, StadiumDef, StageDef, SwingEvaluation, SwingKind, SwingMods, TargetDef, Vec3 } from '../contracts';
+import type { BattedBall, BatterLook, CharacterDef, Hand, PitchPlan, PitchTypeId, PitcherDef, Settings, StadiumDef, StadiumId, StageDef, SwingEvaluation, SwingKind, SwingMods, TargetDef, Vec3 } from '../contracts';
+import { rivalById, type RivalTeam } from '../config/rivals';
+import { playText } from '../i18n/play';
+import { BaseRunningPlay, basePos, fielderAt, looseBallAt, planFielding, type FielderId, type FieldingPlan, type RunEvent, type XZ } from '../sim/baserunning';
+import { GameSession, type GameEvent, type Play } from '../sim/game';
 import type { AudioEngine } from '../audio/api';
 import { DEG, FT, MPH, STRIKE_ZONE } from '../config/constants';
 import { PITCHERS } from '../config/pitches';
@@ -33,14 +37,33 @@ import type { World } from './World';
  * judgement uses the DOM event timestamp; slow-motion only ever affects the
  * batted-ball cinematic, never the pitch.
  */
+/** Quick game setup: the park, the rival team and how many innings. */
+export interface GameConfig {
+  stadium: StadiumId;
+  rival: string;
+  innings: number;
+}
+
 export type MatchMode =
   | { kind: 'campaign'; stage: StageDef }
   | { kind: 'practice'; config: PracticeConfig }
-  | { kind: 'derby'; stadium: StadiumDef['id'] };
+  | { kind: 'derby'; stadium: StadiumDef['id'] }
+  | { kind: 'game'; config: GameConfig }
+  | { kind: 'daily'; stage: StageDef; day: string };
 
 export interface MatchSummary {
   mode: MatchMode;
   session: Session;
+  /** Quick game only. */
+  game: GameSession | null;
+  /** Extra bases taken on the run (doubles, triples, inside-the-park HR) this match. */
+  extraBases: number;
+  walkOff: boolean;
+}
+
+/** The stage of a campaign or daily match. */
+export function stageOf(mode: MatchMode): StageDef | null {
+  return mode.kind === 'campaign' || mode.kind === 'daily' ? mode.stage : null;
 }
 
 export interface MatchDeps {
@@ -55,9 +78,17 @@ export interface MatchDeps {
   firstTime: boolean;
   /** The selected batter (stats + ability). */
   character: CharacterDef;
+  /**
+   * Second chance (rewarded ad) when a stage/derby is lost on outs or time.
+   * Resolves true when the player watched the ad.
+   */
+  offerContinue?: (kind: 'outs' | 'time') => Promise<boolean>;
 }
 
-type Phase = 'intro' | 'ready' | 'windup' | 'pitch' | 'contact' | 'flight' | 'result' | 'blessing' | 'robbery' | 'explosion' | 'ended';
+type Phase = 'intro' | 'ready' | 'windup' | 'pitch' | 'contact' | 'flight' | 'result' | 'blessing' | 'robbery' | 'explosion' | 'running' | 'inning' | 'offer' | 'ended';
+
+/** Seconds the inning summary stays up before the first pitch of your half. */
+const INNING_PAUSE = 2.8;
 
 const WINDUP = 1.05;
 const CATCH_Z = -0.42;
@@ -68,9 +99,41 @@ const PENNY_HIT_RADIUS = 4.2;
 const EXPLOSION_DURATION = 6.5;
 
 export function stadiumFor(mode: MatchMode): StadiumDef {
-  if (mode.kind === 'campaign') return STADIUMS[mode.stage.stadium];
+  if (mode.kind === 'campaign' || mode.kind === 'daily') return STADIUMS[mode.stage.stadium];
   if (mode.kind === 'practice') return STADIUMS[mode.config.stadium];
+  if (mode.kind === 'game') return STADIUMS[mode.config.stadium];
   return STADIUMS[mode.stadium];
+}
+
+interface RunState {
+  play: BaseRunningPlay;
+  plan: FieldingPlan;
+  ball: BattedBall;
+  /** Starting bases of the teammates on base (1..3). */
+  ghosts: number[];
+  /** Fielders covering each base (index 1..4). */
+  cover: (FielderId | null)[];
+  doneAt: number;
+  ballPos: Vec3;
+}
+
+/** Point on the base paths at `prog` bases from home (0..4). */
+function pathPoint(prog: number): XZ {
+  const p = Math.max(0, Math.min(4, prog));
+  const i = Math.min(3, Math.floor(p));
+  const a = basePos(i);
+  const b = basePos(i + 1);
+  const k = p - i;
+  return { x: a.x + (b.x - a.x) * k, z: a.z + (b.z - a.z) * k };
+}
+
+function headingTo(from: XZ, to: XZ): number {
+  return Math.atan2(to.x - from.x, to.z - from.z);
+}
+
+/** Teammates on base wear the batter's jersey (plain bodies, no gimmicks). */
+function teamLook(c: CharacterDef): BatterLook {
+  return { skin: '#c68c5a', hair: '#1c130d', heightM: 1.85, build: 1, belly: 0, muscle: 0.2, extraArms: false, beard: false, horns: false, hornBat: false, jersey: c.look.jersey, trim: c.look.trim, number: '' };
 }
 
 interface SwingState {
@@ -155,13 +218,28 @@ export class Match {
   private blowUp = false;
   /** El Mati's pre-workout: pitches left out of the wheelchair (0 = sitting). */
   private pumpedLeft = 0;
+  /** Quick game: the game rules, the rival team, the base-running play in progress. */
+  readonly game: GameSession | null = null;
+  private readonly rival: RivalTeam | null = null;
+  private run: RunState | null = null;
+  private runPlay: Play | null = null;
+  private runTitle: string | null = null;
+  private extraBases = 0;
+  private walkOff = false;
+  private runIntroShown = false;
+  private readonly camFocus: Vec3 = { x: 0, y: 0, z: 0 };
+  /** Teammates walking to their new bases after a play: [from, to] in bases. */
+  private ghostTween: [number, number][] = [];
+  /** A second chance was already offered this match. */
+  private continued = false;
+  private disposed = false;
 
   constructor(mode: MatchMode, deps: MatchDeps, seed: number) {
     this.mode = mode;
     this.d = deps;
     this.rng = new Rng(seed);
     this.stadium = stadiumFor(mode);
-    if (mode.kind === 'campaign') {
+    if (mode.kind === 'campaign' || mode.kind === 'daily') {
       this.session = new Session(rulesForStage(mode.stage));
       this.pitcherDef = PITCHERS[mode.stage.pitcher]!;
       this.selector = { pitcher: this.pitcherDef, arsenal: mode.stage.arsenal, speedOffsetMph: mode.stage.speedOffsetMph, zoneRate: mode.stage.zoneRate, airDensity: this.stadium.airDensity };
@@ -171,6 +249,14 @@ export class Match {
       const c = mode.config;
       this.pitcherDef = { ...PITCHERS.machine!, hand: c.pitcherHand, arsenal: c.pitches.map((type) => ({ type, weight: 1, speedOffset: -4 })) };
       this.selector = { pitcher: this.pitcherDef, hand: c.pitcherHand, location: c.location, speedScale: c.speed === 'slow' ? 0.82 : c.speed === 'fast' ? 1.06 : 1, airDensity: this.stadium.airDensity };
+      this.targets = [];
+    } else if (mode.kind === 'game') {
+      this.session = new Session(PRACTICE_RULES);
+      this.rival = rivalById(mode.config.rival);
+      this.game = new GameSession({ innings: mode.config.innings, difficulty: this.rival.difficulty }, this.rng);
+      const base = PITCHERS[this.rival.pitcher]!;
+      this.pitcherDef = { ...base, look: { ...base.look, jersey: this.rival.kit.jersey, jerseyTrim: this.rival.kit.jerseyTrim, cap: this.rival.kit.cap, pants: this.rival.kit.pants } };
+      this.selector = { pitcher: this.pitcherDef, airDensity: this.stadium.airDensity };
       this.targets = [];
     } else {
       this.session = new Session(DERBY_RULES);
@@ -199,6 +285,8 @@ export class Match {
     w.stopThief();
     w.stopInferno();
     w.ball.setFirecracker(false);
+    w.setGameMode(this.rival ? this.rival.kit : null, this.rival ? teamLook(deps.character) : null);
+    w.setBatterVisible(true);
     this.abilityUses = deps.character.ability?.uses ?? 0;
     this.updateScoreboard(null);
   }
@@ -261,6 +349,8 @@ export class Match {
         this.powerToggle = on;
         this.d.input.powerLatched = on;
       },
+      onRunAdvance: () => this.runCommand(false),
+      onRunBack: () => this.runCommand(true),
     });
     this.phase = 'intro';
     this.phaseT = 0;
@@ -268,7 +358,7 @@ export class Match {
       // Show off the castle and the UFO bridge before the first pitch.
       this.d.camera.playIntro(() => this.afterIntro(), 4.2, { from: { x: -20, y: 46, z: -60 }, mid: { x: -8, y: 14, z: -24 }, look: { x: 10, y: 60, z: 520 } });
     } else {
-      this.d.camera.playIntro(() => this.afterIntro(), this.mode.kind === 'campaign' ? 2.8 : 1.6);
+      this.d.camera.playIntro(() => this.afterIntro(), this.mode.kind === 'campaign' || this.mode.kind === 'game' ? 2.8 : 1.6);
     }
     if (this.atHome) {
       const t = gameText(s.lang);
@@ -322,15 +412,19 @@ export class Match {
     else if (this.phase === 'blessing' && this.phaseT > 1.5) this.finishBlessing();
     else if (this.phase === 'robbery' && this.phaseT > 1.2) this.finishRobbery();
     else if (this.phase === 'explosion' && this.phaseT > 2.5) this.phaseT = EXPLOSION_DURATION;
+    else if (this.phase === 'inning' && this.phaseT > 0.8) this.phaseT = INNING_PAUSE;
   }
 
   dispose(): void {
+    this.disposed = true;
     this.d.world.setMatchActive(false);
     this.d.world.setPenny(null);
     this.d.world.stopBlessing();
     this.d.world.stopThief();
     this.d.world.stopInferno();
     this.d.world.ball.setFirecracker(false);
+    this.d.world.setGameMode(null, null);
+    this.d.world.setBatterVisible(true);
     this.d.input.enabled = false;
     this.d.ui.showTip(null);
   }
@@ -339,7 +433,11 @@ export class Match {
 
   onSwing(timeStamp: number, power: boolean): void {
     if (this.paused) return;
-    if (this.phase === 'flight' || this.phase === 'result') {
+    if (this.phase === 'running') {
+      this.runCommand(power || this.powerToggle);
+      return;
+    }
+    if (this.phase === 'flight' || this.phase === 'result' || this.phase === 'inning') {
       this.confirm();
       return;
     }
@@ -435,6 +533,7 @@ export class Match {
         this.d.ui.hideHitCard();
         this.d.ui.showPitchLabel(null);
         this.d.input.enabled = true;
+        if (this.game) this.placeRunnersOnBase();
         if (!this.plan) this.plan = planPitch(choosePitch(this.rng, this.selector, this.lastType));
         this.lastType = this.plan.type;
         this.spawnPenny();
@@ -446,7 +545,7 @@ export class Match {
         break;
       }
       case 'blessing': {
-        // Netanyahu's flying kippah: a side shot of the plate while he comes down.
+        // Nitanllaju's flying kippah: a side shot of the plate while he comes down.
         const sd = this.hand === 'R' ? 1 : -1;
         this.blessingPending = false;
         this.d.input.enabled = false;
@@ -472,6 +571,9 @@ export class Match {
         this.d.audio.crowdReaction('groan');
         break;
       }
+      case 'inning':
+        this.beginInning();
+        break;
       case 'windup':
         this.releaseAtMs = performance.now() + WINDUP * 1000;
         w.pitcher.startDelivery(WINDUP);
@@ -500,7 +602,7 @@ export class Match {
     this.phaseT += dt;
     const w = this.d.world;
     const aim = this.currentAim();
-    const cinematic = this.phase === 'blessing' || this.phase === 'robbery' || this.phase === 'explosion';
+    const cinematic = this.phase === 'blessing' || this.phase === 'robbery' || this.phase === 'explosion' || this.phase === 'running' || this.phase === 'inning' || this.phase === 'offer';
     if (this.phase !== 'flight' && this.phase !== 'result' && this.phase !== 'contact' && !cinematic) {
       w.zone.setAim(aim.x, aim.y);
       if (!this.swing) w.batter.setAim(aim.x, aim.y);
@@ -543,7 +645,19 @@ export class Match {
         this.updateFlight(dt);
         break;
       case 'result':
+        this.updateGhostTween();
         if (this.phaseT >= this.resultDuration) this.afterResult();
+        break;
+      case 'running':
+        this.updateRunning(dt);
+        break;
+      case 'inning':
+        if (this.phaseT >= INNING_PAUSE) {
+          if (this.game?.finished) this.endMatchSoon();
+          else this.enter('ready');
+        }
+        break;
+      case 'offer':
         break;
       case 'blessing':
         if (!w.blessingPlaying || this.phaseT > BLESSING_DURATION + 0.5) this.finishBlessing();
@@ -554,6 +668,7 @@ export class Match {
       case 'explosion':
         if (this.phaseT >= EXPLOSION_DURATION) {
           this.session.forfeit();
+          this.game?.forfeit();
           this.endMatchSoon();
         }
         break;
@@ -577,6 +692,7 @@ export class Match {
   }
 
   get ballForCamera(): Vec3 | null {
+    if (this.phase === 'running' || (this.phase === 'result' && this.run)) return this.camFocus;
     return this.phase === 'flight' || this.phase === 'result' ? this.ballPos : null;
   }
 
@@ -649,6 +765,7 @@ export class Match {
     this.d.audio.batCrack(q, clamp((evMph - 60) / 55, 0, 1));
     w.zone.flashContact();
     w.zone.hideHint();
+    this.buzz(ball.isBarrel ? [35] : ball.quality === 'solid' ? [20] : [8]);
     if (!s.reducedMotion) this.d.camera.shake(0.02 + q * 0.05);
     this.phase = 'contact';
     this.phaseT = 0;
@@ -713,6 +830,7 @@ export class Match {
     w.fx.fireworks({ x: at.x, y: at.y + 3, z: at.z }, 2);
     w.blowUp(at);
     this.d.audio.explosion(1);
+    this.buzz([200, 80, 300]);
     this.d.audio.crowdReaction('ooh');
     if (!s.reducedMotion) this.d.camera.shake(0.35);
     // Wide shot from behind the mound: the plate, the fallen giant and the burning stands.
@@ -749,6 +867,7 @@ export class Match {
         this.d.ui.showCallout(this.firecracker ? t.firecrackerHomeRun : this.rng.pick(t.hrCalls), 'homeRun', `${distTxt} · ${speed(f.ball.exitVelocity, s.units)}`);
         this.d.audio.crowdReaction('roar');
         this.d.audio.homeRunJingle();
+        this.buzz([40, 60, 40, 60, 80]);
         this.excitement = 1;
         const bursts = this.stadium.features.fireworks ? 7 : 3;
         w.fx.fireworks({ x: this.ballPos.x * 0.8, y: 32, z: this.ballPos.z + 25 }, bursts);
@@ -818,6 +937,10 @@ export class Match {
       this.d.audio.crowdReaction('roar');
     }
     for (const tg of f.targetsAt) if (!tg.done) this.d.world.stadium.markTargetHit(tg.index);
+    if (this.game && this.needsRun(f.ball)) {
+      this.startRunning(f.t);
+      return;
+    }
     if (f.ball.outcome !== 'homeRun') this.d.world.batter.react('out');
     this.resolve({ kind: 'contact', ball: f.ball }, this.swing!.evaluation, true);
   }
@@ -842,10 +965,12 @@ export class Match {
     this.d.ui.showHitCard(this.hitCardVM(result, evaluation));
     this.updateTemper(result);
     this.handleEvents(events);
+    this.resultDuration = result.kind === 'contact' ? 2.0 : result.kind === 'ball' ? 1.1 : 1.5;
+    if (this.game) this.applyGame(result);
     this.updateScoreboard(result);
     this.phase = 'result';
     this.phaseT = 0;
-    this.resultDuration = result.kind === 'contact' ? 2.0 : result.kind === 'ball' ? 1.1 : 1.5;
+    if (this.game && this.ghostTween.length) this.resultDuration = Math.max(this.resultDuration, 1.6);
     if (result.kind === 'whiff' || result.kind === 'calledStrike') this.d.audio.crowdReaction('groan');
   }
 
@@ -909,6 +1034,18 @@ export class Match {
       this.enter('robbery');
       return;
     }
+    if (this.game) {
+      this.clearRun();
+      if (this.game.finished) {
+        this.blessingPending = false;
+        this.endMatchSoon();
+        return;
+      }
+      if (!this.game.atBat) {
+        this.enter('inning');
+        return;
+      }
+    }
     if (this.session.finished) {
       this.blessingPending = false;
       this.endMatchSoon();
@@ -922,6 +1059,16 @@ export class Match {
     if (this.phase !== 'robbery') return;
     this.theft = null;
     this.d.world.stopThief();
+    if (this.game) {
+      if (this.game.finished) {
+        this.endMatchSoon();
+        return;
+      }
+      if (!this.game.atBat) {
+        this.enter('inning');
+        return;
+      }
+    }
     if (this.session.finished) {
       this.blessingPending = false;
       this.endMatchSoon();
@@ -948,7 +1095,7 @@ export class Match {
   /**
    * El Mati's pre-workout: before each pitch (while he is still in the
    * wheelchair), with some chance, a shaker of coffee, Monster and horse semen
-   * falls on him and Ronnie Coleman gets up for a few pitches.
+   * falls on him and Ronnie Colamano gets up for a few pitches.
    */
   private rollPreWorkout(): void {
     const pw = this.d.character.preWorkout;
@@ -963,7 +1110,7 @@ export class Match {
     const call = this.rng.pick(t.preWorkoutCalls);
     const { vision, contact, power } = pw.ratings;
     window.setTimeout(() => this.d.ui.showCallout(call, 'bonus', t.preWorkoutCallSub(vision, contact, power, pw.pitches)), 1500);
-    this.d.world.stadium.setScoreboard({ title: t.preWorkoutBoard, line1: t.preWorkoutIngredients, line2: 'RONNIE COLEMAN', big: 'YEAH BUDDY', highlight: true });
+    this.d.world.stadium.setScoreboard({ title: t.preWorkoutBoard, line1: t.preWorkoutIngredients, line2: 'RONNIE COLAMANO', big: 'YEAH BUDDY', highlight: true });
   }
 
   /**
@@ -984,7 +1131,7 @@ export class Match {
     this.d.ui.showCallout(t.pennyOn, 'info');
   }
 
-  /** Netanyahu blesses the batter: the PCI fills most of the zone for a few pitches. */
+  /** Nitanllaju blesses the batter: the PCI fills most of the zone for a few pitches. */
   private giveBlessing(): void {
     const pb = this.d.character.pennyBlessing;
     if (!pb || this.blessingLeft > 0) return;
@@ -997,7 +1144,7 @@ export class Match {
 
   /**
    * Whoever brings the penny blessing (Benjamin) is welcomed into the match
-   * by Netanyahu in his flying kippah, once, right after the camera intro.
+   * by Nitanllaju in his flying kippah, once, right after the camera intro.
    */
   private afterIntro(): void {
     if (this.d.character.pennyBlessing && !this.welcomed) {
@@ -1005,16 +1152,16 @@ export class Match {
       this.welcoming = true;
       this.enter('blessing');
     } else {
-      this.enter('ready');
+      this.enter(this.game ? 'inning' : 'ready');
     }
   }
 
-  /** Netanyahu raises his arms and welcomes the player to the game. */
+  /** Nitanllaju raises his arms and welcomes the player to the game. */
   private greet(): void {
     if (!this.welcoming) return;
     this.welcoming = false;
     const t = gameText(this.d.settings().lang);
-    this.d.ui.showCallout(t.welcomeNetanyahu, 'bonus', t.welcomeSub);
+    this.d.ui.showCallout(t.welcomeNitanllaju, 'bonus', t.welcomeSub);
     this.d.audio.crowdReaction('cheer');
   }
 
@@ -1024,6 +1171,11 @@ export class Match {
     if (this.welcoming) {
       this.greet();
       if (this.d.firstTime) this.showFirstTip();
+      // Quick game: the welcome comes before the first inning.
+      if (this.game && this.game.inning === 1 && !this.game.atBat) {
+        this.enter('inning');
+        return;
+      }
     } else {
       this.giveBlessing();
     }
@@ -1031,18 +1183,459 @@ export class Match {
   }
 
   private endMatchSoon(): void {
-    if (this.phase === 'ended') return;
+    if (this.phase === 'ended' || this.phase === 'offer') return;
+    const kind = this.session.rules.limit?.type;
+    const lost = (this.mode.kind === 'campaign' || this.mode.kind === 'daily') && !this.session.goalMet;
+    if (!this.continued && this.d.offerContinue && kind && !this.session.forfeited && (lost || this.mode.kind === 'derby')) {
+      this.continued = true;
+      this.phase = 'offer';
+      this.d.input.enabled = false;
+      void this.d.offerContinue(kind).then((ok) => {
+        if (this.phase !== 'offer') return;
+        if (ok) this.revive();
+        else {
+          this.phase = 'result';
+          this.endMatchSoon();
+        }
+      });
+      return;
+    }
     this.phase = 'ended';
     this.d.input.enabled = false;
     this.session.finish();
-    const success = this.session.success;
+    const success = this.game ? this.game.result === 'win' : this.session.success;
     this.d.audio.stageEnd(success);
-    if (success && this.mode.kind === 'campaign') {
+    if (success && (this.mode.kind === 'campaign' || this.mode.kind === 'game' || this.mode.kind === 'daily')) {
       this.d.world.fx.confetti({ x: 0, y: 2, z: -2 });
       this.d.audio.crowdReaction('roar');
     }
-    window.setTimeout(() => this.d.onFinished({ mode: this.mode, session: this.session }), 900);
+    window.setTimeout(() => this.d.onFinished({ mode: this.mode, session: this.session, game: this.game, extraBases: this.extraBases, walkOff: this.walkOff }), 900);
   }
+
+  /** The player watched the ad: three more outs (or 15 s) and back to batting. */
+  private revive(): void {
+    this.session.revive();
+    const p = playText(this.d.settings().lang);
+    this.d.ui.showCallout(p.continued, 'bonus', p.continuedSub);
+    this.d.audio.crowdReaction('cheer');
+    this.enter('ready');
+  }
+
+  /** Short vibration on phones that support it (setting: haptics). */
+  private buzz(pattern: number[]): void {
+    if (!this.d.settings().haptics) return;
+    try {
+      navigator.vibrate?.(pattern);
+    } catch {
+      /* not allowed */
+    }
+  }
+
+  // ── Quick game ──
+
+  /** Top of the inning (rival, simulated) and the summary before your half. */
+  private beginInning(): void {
+    const g = this.game!;
+    const s = this.d.settings();
+    const p = playText(s.lang);
+    const rival = this.rival!;
+    this.d.input.enabled = false;
+    this.clearRun();
+    const ev = g.startInning();
+    const half = ev.find((e) => e.type === 'rivalHalf');
+    const head = ev.find((e) => e.type === 'inning');
+    const title = head && head.type === 'inning' ? p.inningCall(head.inning, head.extra) : '';
+    const runs = half && half.type === 'rivalHalf' ? half.runs : 0;
+    const scored = p.rivalScored(rival.name[s.lang], runs);
+    const blank = runs === 0 ? ` · ${this.rng.pick(p.rivalBlank)}` : '';
+    this.d.ui.showCallout(title, 'info', `${scored}${blank}`);
+    if (runs > 0) this.d.audio.crowdReaction('groan');
+    const taunt = this.rng.pick(rival.taunts)[s.lang];
+    window.setTimeout(() => {
+      if (this.phase === 'inning') this.d.ui.showCallout(rival.short, 'warning', taunt);
+    }, 1400);
+    if (ev.some((e) => e.type === 'ghostRunner')) window.setTimeout(() => this.d.ui.showCallout(p.ghostRunner, 'info'), 2300);
+    this.placeRunnersOnBase();
+    this.d.camera.setBatting();
+    this.updateScoreboard(null);
+  }
+
+  /** Teammates standing on their bases (lead-off pose) between pitches. */
+  private placeRunnersOnBase(): void {
+    const g = this.game;
+    const w = this.d.world;
+    w.runner.setVisible(false);
+    w.setBatterVisible(true);
+    const occupied = g ? g.bases.map((on, i) => (on ? i + 1 : 0)).filter((x) => x > 0) : [];
+    w.ghosts.forEach((r, i) => {
+      const base = occupied[i];
+      r.setVisible(base !== undefined);
+      if (base !== undefined) {
+        const b = basePos(base);
+        const n = basePos(base + 1);
+        // A step off the bag toward the next base.
+        const k = 1.8 / Math.hypot(n.x - b.x, n.z - b.z);
+        r.place({ x: b.x + (n.x - b.x) * k, z: b.z + (n.z - b.z) * k }, Math.atan2(-b.x, -b.z), 'lead');
+      }
+    });
+    w.fielders.reset();
+  }
+
+  /** Grounders the infield fields and every hit that stays in the park are run out. */
+  private needsRun(b: BattedBall): boolean {
+    return b.outcome === 'hit' || (b.outcome === 'out' && b.launchAngleDeg < 10);
+  }
+
+  /** Sprint speed rating right now (El Mati off the chair runs better). */
+  private get speedRating(): number {
+    const c = this.d.character;
+    return this.pumpedLeft > 0 && c.preWorkout ? c.preWorkout.ratings.speed : c.ratings.speed;
+  }
+
+  private startRunning(flightT: number): void {
+    const g = this.game!;
+    const w = this.d.world;
+    const s = this.d.settings();
+    const p = playText(s.lang);
+    const ev = this.swing!.evaluation;
+    if (ev.kind !== 'contact') return;
+    const ball = ev.ball;
+    const plan = planFielding(ball, this.stadium);
+    const forceSecond = ball.outcome === 'out' && g.forceAtSecond;
+    const play = new BaseRunningPlay(plan, { speed: this.speedRating, forceSecond });
+    // Catch up with the flight that was just shown (he was already running).
+    const t0 = Math.max(0, Math.min(flightT, ball.outcome === 'out' ? plan.pickupTime - 0.6 : ball.hangTime + 0.25));
+    while (play.t < t0 && !play.finished) play.step(1 / 120);
+    const ghosts: number[] = [];
+    g.bases.forEach((on, i) => {
+      if (on) ghosts.push(i + 1);
+    });
+    const used = new Set<FielderId>([plan.fielder]);
+    const pick = (...ids: FielderId[]): FielderId | null => {
+      const id = ids.find((x) => !used.has(x)) ?? null;
+      if (id) used.add(id);
+      return id;
+    };
+    const first = pick('1B', '2B');
+    const second = ['SS', '3B', 'LF'].includes(plan.fielder) ? pick('2B', 'SS') : pick('SS', '2B');
+    const third = pick('3B', 'SS');
+    this.run = { play, plan, ball, ghosts, cover: [null, first, second, third, null], doneAt: -1, ballPos: { x: 0, y: 0, z: 0 } };
+    this.runPlay = null;
+    this.runTitle = null;
+    w.setBatterVisible(false);
+    w.runner.setVisible(true);
+    w.ball.setVisible(true);
+    w.ball.setTrail('off');
+    w.fx.clearMarkers();
+    this.d.camera.overview();
+    this.phase = 'running';
+    this.phaseT = 0;
+    this.d.input.enabled = true;
+    if (!this.runIntroShown && ball.outcome === 'hit') {
+      this.runIntroShown = true;
+      const look = this.d.character.look;
+      const line = look.wheelchair ? p.runStart.wheelchair : look.heightM > 3 ? p.runStart.giant : look.monkey ? p.runStart.monkey : look.skeleton ? p.runStart.skeleton : look.rabbi ? p.runStart.rabbi : p.runStart.default;
+      this.d.ui.showCallout(line, 'info');
+    }
+    this.renderRun();
+  }
+
+  /** Space / tap: run on (or slide); Shift / right-click / back: retreat. */
+  private runCommand(back: boolean): void {
+    const r = this.run;
+    if (!r || this.phase !== 'running' || r.play.finished) return;
+    const p = playText(this.d.settings().lang);
+    if (back) {
+      r.play.retreat();
+      return;
+    }
+    if (r.play.slideWindow) {
+      const ev = r.play.slide();
+      if (ev && ev.type === 'slide') {
+        this.d.ui.showCallout(ev.quality === 'perfect' ? p.slidePerfect : p.slideEarly, ev.quality === 'perfect' ? 'bonus' : 'warning');
+        this.d.audio.thud(0.5);
+        this.buzz([25]);
+      }
+      return;
+    }
+    if (r.play.advance()) this.d.audio.uiClick();
+  }
+
+  private updateRunning(dt: number): void {
+    const r = this.run!;
+    const p = playText(this.d.settings().lang);
+    if (!r.play.finished) {
+      for (const e of r.play.step(dt)) this.onRunEvent(e, p);
+      if (r.play.finished) r.doneAt = this.phaseT;
+    }
+    this.renderRun();
+    if (r.play.finished && this.phaseT - r.doneAt > 0.7) this.finishRunning();
+  }
+
+  private onRunEvent(e: RunEvent, p: ReturnType<typeof playText>): void {
+    switch (e.type) {
+      case 'pickup':
+      case 'catch':
+        this.d.audio.mittPop();
+        break;
+      case 'throw':
+        this.d.audio.swingWhoosh(false);
+        break;
+      case 'safe':
+        if (e.margin < 0.6) {
+          this.d.ui.showCallout(p.safe, 'bonus', this.rng.pick(e.margin < 0.25 ? p.safeClose : p.safeEasy));
+          this.d.audio.crowdReaction('cheer');
+          this.excitement = 1;
+        }
+        break;
+      case 'out':
+        this.d.ui.showCallout(p.outAt(e.base), 'warning', this.rng.pick(p.outFunny));
+        this.d.audio.crowdReaction('groan');
+        this.buzz([70]);
+        break;
+      case 'touch':
+        if (e.base === 4) {
+          this.d.audio.crowdReaction('roar');
+          this.excitement = 1;
+        }
+        break;
+      default:
+        break;
+    }
+  }
+
+  /** Puts the runner, his teammates, the fielders and the ball where the play says. */
+  private renderRun(): void {
+    const r = this.run;
+    if (!r) return;
+    const w = this.d.world;
+    const play = r.play;
+    const t = play.t;
+    // Batter-runner.
+    const at = play.position();
+    const next = basePos(play.toward);
+    const mode = play.stopped || play.out ? 'stand' : play.sliding ? 'slide' : 'run';
+    w.runner.place(at, play.stopped ? Math.atan2(-at.x, -at.z) : headingTo(at, next), mode);
+    // Teammates move along with him (their final bases are settled after the play).
+    const prog = play.progress;
+    w.ghosts.forEach((g, i) => {
+      const from = r.ghosts[i];
+      if (from === undefined) {
+        g.setVisible(false);
+        return;
+      }
+      g.setVisible(true);
+      const pp = Math.min(4, from + Math.max(0, prog));
+      const pos = pathPoint(pp);
+      g.place(pos, headingTo(pos, pathPoint(Math.min(4, pp + 0.1))), pp >= 4 || play.stopped ? 'stand' : 'run');
+    });
+    // Fielders: the one going for the ball, and the ones covering the bags.
+    const f = w.fielders;
+    const plan = r.plan;
+    const b = play.ball;
+    const chaserAt = t < plan.pickupTime ? fielderAt(plan, t) : plan.pickup;
+    const targetBase = b.kind === 'thrown' ? b.to : null;
+    const throwing = b.kind === 'thrown' && t - b.departAt < 0.35 && b.from === plan.pickup;
+    f.move(plan.fielder, chaserAt, t < plan.pickupTime ? looseBallAt(plan, t) : { x: 0, z: 0 }, t < plan.pickupTime ? 'run' : throwing ? 'throw' : 'stand');
+    for (let base = 1; base <= 3; base++) {
+      const id = r.cover[base];
+      if (!id) continue;
+      const home = f.home(id);
+      const bag = basePos(base);
+      const d = Math.hypot(bag.x - home.x, bag.z - home.z);
+      const k = d > 0 ? Math.max(0, Math.min(1, ((t - 0.3) * 7) / d)) : 1;
+      const pos = { x: home.x + (bag.x - home.x) * k, z: home.z + (bag.z - home.z) * k };
+      f.move(id, pos, b.kind === 'loose' ? looseBallAt(plan, t) : plan.pickup, k < 1 ? 'run' : targetBase === base ? 'catch' : 'ready');
+    }
+    // The ball.
+    const bp = r.ballPos;
+    if (b.kind === 'loose') {
+      if (t < plan.groundTime) {
+        const traj = r.ball.trajectory;
+        let i = 0;
+        while (i < traj.length - 1 && traj[i + 1]!.t <= t) i++;
+        const s0 = traj[i]!;
+        bp.x = s0.x;
+        bp.y = s0.y;
+        bp.z = s0.z;
+      } else {
+        const lp = looseBallAt(plan, t);
+        const since = t - plan.groundTime;
+        bp.x = lp.x;
+        bp.z = lp.z;
+        bp.y = 0.08 + Math.abs(Math.sin(since * 7)) * 0.5 * Math.exp(-since * 1.5);
+      }
+    } else if (b.kind === 'held') {
+      const holder = b.base === null ? chaserAt : basePos(b.base);
+      bp.x = holder.x;
+      bp.z = holder.z;
+      bp.y = 1.1;
+    } else {
+      const to = basePos(b.to);
+      const u = Math.max(0, Math.min(1, (t - b.departAt) / Math.max(0.05, b.arriveAt - b.departAt)));
+      const d = Math.hypot(to.x - b.from.x, to.z - b.from.z);
+      bp.x = b.from.x + (to.x - b.from.x) * u;
+      bp.z = b.from.z + (to.z - b.from.z) * u;
+      bp.y = 1.6 + Math.sin(Math.PI * u) * Math.min(9, d * 0.07);
+    }
+    w.ball.setPosition(bp);
+    // Camera: between the runner and the ball, leaning on the runner.
+    this.camFocus.x = at.x * 0.6 + bp.x * 0.4;
+    this.camFocus.y = 0;
+    this.camFocus.z = at.z * 0.6 + bp.z * 0.4;
+  }
+
+  /** Turns the finished run into a play for the game rules and shows the result. */
+  private finishRunning(): void {
+    const r = this.run!;
+    const res = r.play.result();
+    const lang = this.d.settings().lang;
+    const p = playText(lang);
+    const ball = r.ball;
+    const deep = r.plan.deep;
+    let play: Play;
+    let title: string;
+    if (ball.outcome === 'out') {
+      const slow = ball.exitVelocity / MPH < 72;
+      if (res.forceOut) {
+        play = { type: 'groundOut', doublePlay: res.out, fieldersChoice: !res.out, slow };
+        title = res.out ? p.doublePlay : p.fieldersChoice;
+      } else if (res.out) {
+        play = { type: 'groundOut', doublePlay: false, fieldersChoice: false, slow };
+        title = gameText(lang).result.out;
+      } else {
+        play = { type: 'infieldHit' };
+        title = p.infieldHit;
+        this.d.ui.showCallout(p.infieldHit, 'bonus', p.infieldHitSub);
+      }
+    } else if (res.out) {
+      play = res.bases >= 1 ? { type: 'thrownOut', safeBases: Math.min(3, res.bases) as 1 | 2 | 3, deep } : { type: 'groundOut', doublePlay: false, fieldersChoice: false, slow: false };
+      title = p.outAt(res.outAt ?? res.bases + 1);
+    } else {
+      const bases = Math.max(1, Math.min(4, res.bases)) as 1 | 2 | 3 | 4;
+      play = { type: 'hit', bases, deep };
+      title = bases === 1 ? p.single : bases === 2 ? p.double : bases === 3 ? p.triple : p.insidePark;
+      if (bases >= 2) this.extraBases++;
+      if (bases === 4) {
+        this.d.ui.showCallout(p.insidePark, 'homeRun', p.insideParkSub);
+        this.d.audio.homeRunJingle();
+        this.d.world.fx.fireworks({ x: 0, y: 30, z: 60 }, 4);
+      } else if (bases >= 2) this.d.ui.showCallout(title, 'bonus');
+    }
+    this.runPlay = play;
+    this.runTitle = title;
+    this.resolve({ kind: 'contact', ball }, this.swing!.evaluation, true);
+  }
+
+  private clearRun(): void {
+    this.run = null;
+    this.runPlay = null;
+    this.runTitle = null;
+    this.ghostTween = [];
+  }
+
+  /** Feeds the pitch / play to the game rules and narrates what happened. */
+  private applyGame(result: PitchResult): void {
+    const g = this.game!;
+    const before = [...g.bases];
+    let ev: GameEvent[];
+    if (result.kind === 'ball') ev = g.pitch('ball');
+    else if (result.kind === 'calledStrike') ev = g.pitch('calledStrike');
+    else if (result.kind === 'whiff') ev = g.pitch('whiff');
+    else {
+      const b = result.ball;
+      if (b.outcome === 'foul') ev = g.pitch('foul');
+      else if (b.outcome === 'homeRun') ev = g.applyPlay({ type: 'homeRun' });
+      else if (this.runPlay) ev = g.applyPlay(this.runPlay);
+      else ev = g.applyPlay(b.launchAngleDeg >= 20 ? { type: 'flyOut', distanceM: b.distance } : { type: 'lineOut' });
+    }
+    // Teammates (not the batter) move to their new bases during the result.
+    // Ghost rigs follow the ascending order of the bases they started on.
+    const run = this.run;
+    const startsAsc = run ? [...run.ghosts] : before.map((on, i) => (on ? i + 1 : 0)).filter((x) => x > 0);
+    const prog = run ? Math.max(0, run.play.progress) : 0;
+    const walked = ev.some((e) => e.type === 'walk');
+    const batterBase = walked ? 1 : run && !run.play.out ? run.play.result().bases : 0;
+    const endsAsc = g.bases.map((on, i) => (on ? i + 1 : 0)).filter((x) => x > 0 && x !== batterBase);
+    const forcedOut = this.runPlay?.type === 'groundOut' && (this.runPlay.doublePlay || this.runPlay.fieldersChoice) && startsAsc[0] === 1;
+    const inningOver = !g.atBat && !(g.finished && g.result === 'win');
+    let k = 0;
+    this.ghostTween = startsAsc.map((from, i) => {
+      const shown = Math.min(4, from + prog);
+      if (inningOver || (forcedOut && i === 0)) return [shown, -1];
+      const to = endsAsc[k++] ?? 4;
+      return [shown, to];
+    });
+    this.handleGameEvents(ev);
+  }
+
+  private updateGhostTween(): void {
+    if (!this.game || !this.ghostTween.length) return;
+    const k = Math.min(1, this.phaseT / 1.2);
+    this.d.world.ghosts.forEach((g, i) => {
+      const tw = this.ghostTween[i];
+      if (!tw) return;
+      if (tw[1] < 0) {
+        g.setVisible(false);
+        return;
+      }
+      const pp = tw[0] + (tw[1] - tw[0]) * k;
+      g.setVisible(pp < 4);
+      const pos = pathPoint(pp);
+      g.place(pos, headingTo(pos, pathPoint(Math.min(4, pp + 0.1))), k < 1 && tw[1] > tw[0] ? 'run' : 'stand');
+    });
+  }
+
+  private handleGameEvents(ev: GameEvent[]): void {
+    const p = playText(this.d.settings().lang);
+    let delay = 900;
+    const later = (fn: () => void): void => {
+      window.setTimeout(() => {
+        if (!this.disposed) fn();
+      }, delay);
+      delay += 900;
+    };
+    for (const e of ev) {
+      switch (e.type) {
+        case 'walk':
+          later(() => this.d.ui.showCallout(p.walk, 'info', this.rng.pick(p.walkSub)));
+          break;
+        case 'strikeout':
+          later(() => this.d.ui.showCallout(p.strikeout, 'warning', this.rng.pick(p.strikeoutSub)));
+          break;
+        case 'runs':
+          later(() => {
+            this.d.ui.showCallout(p.runs(e.n), 'bonus', e.rbi > 0 ? p.rbi(e.rbi) : undefined);
+            this.d.audio.crowdReaction('cheer');
+          });
+          break;
+        case 'sacFly':
+          later(() => this.d.ui.showCallout(p.sacFly, 'bonus', p.sacFlySub));
+          break;
+        case 'doublePlay':
+          later(() => this.d.ui.showCallout(p.doublePlay, 'warning', p.doublePlaySub));
+          break;
+        case 'fieldersChoice':
+          later(() => this.d.ui.showCallout(p.fieldersChoice, 'info', p.fieldersChoiceSub));
+          break;
+        case 'halfOver':
+          later(() => this.d.ui.showCallout(p.sideRetired, 'warning', p.sideRetiredSub));
+          break;
+        case 'walkOff':
+          this.walkOff = true;
+          later(() => {
+            this.d.ui.showCallout(p.walkOff, 'homeRun', p.walkOffSub);
+            this.d.audio.crowdReaction('roar');
+            this.d.world.fx.fireworks({ x: 0, y: 30, z: 70 }, 6);
+          });
+          break;
+        default:
+          break;
+      }
+    }
+    if (ev.some((e) => e.type === 'finished' || e.type === 'halfOver')) this.resultDuration = Math.max(this.resultDuration, delay / 1000 + 0.3);
+  }
+
 
   // ── View models ──
 
@@ -1054,15 +1647,35 @@ export class Match {
     const pro = s.controlMode === 'pro';
     const hint = this.d.input.isTouch ? (pro ? t.controlsTouch : t.controlsTouchCasual) : pro ? t.controlsPro : t.controlsCasual;
     const ability = this.abilityVM();
-    if (this.mode.kind === 'campaign') {
-      const st = this.mode.stage;
+    if (this.game && this.rival) {
+      const g = this.game;
+      const p = playText(s.lang);
+      return {
+        mode: 'game',
+        stageLabel: `${p.game} · ${this.rival.name[s.lang]}`,
+        goalText: `${p.inningBottom(g.inning)}|${g.you}-${g.rival}`,
+        progress: Math.min(1, (g.inning - 1 + g.outs / 3) / g.rules.innings),
+        outs: null,
+        timeLeft: null,
+        streak: null,
+        score: null,
+        powerOn,
+        controlHint: this.phase === 'running' ? (this.d.input.isTouch ? p.runHintTouch : p.runHint) : hint,
+        ability,
+        scorebug: { away: this.rival.short, home: p.you, awayRuns: g.rival, homeRuns: g.you, inning: g.atBat ? p.inningBottom(g.inning) : p.inningTop(g.inning), balls: g.balls, strikes: g.strikes, outs: g.outs, bases: [...g.bases] },
+        run: this.runVM(),
+      };
+    }
+    const stage = stageOf(this.mode);
+    if (stage) {
+      const st = stage;
       const [cur, target] = ses.progress();
       const g = st.goal;
       const label = t.goalLabel[g.type];
       const value = g.type === 'distance' ? `${dist(cur * FT, s.units)} / ${dist(target * FT, s.units)}` : `${Math.min(cur, target)}/${target}`;
       return {
-        mode: 'campaign',
-        stageLabel: `${st.id} · ${st.name[s.lang]}`,
+        mode: this.mode.kind === 'daily' ? 'daily' : 'campaign',
+        stageLabel: this.mode.kind === 'daily' ? `${playText(s.lang).daily} · ${st.name[s.lang]}` : `${st.id} · ${st.name[s.lang]}`,
         goalText: `${label}|${value}`,
         progress: target > 0 ? cur / target : 0,
         outs: ses.rules.limit?.type === 'outs' ? { left: ses.outsLeft, total: ses.outsTotal } : null,
@@ -1101,6 +1714,25 @@ export class Match {
       powerOn,
       controlHint: hint,
       ability,
+    };
+  }
+
+  /** Base-running controls (null when not running). */
+  private runVM(): HudVM['run'] {
+    const r = this.run;
+    if (!r || this.phase !== 'running' || r.play.finished) return null;
+    const s = this.d.settings();
+    const p = playText(s.lang);
+    const sign = s.runCoach ? r.play.coach() : null;
+    const canBack = !r.play.stopped && r.play.toward > r.play.from && (r.play.goal > r.play.toward || r.play.from >= 1);
+    return {
+      coach: sign,
+      coachText: sign ? p.coach[sign] : '',
+      coachWho: p.coachWho,
+      primary: r.play.slideWindow ? p.runSlide : p.runAdvance,
+      slide: r.play.slideWindow,
+      back: canBack ? p.runBack : null,
+      hint: this.d.input.isTouch ? p.runHintTouch : p.runHint,
     };
   }
 
@@ -1161,9 +1793,11 @@ export class Match {
     const robbed = !!this.theft;
     if (b.targetsHit.length) badges.push(t.target);
     if (robbed) badges.push(t.thiefBadge);
+    const runHit = !!this.runPlay && (this.runPlay.type === 'hit' || this.runPlay.type === 'infieldHit');
+    const runOut = !!this.runPlay && !runHit;
     return {
-      result: b.outcome,
-      title: t.result[b.outcome],
+      result: runHit ? 'hit' : runOut ? 'out' : b.outcome,
+      title: this.runTitle ?? t.result[b.outcome],
       stats: [
         { label: t.stat.ev, value: speed(b.exitVelocity, s.units) },
         { label: t.stat.la, value: `${Math.round(b.launchAngleDeg)}°` },
@@ -1181,8 +1815,22 @@ export class Match {
   private updateScoreboard(result: PitchResult | null): void {
     const s = this.d.settings();
     const t = gameText(s.lang);
+    if (this.game && this.rival) {
+      const g = this.game;
+      const p = playText(s.lang);
+      const big = this.runTitle ?? (result ? (result.kind === 'contact' ? t.result[result.ball.outcome] : t.result[result.kind]) : p.inningCall(g.inning, g.isExtra));
+      this.d.world.stadium.setScoreboard({
+        title: `${this.rival.short} ${g.rival}  ·  ${g.you} ${p.you}`,
+        line1: `${g.atBat ? p.inningBottom(g.inning) : p.inningTop(g.inning)} · ${p.outCall(g.outs)} · ${p.countLine(g.balls, g.strikes)}`,
+        line2: this.rival.name[s.lang].toUpperCase(),
+        big: big.toUpperCase(),
+        highlight: !!result && result.kind === 'contact' && result.ball.outcome === 'homeRun',
+      });
+      return;
+    }
     const title = this.stadium.name[s.lang].toUpperCase();
-    const line2 = this.mode.kind === 'campaign' ? `${this.mode.stage.id} · ${this.mode.stage.name[s.lang].toUpperCase()}` : t.derby.toUpperCase();
+    const st = stageOf(this.mode);
+    const line2 = st ? `${this.mode.kind === 'daily' ? playText(s.lang).daily.toUpperCase() : st.id} · ${st.name[s.lang].toUpperCase()}` : t.derby.toUpperCase();
     if (!result || result.kind !== 'contact') {
       this.d.world.stadium.setScoreboard({ title, line1: `HR ${this.session.homeRuns}`, line2, big: result ? t.result[result.kind] : 'JONRÓN', highlight: false });
       return;

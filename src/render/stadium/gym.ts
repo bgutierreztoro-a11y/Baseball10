@@ -11,7 +11,7 @@ import { MeshBuilder, chalkLine } from './geom';
  * a mirror band and murals, a roof of steel trusses with strip lights, rubber
  * tile lines and a logo painted on the floor, gym equipment all around the
  * outfield (racks, benches, treadmills, cable towers, dumbbells, kettlebells,
- * plates...), two golden statues of Ronnie Coleman flexing behind the stands,
+ * plates...), two golden statues of Ronnie Colamano flexing behind the stands,
  * banners with his catchphrases and heavy bags that swing. Pure decoration:
  * the ball flies through all of it. Static props are merged into one mesh per
  * material, so the whole gym costs a dozen draw calls.
@@ -358,7 +358,7 @@ function bagRigFrame(r: Rig): void {
   r.box('red', 5.0, 0.05, 0.2, 0, 2.9, 0);
 }
 
-/** Front double biceps: the golden Ronnie Coleman statue on its pedestal (y = 0 at the ground). */
+/** Front double biceps: the golden Ronnie Colamano statue on its pedestal (y = 0 at the ground). */
 function statue(r: Rig): void {
   const P = 0.65;
   r.box('stone', 2.0, P, 1.5, 0, P / 2, 0);
@@ -714,7 +714,7 @@ export function createGym(def: StadiumDef, quality: QualitySettings): Gym {
     }
   }
 
-  // ── Ronnie Coleman statues behind the stands, flexing at the pitcher ──
+  // ── Ronnie Colamano statues behind the stands, flexing at the pitcher ──
   for (const ang of [-30, 30]) {
     const a = ang * DEG;
     const p = polarToXZ(a, 176);

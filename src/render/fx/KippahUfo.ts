@@ -5,7 +5,7 @@ import { Humanoid, makePose } from '../characters/humanoid';
 /**
  * Benjamin's blessing cinematic: a giant flying kippah (UFO style: blinking
  * lights under the rim and a tractor beam) swoops down next to home plate;
- * Benjamin Netanyahu floats down the beam, blesses the batter with raised
+ * Benjamin Nitanllaju floats down the beam, blesses the batter with raised
  * arms, floats back up and the kippah flies away. Driven by elapsed time.
  */
 
@@ -63,8 +63,8 @@ function kippahTexture(): THREE.CanvasTexture {
   return t;
 }
 
-/** Netanyahu: grey hair, navy suit, white shirt, blue tie. */
-function makeNetanyahu(quality: QualitySettings): Humanoid {
+/** Nitanllaju: grey hair, navy suit, white shirt, blue tie. */
+function makeNitanllaju(quality: QualitySettings): Humanoid {
   const h = new Humanoid(
     { skin: '#e7bf9f', jersey: '#1c2538', trim: '#1c2538', sleeve: '#1c2538', pants: '#1c2538', socks: '#111216', shoes: '#0d0d10', hat: '#1c2538', gloves: '#e7bf9f', build: 1.08 },
     quality,
@@ -134,11 +134,11 @@ export class KippahUfo {
     const beamG = new THREE.CylinderGeometry(1.0, 2.2, HOVER_Y, 32, 1, true);
     beamG.translate(0, -HOVER_Y / 2, 0);
     this.beam = new THREE.Mesh(beamG, new THREE.MeshBasicMaterial({ color: '#fff1b8', transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, toneMapped: false }));
-    this.man = makeNetanyahu(quality);
+    this.man = makeNitanllaju(quality);
     // The beam hangs straight down from the saucer (not tilted with it).
     this.root.add(this.ufo, this.beam, this.man.root);
     this.root.visible = false;
-    // No shadows from the saucer: it would leave Netanyahu in the dark.
+    // No shadows from the saucer: it would leave Nitanllaju in the dark.
     for (const obj of [this.ufo, this.beam]) {
       obj.traverse((o) => {
         if (o instanceof THREE.Mesh) {
@@ -156,7 +156,7 @@ export class KippahUfo {
 
   /**
    * Starts the sequence: the kippah hovers over `land` (feet position of
-   * Netanyahu), who faces `faceYaw`, tilted toward `camera`. `onGive` fires
+   * Nitanllaju), who faces `faceYaw`, tilted toward `camera`. `onGive` fires
    * when he blesses the batter.
    */
   play(land: { x: number; z: number }, faceYaw: number, camera: { x: number; z: number }, onGive: () => void): void {
@@ -204,7 +204,7 @@ export class KippahUfo {
     (this.beam.material as THREE.MeshBasicMaterial).opacity = 0.3 * beamOn;
     this.beam.visible = beamOn > 0.01;
 
-    // Netanyahu: down the beam, bless, back up.
+    // Nitanllaju: down the beam, bless, back up.
     const down = ease((t - 2.1) / 1.3);
     const up = ease((t - 5.3) / 0.9);
     const visible = t > 2.0 && t < 6.3;

@@ -274,6 +274,124 @@ function makeDumbbell(): { group: THREE.Group; wood: THREE.MeshStandardMaterial;
 }
 
 /**
+ * A giant French baguette as a bat (same axis convention: knob at 0, along
+ * +Y): a paper wrapper under the hands and a golden crust with the classic
+ * diagonal scores along the barrel.
+ */
+function makeBaguette(): { group: THREE.Group; wood: THREE.MeshStandardMaterial; grip: THREE.MeshStandardMaterial } {
+  const crust = new THREE.MeshStandardMaterial({ color: '#d39a4a', roughness: 0.75 });
+  const crumb = new THREE.MeshStandardMaterial({ color: '#f2d59c', roughness: 0.9 });
+  const paper = new THREE.MeshStandardMaterial({ color: '#f4efe2', roughness: 0.95 });
+  const group = new THREE.Group();
+  const prof = [
+    [0, -0.01],
+    [0.024, 0.0],
+    [0.03, 0.05],
+    [0.034, 0.3],
+    [0.038, 0.6],
+    [0.037, 0.8],
+    [0.026, BAT_LENGTH - 0.01],
+    [0, BAT_LENGTH + 0.01],
+  ].map(([r, y]) => new THREE.Vector2(r!, y!));
+  const loaf = new THREE.Mesh(new THREE.LatheGeometry(prof, 14), crust);
+  loaf.scale.set(1.15, 1, 0.9);
+  group.add(loaf);
+  for (let k = 0; k < 6; k++) {
+    const cut = new THREE.Mesh(new THREE.CapsuleGeometry(0.008, 0.06, 2, 6), crumb);
+    cut.position.set(0, 0.36 + k * 0.08, 0.031);
+    cut.rotation.set(0, 0, 0.9);
+    group.add(cut);
+  }
+  const wrap = new THREE.Mesh(new THREE.CylinderGeometry(0.036, 0.034, 0.22, 12, 1, true), paper);
+  wrap.position.y = 0.12;
+  wrap.scale.set(1.15, 1, 0.92);
+  (wrap.material as THREE.MeshStandardMaterial).side = THREE.DoubleSide;
+  group.add(wrap);
+  return { group, wood: crust, grip: paper };
+}
+
+/**
+ * La chancla: a giant flip-flop held by the heel. The sole lies in the
+ * local YZ plane (like the racket head) so it faces the pitcher in the
+ * swing; the V strap sits on top near the toe, around the sweet spot.
+ */
+function makeChancla(): { group: THREE.Group; wood: THREE.MeshStandardMaterial; grip: THREE.MeshStandardMaterial } {
+  const sole = new THREE.MeshStandardMaterial({ color: '#2c7be5', roughness: 0.6 });
+  const edge = new THREE.MeshStandardMaterial({ color: '#f7d117', roughness: 0.6 });
+  const strap = new THREE.MeshStandardMaterial({ color: '#f4f1e8', roughness: 0.5 });
+  const shape = new THREE.Shape();
+  // Footprint outline in (z, y): heel at the knob, toe past the sweet spot.
+  const pts: [number, number][] = [
+    [0, 0.05],
+    [0.05, 0.08],
+    [0.065, 0.3],
+    [0.075, 0.55],
+    [0.09, 0.74],
+    [0.075, 0.86],
+    [0.02, 0.9],
+    [-0.04, 0.88],
+    [-0.075, 0.76],
+    [-0.065, 0.52],
+    [-0.05, 0.25],
+    [-0.045, 0.08],
+  ];
+  shape.moveTo(pts[0]![0], pts[0]![1]);
+  for (const [z, y] of pts.slice(1)) shape.lineTo(z, y);
+  shape.closePath();
+  const geo = new THREE.ExtrudeGeometry(shape, { depth: 0.03, bevelEnabled: true, bevelThickness: 0.006, bevelSize: 0.006, bevelSegments: 1, curveSegments: 4 });
+  geo.translate(0, 0, -0.015);
+  // Shape x → local Z (toward the pitcher), shape y → local Y, extrusion → local X.
+  geo.rotateY(Math.PI / 2);
+  const group = new THREE.Group();
+  const body = new THREE.Mesh(geo, sole);
+  group.add(body);
+  const rim = new THREE.Mesh(geo, edge);
+  rim.scale.set(1.25, 1.01, 1.03);
+  rim.position.x = -0.01;
+  group.add(rim);
+  // V strap: two arcs from the toe post to the sides.
+  for (const side of [1, -1]) {
+    const arc = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.009, 6, 12, Math.PI * 0.75), strap);
+    arc.position.set(0.03, 0.74, side * 0.02);
+    arc.rotation.set(0, Math.PI / 2, side > 0 ? -0.4 : Math.PI + 0.4);
+    group.add(arc);
+  }
+  return { group, wood: sole, grip: edge };
+}
+
+/** Sunglasses or round "grandpa" glasses on the face (head local frame). */
+function addGlasses(h: Humanoid, kind: 'sun' | 'nerd'): void {
+  const frame = new THREE.MeshStandardMaterial({ color: kind === 'sun' ? '#101114' : '#6b4a2b', roughness: 0.35, metalness: 0.3 });
+  const lens = new THREE.MeshStandardMaterial({ color: kind === 'sun' ? '#0b0f1a' : '#cfe8ff', roughness: 0.1, metalness: 0.4, transparent: kind === 'nerd', opacity: kind === 'nerd' ? 0.35 : 1 });
+  for (const side of [1, -1]) {
+    const l = kind === 'sun' ? new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.032, 0.008), lens) : new THREE.Mesh(new THREE.CircleGeometry(0.024, 14), lens);
+    l.position.set(side * 0.04, 0.022, 0.112);
+    const ring = new THREE.Mesh(kind === 'sun' ? new THREE.BoxGeometry(0.056, 0.006, 0.01) : new THREE.TorusGeometry(0.025, 0.004, 5, 16), frame);
+    ring.position.set(side * 0.04, kind === 'sun' ? 0.04 : 0.022, 0.113);
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.004, 0.004, 0.1), frame);
+    arm.position.set(side * 0.1, 0.03, 0.06);
+    h.head.add(l, ring, arm);
+    for (const m of [l, ring, arm]) m.castShadow = false;
+  }
+  const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.005, 0.006), frame);
+  bridge.position.set(0, 0.03, 0.114);
+  h.head.add(bridge);
+}
+
+/** A big handlebar moustache under the nose. */
+function addMustache(h: Humanoid, color: string): void {
+  const m = new THREE.MeshStandardMaterial({ color, roughness: 0.9 });
+  for (const side of [1, -1]) {
+    const lobe = new THREE.Mesh(new THREE.CapsuleGeometry(0.013, 0.045, 3, 8), m);
+    lobe.position.set(side * 0.03, -0.03, 0.112);
+    lobe.rotation.set(0, 0, side * (Math.PI / 2 - 0.35));
+    const curl = new THREE.Mesh(new THREE.SphereGeometry(0.011, 8, 6), m);
+    curl.position.set(side * 0.062, -0.017, 0.1);
+    h.head.add(lobe, curl);
+  }
+}
+
+/**
  * Monkey parts on top of the humanoid: a light face mask and muzzle, big
  * round ears, a curled tail on the hips and a tennis sweatband. The fur is
  * the humanoid's skin material, so it tints with the rest of the body.
@@ -329,7 +447,7 @@ function addMonkey(h: Humanoid, look: BatterLook, quality: QualitySettings): THR
  * with push handles, two big rear wheels with hand rims and spokes, front
  * casters and a footplate.
  */
-function makeWheelchair(quality: QualitySettings): THREE.Group {
+export function makeWheelchair(quality: QualitySettings): THREE.Group {
   const frame = new THREE.MeshStandardMaterial({ color: '#2b2f36', roughness: 0.35, metalness: 0.75 });
   const chrome = new THREE.MeshStandardMaterial({ color: '#c9ced6', roughness: 0.22, metalness: 0.9 });
   const tire = new THREE.MeshStandardMaterial({ color: '#141518', roughness: 0.85 });
@@ -494,6 +612,101 @@ export function batterMetrics(look: BatterLook): { scale: number; giant: number;
   return { scale, giant, batScale, stanceX };
 }
 
+/**
+ * Skin reads as skin at every tone: a touch of sheen, a faint warm
+ * "subsurface" emissive so faces under the brim aren't pitch black, and very
+ * dark albedos lifted slightly (hue kept) so deep browns stay brown.
+ */
+function tuneSkin(m: THREE.MeshStandardMaterial): void {
+  m.roughness = 0.46;
+  const c = m.color;
+  const lum = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
+  if (lum < 0.032) c.multiplyScalar(Math.min(1.6, 0.032 / Math.max(lum, 1e-4)));
+  m.emissive.copy(c).multiplyScalar(0.16);
+}
+
+function addHelmet(h: Humanoid, look: BatterLook, quality: QualitySettings): void {
+  const m = h.materials;
+  const helmetMat = new THREE.MeshStandardMaterial({ color: m.hat!.color, roughness: 0.25, metalness: 0.2 });
+  m.helmet = helmetMat;
+  const logoMat = new THREE.MeshStandardMaterial({ color: mixHex(look.trim, '#ffffff', 0.15), roughness: 0.4 });
+  m.logo = logoMat;
+  const shell = new THREE.Mesh(new THREE.SphereGeometry(0.132, 18, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), helmetMat);
+  shell.position.y = 0.01;
+  const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.012, 16, 1, false, -Math.PI / 2, Math.PI), helmetMat);
+  brim.scale.set(1, 1, 0.7);
+  brim.position.set(0, 0.0, 0.1);
+  // Ear flap on the side facing the pitcher (+X).
+  const flap = new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 8), helmetMat);
+  flap.scale.set(0.45, 1, 1);
+  flap.position.set(0.11, -0.05, 0.0);
+  // Team stripe over the crown + front logo, in the trim colour.
+  const stripe = new THREE.Mesh(new THREE.TorusGeometry(0.1335, 0.007, 4, 24, Math.PI * 0.9), logoMat);
+  stripe.rotation.set(0, Math.PI / 2, Math.PI * 0.05);
+  stripe.position.y = 0.01;
+  const logo = new THREE.Mesh(new THREE.CircleGeometry(0.03, 12), logoMat);
+  logo.position.set(0, 0.06, 0.12);
+  logo.rotation.x = -0.45;
+  for (const x of [shell, brim, flap, stripe, logo]) {
+    x.castShadow = quality.shadows;
+    h.head.add(x);
+  }
+}
+
+/**
+ * Builds a batter's body from a look, without the bat: uniform (or bones),
+ * shape, head gear and face accessories. Shared by the batting rig and the
+ * base runner. `face` is the monkey's face material (anger tint), if any.
+ */
+export function dressBatter(look: BatterLook, quality: QualitySettings, scale = look.heightM / BASE_HEIGHT): { h: Humanoid; face: THREE.MeshStandardMaterial | null } {
+  const bone = look.skeleton ? look.skin : null;
+  const outfit: Outfit = bone
+    ? { skin: bone, jersey: bone, trim: bone, sleeve: bone, pants: bone, socks: bone, shoes: bone, hat: bone, gloves: bone, build: look.build }
+    : {
+        skin: look.skin,
+        jersey: look.jersey,
+        trim: look.trim,
+        // A rabbi's coat has long black sleeves and black trousers.
+        sleeve: look.rabbi ? look.jersey : look.trim,
+        pants: look.rabbi ? look.jersey : '#ece8dc',
+        socks: look.rabbi ? '#101014' : mixHex(look.trim, '#0b1426', 0.25),
+        shoes: '#15161a',
+        hat: mixHex(look.trim, '#0b1426', 0.08),
+        gloves: look.monkey ? '#e2b48a' : look.rabbi ? look.skin : look.trim,
+        build: look.build,
+        number: look.number,
+      };
+  const shape: BodyShape = {
+    scale,
+    belly: look.belly,
+    muscle: look.muscle,
+    hair: look.hair,
+    // Beardless + hair = flowing locks (Arturek); bearded = tidy nape.
+    longHair: !!look.hair && !look.beard,
+    beard: look.beard ? (look.hair ?? '#17110d') : null,
+    beardStyle: look.hair ? 'full' : 'goatee',
+    extraArms: look.extraArms,
+    face: true,
+    skeleton: !!look.skeleton,
+  };
+  const h = new Humanoid(outfit, quality, shape);
+  tuneSkin(h.materials.skin!);
+  const face = look.monkey ? addMonkey(h, look, quality) : null;
+  if (look.rabbi) addRabbiAttire(h, look.hair ?? '#2a1d14', quality, { chestDepth: h.chestDepth });
+  // A skeleton wears no helmet: the horns grow straight out of the skull.
+  if (!look.monkey && !look.rabbi && !look.skeleton) addHelmet(h, look, quality);
+  if (look.horns) h.head.add(makeHeadHorns(quality));
+  if (look.glasses) addGlasses(h, look.glasses);
+  if (look.mustache && !look.skeleton) addMustache(h, look.hair ?? '#2a1d14');
+  // Bobblehead: the head grows from the neck.
+  const hs = look.headScale ?? 1;
+  if (hs !== 1) {
+    h.head.scale.multiplyScalar(hs);
+    h.head.position.y *= 1 + (hs - 1) * 0.9;
+  }
+  return { h, face };
+}
+
 type BatterState = 'stance' | 'prepare' | 'swing' | 'celebrate' | 'react';
 
 /** Hips height and depth (body units) while sitting in the wheelchair. */
@@ -561,46 +774,12 @@ export class Batter implements BatterRig {
     this.sweet = SWEET * m.batScale;
     this.stanceOffsetX = m.stanceX;
     this.extra = look.extraArms;
-    const bone = look.skeleton ? look.skin : null;
-    const outfit: Outfit = bone
-      ? { skin: bone, jersey: bone, trim: bone, sleeve: bone, pants: bone, socks: bone, shoes: bone, hat: bone, gloves: bone, build: look.build }
-      : {
-          skin: look.skin,
-          jersey: look.jersey,
-          trim: look.trim,
-          // A rabbi's coat has long black sleeves and black trousers.
-          sleeve: look.rabbi ? look.jersey : look.trim,
-          pants: look.rabbi ? look.jersey : '#ece8dc',
-          socks: look.rabbi ? '#101014' : mixHex(look.trim, '#0b1426', 0.25),
-          shoes: '#15161a',
-          hat: mixHex(look.trim, '#0b1426', 0.08),
-          gloves: look.monkey ? '#e2b48a' : look.rabbi ? look.skin : look.trim,
-          build: look.build,
-          number: look.number,
-        };
-    const shape: BodyShape = {
-      scale: m.scale,
-      belly: look.belly,
-      muscle: look.muscle,
-      hair: look.hair,
-      // Beardless + hair = flowing locks (Arturek); bearded = tidy nape.
-      longHair: !!look.hair && !look.beard,
-      beard: look.beard ? (look.hair ?? '#17110d') : null,
-      beardStyle: look.hair ? 'full' : 'goatee',
-      extraArms: look.extraArms,
-      face: true,
-      skeleton: !!look.skeleton,
-    };
-    this.h = new Humanoid(outfit, quality, shape);
-    this.tuneSkin(this.h.materials.skin!);
+    const dressed = dressBatter(look, quality, m.scale);
+    this.h = dressed.h;
     this.root = this.h.root;
-    const face = look.monkey ? addMonkey(this.h, look, quality) : null;
-    if (look.rabbi) addRabbiAttire(this.h, look.hair ?? '#2a1d14', quality, { chestDepth: this.h.chestDepth });
-    // A skeleton wears no helmet: the horns grow straight out of the skull.
-    if (!look.monkey && !look.rabbi && !look.skeleton) this.addHelmet(look, quality);
-    if (look.horns) this.h.head.add(makeHeadHorns(quality));
-    this.hornBat = look.hornBat || !!look.racket || !!look.dumbbell;
-    const bat = look.dumbbell ? makeDumbbell() : look.racket ? makeRacket() : look.hornBat ? makeHornBat() : makeBat();
+    const face = dressed.face;
+    this.hornBat = look.hornBat || !!look.racket || !!look.dumbbell || !!look.baguette || !!look.chancla;
+    const bat = look.dumbbell ? makeDumbbell() : look.racket ? makeRacket() : look.baguette ? makeBaguette() : look.chancla ? makeChancla() : look.hornBat ? makeHornBat() : makeBat();
     this.bat = bat.group;
     this.bat.scale.setScalar(this.batScale);
     this.batWood = bat.wood;
@@ -631,47 +810,6 @@ export class Batter implements BatterRig {
     this.cur = key({}, new THREE.Vector3(), new THREE.Vector3(0, 1, 0));
     this.copyKey(STANCE, this.cur);
     this.applyCurrent();
-  }
-
-  /**
-   * Skin reads as skin at every tone: a touch of sheen, a faint warm
-   * "subsurface" emissive so faces under the brim aren't pitch black, and very
-   * dark albedos lifted slightly (hue kept) so deep browns stay brown.
-   */
-  private tuneSkin(m: THREE.MeshStandardMaterial): void {
-    m.roughness = 0.46;
-    const c = m.color;
-    const lum = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
-    if (lum < 0.032) c.multiplyScalar(Math.min(1.6, 0.032 / Math.max(lum, 1e-4)));
-    m.emissive.copy(c).multiplyScalar(0.16);
-  }
-
-  private addHelmet(look: BatterLook, quality: QualitySettings): void {
-    const m = this.h.materials;
-    const helmetMat = new THREE.MeshStandardMaterial({ color: m.hat!.color, roughness: 0.25, metalness: 0.2 });
-    m.helmet = helmetMat;
-    const logoMat = new THREE.MeshStandardMaterial({ color: mixHex(look.trim, '#ffffff', 0.15), roughness: 0.4 });
-    m.logo = logoMat;
-    const shell = new THREE.Mesh(new THREE.SphereGeometry(0.132, 18, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), helmetMat);
-    shell.position.y = 0.01;
-    const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.012, 16, 1, false, -Math.PI / 2, Math.PI), helmetMat);
-    brim.scale.set(1, 1, 0.7);
-    brim.position.set(0, 0.0, 0.1);
-    // Ear flap on the side facing the pitcher (+X).
-    const flap = new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 8), helmetMat);
-    flap.scale.set(0.45, 1, 1);
-    flap.position.set(0.11, -0.05, 0.0);
-    // Team stripe over the crown + front logo, in the trim colour.
-    const stripe = new THREE.Mesh(new THREE.TorusGeometry(0.1335, 0.007, 4, 24, Math.PI * 0.9), logoMat);
-    stripe.rotation.set(0, Math.PI / 2, Math.PI * 0.05);
-    stripe.position.y = 0.01;
-    const logo = new THREE.Mesh(new THREE.CircleGeometry(0.03, 12), logoMat);
-    logo.position.set(0, 0.06, 0.12);
-    logo.rotation.x = -0.45;
-    for (const x of [shell, brim, flap, stripe, logo]) {
-      x.castShadow = quality.shadows;
-      this.h.head.add(x);
-    }
   }
 
   setHandedness(hand: Hand): void {

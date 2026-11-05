@@ -45,6 +45,10 @@ export interface Settings {
   pitchHint: boolean;
   /** Pulls near-miss swings toward the ball in pro mode (assist). */
   aimAssist: boolean;
+  /** Vibrates on contact and on big moments (phones that support it). */
+  haptics: boolean;
+  /** Base-running coach light: green / yellow / red on taking the next base (assist). */
+  runCoach: boolean;
 }
 
 export interface QualitySettings {
@@ -315,6 +319,28 @@ export interface LifetimeStats {
   maxEVmph: number;
 }
 
+/** Quick-game (modo Partido) career numbers. */
+export interface GameStats {
+  played: number;
+  won: number;
+  runs: number;
+  hits: number;
+  rbi: number;
+  /** Extra-base hits earned on the bases (doubles, triples, inside-the-park HR). */
+  extraBases: number;
+  walkOffs: number;
+}
+
+/** Daily challenge progress (one seeded stage per day). */
+export interface DailyProgress {
+  /** YYYY-MM-DD of the last day played. */
+  lastDay: string;
+  /** Consecutive days played. */
+  streak: number;
+  /** Best score per day key (last few days only). */
+  best: Record<string, number>;
+}
+
 export interface SaveData {
   version: number;
   settings: Settings;
@@ -324,6 +350,17 @@ export interface SaveData {
   selectedBat: string;
   selectedCharacter: CharacterId;
   seenTips: string[];
+  /** Soft currency (Fichas): earned by playing, spent on creator parts. Never sold for money. */
+  coins: number;
+  /** Unlocked creator parts / slots (ids from config/creator.ts). */
+  owned: string[];
+  customCharacters: CustomCharacter[];
+  gameStats: GameStats;
+  daily: DailyProgress;
+  /** YYYY-MM-DD of the last daily login bonus. */
+  lastBonusDay: string;
+  /** Supporter purchase: no interstitial ads (rewarded stay opt-in). */
+  adsRemoved: boolean;
 }
 
 // ───────────────────────────── Cosmetics ─────────────────────────────
@@ -339,7 +376,26 @@ export interface BatDef {
 
 // ───────────────────────────── Playable characters ─────────────────────────────
 
-export type CharacterId = 'moro' | 'mati' | 'arturek' | 'chamo' | 'chimon' | 'benjamin';
+export type BuiltinCharacterId = 'moro' | 'mati' | 'arturek' | 'chamo' | 'chimon' | 'benjamin';
+/** Players made in the character creator. */
+export type CustomCharacterId = `custom-${string}`;
+export type CharacterId = BuiltinCharacterId | CustomCharacterId;
+
+/** Funny traits a created player can take (each reuses a roster mechanic). */
+export type TraitId = 'none' | 'peak' | 'preWorkout' | 'temper' | 'penny' | 'firecracker' | 'homeCooking';
+
+/** A player made in the character creator (persisted in the save). */
+export interface CustomCharacter {
+  id: CustomCharacterId;
+  name: string;
+  /** Nickname / tagline, e.g. "El Bigote de Oro". */
+  nickname: string;
+  look: BatterLook;
+  ratings: BatterRatings;
+  trait: TraitId;
+  /** Park where he plays at home (+10 % eye and bat speed), if any. */
+  home: StadiumId | null;
+}
 
 /** Multipliers applied to a swing profile (1 = base batter). */
 export interface SwingMods {
@@ -357,6 +413,8 @@ export interface BatterRatings {
   contact: number;
   /** Power swing bat speed. */
   power: number;
+  /** Sprint speed on the bases (does not affect the swing). */
+  speed: number;
 }
 
 /** Visual build of a batter; consumed by the character renderer. */
@@ -398,6 +456,16 @@ export interface BatterLook {
   jersey: string;
   trim: string;
   number: string;
+  /** Head size multiplier (1 = normal; up to ~1.8 for a bobblehead). */
+  headScale?: number;
+  /** Glasses over the eyes. */
+  glasses?: 'sun' | 'nerd';
+  /** A big moustache. */
+  mustache?: boolean;
+  /** Bats with a giant French baguette. */
+  baguette?: boolean;
+  /** Bats with a giant flip-flop (la chancla). */
+  chancla?: boolean;
 }
 
 export interface CharacterAbility {
@@ -432,7 +500,7 @@ export interface CharacterDef {
   /**
    * Lucky penny: before each pitch, with probability `spawnChance`, a giant
    * penny floats somewhere in the outfield. A batted ball that touches it
-   * brings Netanyahu down in a flying-kippah UFO (to Hava Nagila), who fills
+   * brings Nitanllaju down in a flying-kippah UFO (to Hava Nagila), who fills
    * the PCI to `pciFill` of the strike zone for the next `pitches` pitches.
    */
   pennyBlessing?: { spawnChance: number; pciFill: number; pitches: number };

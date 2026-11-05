@@ -20,6 +20,7 @@ let selected = (q.get('sel') ?? 'moro') as CharacterId;
 
 function vm(): CharactersVM {
   return {
+    canCreate: true,
     items: CHARACTERS.map((c) => ({
       id: c.id,
       name: c.name,
@@ -49,14 +50,17 @@ function chars(): void {
       log('back');
       title();
     },
+    onCreate: () => log('create'),
+    onEdit: (id) => log('edit', id),
+    onDelete: (id) => log('delete', id),
   });
 }
 
 function title(): void {
   const c = CHARACTERS.find((x) => x.id === selected)!;
   ui.showTitle(
-    { totalStars: 12, maxStars: 75, derbyBest: '1.284 ft', continueLabel: q.get('cont') === '0' ? null : '1-3 · Tiro al blanco', characterName: c.name },
-    { onContinue: () => log('continue'), onCampaign: () => log('campaign'), onPractice: () => log('practice'), onDerby: () => log('derby'), onSettings: () => log('settings'), onCharacters: () => chars() },
+    { totalStars: 12, maxStars: 75, derbyBest: '1.284 ft', continueLabel: q.get('cont') === '0' ? null : '1-3 · Tiro al blanco', characterName: c.name, coins: 640, daily: { label: 'Desafío #5 · Lluvia de jonrones', done: false, streak: 3 } },
+    { onContinue: () => log('continue'), onCampaign: () => log('campaign'), onPractice: () => log('practice'), onDerby: () => log('derby'), onSettings: () => log('settings'), onCharacters: () => chars(), onGame: () => log('game'), onDaily: () => log('daily'), onStudio: () => log('studio') },
   );
 }
 
@@ -79,6 +83,8 @@ function hud(): void {
     onPause: () => log('pause'),
     onSwing: (t) => log('swing', t),
     onPowerToggle: (on) => log('power', on),
+    onRunAdvance: () => log('run'),
+    onRunBack: () => log('back'),
     onAbility: () => {
       log('ability');
       if (base.ability?.state === 'ready') ui.updateHUD({ ...base, ability: { ...base.ability, state: 'active', pitchesLeft: 3 } });
@@ -122,8 +128,92 @@ function portraits(): void {
   document.body.append(wrap);
 }
 
+function results(): void {
+  ui.showResults(
+    {
+      mode: 'game',
+      success: true,
+      title: lang === 'es' ? '¡GANASTE EL PARTIDO!' : 'YOU WON THE GAME!',
+      subtitle: '4-2 contra Los Ramiros',
+      stars: 0,
+      newStars: 0,
+      starTexts: ['', '', ''],
+      starsMet: [false, false, false],
+      stats: [
+        { label: 'Carreras', value: '4' },
+        { label: 'Hits', value: '5' },
+        { label: 'Impulsadas', value: '3' },
+        { label: 'AVG', value: '.455' },
+        { label: 'Jonrones', value: '1' },
+        { label: 'Ponches', value: '2' },
+      ],
+      unlocks: [],
+      canNext: false,
+      shareText: '',
+      linescore: { away: 'RAM', home: 'TÚ', awayLine: [1, 0, 1], homeLine: [0, 3, null], awayTotal: 2, homeTotal: 4 },
+      coins: {
+        lines: [
+          { label: 'Jonrones', amount: 5 },
+          { label: 'Hits', amount: 8 },
+          { label: 'Victoria', amount: 120 },
+          { label: 'Carreras anotadas', amount: 32 },
+          { label: 'Bases extra corriendo', amount: 10 },
+        ],
+        total: 175,
+        balance: 815,
+        canDouble: q.get('dbl') !== '0',
+        doubled: q.get('dbl') === '0',
+      },
+    },
+    { onRetry: () => log('retry'), onNext: () => log('next'), onMenu: () => log('menu'), onShare: () => log('share'), onDoubleCoins: () => log('double') },
+  );
+}
+
+function setup(): void {
+  ui.showGameSetup(
+    {
+      rivals: [
+        { id: 'ramiros', name: 'Los Ramiros', short: 'RAM', difficulty: 'easy', taunt: '«Hola, soy iluvkiwiss… digo, Ramiro»', jersey: '#ff6fb5', trim: '#ffffff' },
+        { id: 'pollos', name: 'Pollos Furiosos', short: 'POL', difficulty: 'easy', taunt: '«¡Cocorocóóó!»', jersey: '#f7d117', trim: '#d9262c' },
+        { id: 'mandem', name: 'Mandem FC', short: 'MDM', difficulty: 'normal', taunt: '«Wagwan, ¿eso fue un swing?»', jersey: '#8a8f98', trim: '#111111' },
+        { id: 'mamados', name: 'Los Mamados del Iron Paradise', short: 'IRN', difficulty: 'hard', taunt: '«¡Lightweight, baby!»', jersey: '#15161b', trim: '#ffc21a' },
+      ],
+      stadiums: [
+        { id: 'solar', name: 'El Solar', locked: false },
+        { id: 'malecon', name: 'Malecón', locked: false },
+      ],
+      innings: [1, 3, 5],
+      initial: { stadium: 'malecon', rival: 'ramiros', innings: 3 },
+      rules: '',
+    },
+    { onStart: (c) => log('start', c), onBack: () => log('back') },
+  );
+}
+
+function gameHud(): void {
+  const base: HudVM = {
+    mode: 'game',
+    stageLabel: 'Partido · Los Ramiros',
+    goalText: '▼2|1-1',
+    progress: 0.4,
+    outs: null,
+    timeLeft: null,
+    streak: null,
+    score: null,
+    powerOn: false,
+    controlHint: null,
+    ability: null,
+    scorebug: { away: 'RAM', home: 'TÚ', awayRuns: 1, homeRuns: 1, inning: '▼2', balls: 2, strikes: 1, outs: 1, bases: [true, false, true] },
+    run: q.get('run') === '0' ? null : { coach: (q.get('coach') ?? 'go') as 'go' | 'risky' | 'hold', coachText: '¡SIGUE, SIGUE!', coachWho: 'Coach de tercera', primary: q.get('slide') === '1' ? '¡BÁRRETE!' : '¡CORRE!', slide: q.get('slide') === '1', back: 'REGRESA', hint: 'Espacio / clic: ¡corre a la siguiente! · Shift / clic derecho: regresa · Bárrete cuando venga el tiro' },
+  };
+  ui.showHUD(base, { onPause: () => log('pause'), onSwing: () => log('swing'), onPowerToggle: () => {}, onAbility: () => {}, onRunAdvance: () => log('run'), onRunBack: () => log('back') });
+}
+
 const screen = q.get('screen') ?? 'chars';
-if (screen === 'portraits') portraits();
+if (screen === 'results') results();
+else if (screen === 'setup') setup();
+else if (screen === 'gamehud') gameHud();
+else if (screen === 'portraits') portraits();
 else if (screen === 'title') title();
 else if (screen === 'hud') hud();
 else chars();

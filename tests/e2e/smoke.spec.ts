@@ -104,3 +104,34 @@ test('pause menu opens with Escape and resumes', async ({ page }) => {
   await page.getByRole('button', { name: /^Continuar$/ }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
 });
+
+test('quick game: pick a rival and the scorebug shows the count, outs and bases', async ({ page }) => {
+  const errors = trackErrors(page);
+  await page.goto('/');
+  await page.getByRole('button', { name: /Partido rápido/ }).click();
+  await page.getByRole('radio', { name: /Pollos Furiosos/ }).click();
+  await page.getByRole('button', { name: /Playball/ }).click();
+  const bug = page.locator('.scorebug');
+  await expect(bug).toBeVisible({ timeout: 45_000 });
+  await expect(bug).toContainText('POL');
+  await expect(bug).toContainText('TÚ');
+  expect(errors).toEqual([]);
+});
+
+test('player studio: build a player, save him and he is picked to bat', async ({ page }) => {
+  const errors = trackErrors(page);
+  await page.goto('/');
+  await page.getByRole('button', { name: /Estudio/ }).click();
+  await expect(page.locator('.cpanel')).toBeVisible();
+  await page.getByRole('button', { name: 'Clásico' }).click();
+  await page.getByRole('tab', { name: 'Rasgo' }).click();
+  await page.getByRole('button', { name: /Sin rasgo/ }).click();
+  const name = page.getByRole('textbox', { name: 'Nombre' });
+  await name.fill('Pepe Prueba');
+  await page.locator('.cfoot').getByRole('button', { name: 'Guardar' }).click();
+  await expect(page.getByRole('heading', { name: 'Pepe Prueba' })).toBeVisible();
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('jonron.save') ?? '{}'));
+  expect(saved.customCharacters).toHaveLength(1);
+  expect(saved.selectedCharacter).toBe(saved.customCharacters[0].id);
+  expect(errors).toEqual([]);
+});

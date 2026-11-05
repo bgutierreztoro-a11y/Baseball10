@@ -158,6 +158,7 @@ function figure(look: BatterLook, cx: number, feet: number, H: number, id: strin
   const beltHalf = Math.max(waist + bellyOut * 0.55, hip);
 
   const skin = look.skin;
+  let headStart = -1;
   const skinDark = mix(skin, '#000000', 0.22);
   const jersey = look.jersey;
   const jerseyShade = mix(jersey, INK, 0.2);
@@ -312,6 +313,7 @@ function figure(look: BatterLook, cx: number, feet: number, H: number, id: strin
     // ── Neck + head ──
     g.append(el('path', { d: `M${r(cx - neck)} ${r(headCy + headRy * 0.4)}L${r(cx - neck)} ${r(y(1.38))}Q${r(cx)} ${r(y(1.6))} ${r(cx + neck)} ${r(y(1.38))}L${r(cx + neck)} ${r(headCy + headRy * 0.4)}Z`, fill: skin }));
     g.append(el('path', { d: `M${r(cx - neck)} ${r(y(1.08))}Q${r(cx)} ${r(y(1.22))} ${r(cx + neck)} ${r(y(1.08))}L${r(cx + neck)} ${r(y(1.2))}Q${r(cx)} ${r(y(1.34))} ${r(cx - neck)} ${r(y(1.2))}Z`, fill: skinDark, opacity: 0.55 }));
+    headStart = g.childNodes.length;
     if (look.hair) {
       // Hair peeking out under the helmet (longer at the back).
       g.append(el('ellipse', { cx, cy: headCy + headRy * 0.05, rx: headRx * 1.18, ry: headRy * 0.92, fill: look.hair }));
@@ -333,6 +335,7 @@ function figure(look: BatterLook, cx: number, feet: number, H: number, id: strin
       }
       // Cheeky grin across the muzzle.
       g.append(el('path', { d: `M${r(cx - headRx * 0.4)} ${r(headCy + headRy * 0.5)}Q${r(cx)} ${r(headCy + headRy * 0.88)} ${r(cx + headRx * 0.42)} ${r(headCy + headRy * 0.48)}`, fill: 'none', stroke: '#3a1d12', 'stroke-width': u * 0.05, 'stroke-linecap': 'round' }));
+      faceExtras(g, look, cx, headCy, headRx, headRy, u);
       // Tennis sweatband over the forehead, fur tuft sticking out on top.
       g.append(el('path', { d: `M${r(cx - headRx * 0.25)} ${r(headCy - headRy * 0.88)}Q${r(cx)} ${r(headCy - headRy * 1.25)} ${r(cx + headRx * 0.3)} ${r(headCy - headRy * 0.9)}Z`, fill: skin }));
       g.append(el('path', { d: `M${r(cx - headRx * 0.98)} ${r(headCy - headRy * 0.42)}Q${r(cx)} ${r(headCy - headRy * 0.72)} ${r(cx + headRx * 0.98)} ${r(headCy - headRy * 0.42)}L${r(cx + headRx * 0.94)} ${r(headCy - headRy * 0.66)}Q${r(cx)} ${r(headCy - headRy * 0.98)} ${r(cx - headRx * 0.94)} ${r(headCy - headRy * 0.66)}Z`, fill: trim }));
@@ -388,6 +391,7 @@ function figure(look: BatterLook, cx: number, feet: number, H: number, id: strin
       // Smile.
       // Grin: a light crescent outlined in dark lip colour (reads on any skin tone).
       g.append(el('path', { d: `M${r(cx - headRx * 0.32)} ${r(headCy + headRy * 0.47)}Q${r(cx)} ${r(headCy + headRy * 0.55)} ${r(cx + headRx * 0.34)} ${r(headCy + headRy * 0.45)}Q${r(cx + headRx * 0.05)} ${r(headCy + headRy * 0.8)} ${r(cx - headRx * 0.32)} ${r(headCy + headRy * 0.47)}Z`, fill: '#f4f1e8', stroke: mix(skin, '#3a0d0d', 0.6), 'stroke-width': u * 0.04, 'stroke-linejoin': 'round' }));
+      faceExtras(g, look, cx, headCy, headRx, headRy, u);
       if (look.rabbi) {
         // Black wide-brimmed hat with a ribbon band.
         const brimY = headCy - headRy * 0.42;
@@ -408,7 +412,9 @@ function figure(look: BatterLook, cx: number, feet: number, H: number, id: strin
       }
     }
   }
+  const headEnd = g.childNodes.length;
   if (chair) g.append(chair.front);
+  const hornsStart = g.childNodes.length;
   if (look.horns) {
     // Villain horns: out from the helmet sides, up, then curling inward at the tips.
     for (const sd of [-1, 1]) {
@@ -420,6 +426,23 @@ function figure(look: BatterLook, cx: number, feet: number, H: number, id: strin
       const hl = c.slice(2, 13).map((p) => [p[0] + sd * u * 0.03, p[1]] as Pt);
       g.append(el('path', { d: `M${hl.map((p) => `${r(p[0])} ${r(p[1])}`).join('L')}`, fill: 'none', stroke: '#8a6a86', 'stroke-width': u * 0.035, 'stroke-linecap': 'round', opacity: 0.55 }));
     }
+  }
+
+  // Bobblehead: scale the head (and the horns on it) up from the chin.
+  const hs = look.headScale ?? 1;
+  if (hs !== 1 && headStart >= 0) {
+    const pivotY = headCy + headRy * 0.9;
+    const tf = `translate(${r(cx)} ${r(pivotY)}) scale(${hs.toFixed(3)}) translate(${r(-cx)} ${r(-pivotY)})`;
+    const wrap = (from: number, to: number): void => {
+      const nodes = Array.from(g.childNodes).slice(from, to);
+      if (!nodes.length) return;
+      const hg = el('g', { transform: tf });
+      g.insertBefore(hg, nodes[0]!);
+      hg.append(...nodes);
+    };
+    const hornsEnd = g.childNodes.length;
+    wrap(hornsStart, hornsEnd);
+    wrap(headStart, headEnd);
   }
 
   // ── Bat + arms ──
@@ -470,6 +493,32 @@ function figure(look: BatterLook, cx: number, feet: number, H: number, id: strin
     g.append(net);
     g.append(el('ellipse', { cx: head[0], cy: head[1], rx: hrx, ry: hry, transform: tr, fill: 'none', stroke: '#1f2a44', 'stroke-width': u * 0.11 }));
     g.append(el('circle', { cx: knob[0], cy: knob[1], r: u * 0.09, fill: '#1f2a44' }));
+  } else if (look.baguette) {
+    // A giant baguette: golden crust with diagonal scores, paper wrapper at the handle.
+    const at = (t: number): Pt => [knob[0] + dir[0] * len * t, knob[1] + dir[1] * len * t];
+    g.append(limb([at(0.02), at(1.02)], u * 0.36, '#9c6b2f'));
+    g.append(limb([at(0.03), at(1.0)], u * 0.3, '#d39a4a'));
+    g.append(limb([at(0.1), at(0.95)], u * 0.08, '#e7b96b'));
+    for (const t of [0.42, 0.53, 0.64, 0.75, 0.86]) {
+      const c = at(t);
+      g.append(el('path', { d: `M${r(c[0] - nrm[0] * u * 0.1 - dir[0] * u * 0.1)} ${r(c[1] - nrm[1] * u * 0.1 - dir[1] * u * 0.1)}L${r(c[0] + nrm[0] * u * 0.1 + dir[0] * u * 0.1)} ${r(c[1] + nrm[1] * u * 0.1 + dir[1] * u * 0.1)}`, stroke: '#f6dfae', 'stroke-width': u * 0.06, 'stroke-linecap': 'round' }));
+    }
+    g.append(limb([at(0.0), at(0.3)], u * 0.38, '#f4efe2'));
+    g.append(limb([at(0.12), at(0.16)], u * 0.385, '#d7263d'));
+  } else if (look.chancla) {
+    // La chancla: a blue flip-flop sole with a yellow rim and a white V strap near the toe.
+    const at = (t: number): Pt => [knob[0] + dir[0] * len * t, knob[1] + dir[1] * len * t];
+    const outline: Pt[] = [];
+    const wide = (t: number): number => u * (0.2 + 0.2 * Math.sin(Math.min(1, t) * Math.PI * 0.85));
+    for (const t of [0.04, 0.2, 0.4, 0.6, 0.78, 0.92, 1.0]) outline.push([at(t)[0] + nrm[0] * wide(t), at(t)[1] + nrm[1] * wide(t)]);
+    for (const t of [1.0, 0.92, 0.78, 0.6, 0.4, 0.2, 0.04]) outline.push([at(t)[0] - nrm[0] * wide(t) * 0.9, at(t)[1] - nrm[1] * wide(t) * 0.9]);
+    g.append(el('path', { d: smooth(outline, true), fill: '#2c7be5', stroke: '#f7d117', 'stroke-width': u * 0.07, 'stroke-linejoin': 'round' }));
+    const post = at(0.84);
+    for (const sd of [-1, 1]) {
+      const end = at(0.62);
+      g.append(el('path', { d: `M${r(post[0])} ${r(post[1])}Q${r(end[0] + nrm[0] * sd * u * 0.35)} ${r(end[1] + nrm[1] * sd * u * 0.35)} ${r(end[0] + nrm[0] * sd * wide(0.62) * 0.95)} ${r(end[1] + nrm[1] * sd * wide(0.62) * 0.95)}`, fill: 'none', stroke: '#f4f1e8', 'stroke-width': u * 0.1, 'stroke-linecap': 'round' }));
+    }
+    g.append(el('circle', { cx: post[0], cy: post[1], r: u * 0.06, fill: '#f4f1e8' }));
   } else if (look.hornBat) {
     // A giant crescent horn: dark leather-wrapped handle, ivory barrel with growth rings.
     const ctrl: Pt[] = [0, 0.3, 0.6, 0.85, 1.04].map((t) => {
@@ -553,6 +602,27 @@ function figure(look: BatterLook, cx: number, feet: number, H: number, id: strin
     arm(shL, [cx - sh - armW * 0.2, y(2.95)], handR, true);
   }
   return { g, hipHalf: beltHalf };
+}
+
+/** Glasses and moustache drawn over the face (any body but the skeleton). */
+function faceExtras(g: SVGGElement, look: BatterLook, cx: number, headCy: number, headRx: number, headRy: number, u: number): void {
+  if (look.mustache) {
+    const c = look.hair ?? '#2a1d14';
+    for (const sd of [-1, 1]) {
+      g.append(el('path', { d: `M${r(cx)} ${r(headCy + headRy * 0.36)}Q${r(cx + sd * headRx * 0.35)} ${r(headCy + headRy * 0.28)} ${r(cx + sd * headRx * 0.62)} ${r(headCy + headRy * 0.46)}Q${r(cx + sd * headRx * 0.72)} ${r(headCy + headRy * 0.3)} ${r(cx + sd * headRx * 0.58)} ${r(headCy + headRy * 0.26)}`, fill: 'none', stroke: c, 'stroke-width': u * 0.12, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }));
+    }
+  }
+  if (look.glasses) {
+    const sun = look.glasses === 'sun';
+    const ey = headCy + headRy * 0.03;
+    for (const sd of [-1, 1]) {
+      const ex = cx + sd * headRx * 0.4;
+      if (sun) g.append(el('rect', { x: ex - u * 0.15, y: ey - u * 0.09, width: u * 0.3, height: u * 0.18, rx: u * 0.06, fill: '#0b0f1a', stroke: '#000000', 'stroke-width': u * 0.03 }));
+      else g.append(el('circle', { cx: ex, cy: ey, r: u * 0.13, fill: '#cfe8ff', 'fill-opacity': 0.3, stroke: '#6b4a2b', 'stroke-width': u * 0.045 }));
+    }
+    g.append(el('path', { d: `M${r(cx - headRx * 0.4 + u * 0.13)} ${r(ey - u * 0.02)}L${r(cx + headRx * 0.4 - u * 0.13)} ${r(ey - u * 0.02)}`, stroke: sun ? '#000000' : '#6b4a2b', 'stroke-width': u * 0.04 }));
+    if (sun) g.append(el('path', { d: `M${r(cx - headRx * 0.5)} ${r(ey - u * 0.04)}L${r(cx - headRx * 0.36)} ${r(ey - u * 0.07)}`, stroke: '#ffffff', 'stroke-width': u * 0.03, opacity: 0.5, 'stroke-linecap': 'round' }));
+  }
 }
 
 /** A bone: outlined round-capped stroke along `pts`. */

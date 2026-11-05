@@ -231,6 +231,18 @@ export class Session {
     return [{ type: 'finished', success: this.success }];
   }
 
+  /**
+   * Second chance (rewarded ad): reopens a finished, failed session with
+   * extra outs (outs mode) or extra seconds (timed mode).
+   */
+  revive(outs = 3, seconds = 15): void {
+    if (!this.finished || this.forfeited) return;
+    this.finished = false;
+    this.success = false;
+    if (this.rules.limit?.type === 'outs') this.outsLeft += outs;
+    else if (this.rules.limit?.type === 'time') this.timeLeft += seconds;
+  }
+
   /** Ends the session as a failure whatever the score (the batter cannot go on). */
   forfeit(): SessionEvent[] {
     if (this.finished) return [];

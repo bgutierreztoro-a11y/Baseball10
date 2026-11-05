@@ -10,5 +10,7 @@
 | [ADR-006](ADR-006-build-y-despliegue.md) | Build con Vite + TypeScript; hosting estático y versión de un solo archivo | Aceptada |
 | [ADR-007](ADR-007-persistencia-local.md) | Persistencia local versionada, sin backend en v1 | Aceptada |
 | [ADR-008](ADR-008-timing-de-input.md) | Timing del swing con `event.timeStamp`, reloj real y *time-warp* visual | Aceptada |
+| [ADR-009](ADR-009-anuncios.md) | Anuncios opcionales con proveedor intercambiable y política propia | Aceptada |
+| [ADR-010](ADR-010-carreras.md) | Corrido de bases determinista con decisiones del jugador | Aceptada |
 
 Formato: contexto → decisión → opciones con tabla → trade-offs → consecuencias → acciones.

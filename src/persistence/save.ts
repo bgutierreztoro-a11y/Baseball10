@@ -1,6 +1,8 @@
-import type { CharacterId, Lang, SaveData, Settings, StageProgress } from '../contracts';
+import type { CharacterId, CustomCharacter, Lang, SaveData, Settings, StageProgress } from '../contracts';
 import { BATS, STAGES } from '../config/campaign';
 import { CHARACTERS, DEFAULT_CHARACTER } from '../config/characters';
+import { MAX_SLOTS, PARTS, sanitizeCustom } from '../config/creator';
+import { COIN } from '../config/economy';
 
 /**
  * Local-first persistence (docs/adr/ADR-007-local-persistence.md).
@@ -9,7 +11,7 @@ import { CHARACTERS, DEFAULT_CHARACTER } from '../config/characters';
  * bad save can never brick the game.
  */
 export const SAVE_KEY = 'jonron.save';
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 /** Minimal storage surface (localStorage or an in-memory fake in tests). */
 export interface KeyValueStore {
@@ -37,6 +39,8 @@ export function defaultSettings(lang: Lang = 'es'): Settings {
     showPitchType: false,
     pitchHint: true,
     aimAssist: true,
+    haptics: true,
+    runCoach: true,
   };
 }
 
@@ -50,6 +54,13 @@ export function defaultSave(lang: Lang = 'es'): SaveData {
     selectedBat: BATS[0]!.id,
     selectedCharacter: DEFAULT_CHARACTER,
     seenTips: [],
+    coins: COIN.starting,
+    owned: [],
+    customCharacters: [],
+    gameStats: { played: 0, won: 0, runs: 0, hits: 0, rbi: 0, extraBases: 0, walkOffs: 0 },
+    daily: { lastDay: '', streak: 0, best: {} },
+    lastBonusDay: '',
+    adsRemoved: false,
   };
 }
 
@@ -86,6 +97,8 @@ export function migrate(raw: unknown, lang: Lang = 'es'): SaveData {
     showPitchType: bool(s.showPitchType, d.showPitchType),
     pitchHint: bool(s.pitchHint, d.pitchHint),
     aimAssist: bool(s.aimAssist, d.aimAssist),
+    haptics: bool(s.haptics, d.haptics),
+    runCoach: bool(s.runCoach, d.runCoach),
   };
 
   const stages: Record<string, StageProgress> = {};
@@ -103,6 +116,24 @@ export function migrate(raw: unknown, lang: Lang = 'es'): SaveData {
 
   const st = isObj(raw.stats) ? raw.stats : {};
   const selected = typeof raw.selectedBat === 'string' && BATS.some((b) => b.id === raw.selectedBat) ? raw.selectedBat : base.selectedBat;
+  const owned = Array.isArray(raw.owned) ? [...new Set(raw.owned.filter((x): x is string => typeof x === 'string' && x in PARTS))] : [];
+  const customs: CustomCharacter[] = [];
+  if (Array.isArray(raw.customCharacters)) {
+    for (const c of raw.customCharacters) {
+      const ok = sanitizeCustom(c);
+      if (ok && !customs.some((x) => x.id === ok.id) && customs.length < MAX_SLOTS) customs.push(ok);
+    }
+  }
+  const gs = isObj(raw.gameStats) ? raw.gameStats : {};
+  const dl = isObj(raw.daily) ? raw.daily : {};
+  const dayRe = /^\d{4}-\d{2}-\d{2}$/;
+  const best: Record<string, number> = {};
+  if (isObj(dl.best)) {
+    // Keep only the last couple of weeks.
+    const keys = Object.keys(dl.best).filter((k) => dayRe.test(k)).sort().slice(-14);
+    for (const k of keys) best[k] = num(dl.best[k], 0, 0, 1e6);
+  }
+  const isCharacter = (id: unknown): id is CharacterId => CHARACTERS.some((c) => c.id === id) || customs.some((c) => c.id === id);
 
   return {
     version: SAVE_VERSION,
@@ -117,8 +148,28 @@ export function migrate(raw: unknown, lang: Lang = 'es'): SaveData {
     },
     derbyBest: num(raw.derbyBest, 0, 0),
     selectedBat: selected,
-    selectedCharacter: CHARACTERS.some((c) => c.id === raw.selectedCharacter) ? (raw.selectedCharacter as CharacterId) : base.selectedCharacter,
+    selectedCharacter: isCharacter(raw.selectedCharacter) ? raw.selectedCharacter : base.selectedCharacter,
     seenTips: Array.isArray(raw.seenTips) ? raw.seenTips.filter((x): x is string => typeof x === 'string') : [],
+    // Saves from before the economy start with the welcome gift.
+    coins: Math.round(num(raw.coins, base.coins, 0, 1e7)),
+    owned,
+    customCharacters: customs,
+    gameStats: {
+      played: num(gs.played, 0, 0),
+      won: num(gs.won, 0, 0),
+      runs: num(gs.runs, 0, 0),
+      hits: num(gs.hits, 0, 0),
+      rbi: num(gs.rbi, 0, 0),
+      extraBases: num(gs.extraBases, 0, 0),
+      walkOffs: num(gs.walkOffs, 0, 0),
+    },
+    daily: {
+      lastDay: typeof dl.lastDay === 'string' && dayRe.test(dl.lastDay) ? dl.lastDay : '',
+      streak: Math.round(num(dl.streak, 0, 0, 10000)),
+      best,
+    },
+    lastBonusDay: typeof raw.lastBonusDay === 'string' && dayRe.test(raw.lastBonusDay) ? raw.lastBonusDay : '',
+    adsRemoved: bool(raw.adsRemoved, false),
   };
 }
 
@@ -183,4 +234,36 @@ export function recordStage(save: SaveData, stageId: string, stars: number, succ
 export function isBatUnlocked(save: SaveData, batId: string): boolean {
   const bat = BATS.find((b) => b.id === batId);
   return !!bat && totalStars(save) >= bat.starsRequired;
+}
+
+// ───────────────────────────── Economy ─────────────────────────────
+
+/** Adds (or, with a negative amount, spends) Fichas. Never below zero. */
+export function addCoins(save: SaveData, amount: number): SaveData {
+  return { ...save, coins: Math.max(0, Math.round(save.coins + amount)) };
+}
+
+/** Buys creator parts if affordable; returns null when the player cannot pay. */
+export function buyParts(save: SaveData, parts: readonly string[]): SaveData | null {
+  const fresh = [...new Set(parts)].filter((p) => p in PARTS && !save.owned.includes(p));
+  const cost = fresh.reduce((s, p) => s + PARTS[p]!.price, 0);
+  if (cost > save.coins) return null;
+  return { ...save, coins: save.coins - cost, owned: [...save.owned, ...fresh] };
+}
+
+/** Daily login bonus: once per calendar day. */
+export function claimDailyBonus(save: SaveData, today: string): { save: SaveData; amount: number } {
+  if (save.lastBonusDay === today) return { save, amount: 0 };
+  return { save: { ...addCoins(save, COIN.dailyBonus), lastBonusDay: today }, amount: COIN.dailyBonus };
+}
+
+/** Saves (or replaces) a created player. */
+export function upsertCustom(save: SaveData, c: CustomCharacter): SaveData {
+  const list = save.customCharacters.some((x) => x.id === c.id) ? save.customCharacters.map((x) => (x.id === c.id ? c : x)) : [...save.customCharacters, c];
+  return { ...save, customCharacters: list };
+}
+
+export function deleteCustom(save: SaveData, id: string): SaveData {
+  const list = save.customCharacters.filter((x) => x.id !== id);
+  return { ...save, customCharacters: list, selectedCharacter: save.selectedCharacter === id ? DEFAULT_CHARACTER : save.selectedCharacter };
 }
