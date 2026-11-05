@@ -13,7 +13,7 @@ export const BATTING_POS = new THREE.Vector3(0, 2.65, -5.2);
 export const BATTING_LOOK = new THREE.Vector3(0, -2.0, 16);
 export const BATTING_FOV = 31;
 
-type Mode = 'batting' | 'follow' | 'intro' | 'title' | 'shot';
+type Mode = 'batting' | 'follow' | 'intro' | 'title' | 'shot' | 'overview' | 'studio';
 
 export class CameraDirector {
   readonly camera: THREE.PerspectiveCamera;
@@ -84,6 +84,34 @@ export class CameraDirector {
     this.fov = fov;
   }
 
+  /**
+   * High broadcast view of the diamond that frames a moving focus point
+   * (base running: between the runner and the ball).
+   */
+  overview(): void {
+    this.mode = 'overview';
+    this.t = 0;
+  }
+
+  /** Close orbit around the batter at the plate (character creator). `spin` = yaw (rad). */
+  studio(spin: number, center: Vec3): void {
+    if (this.mode !== 'studio') this.t = 0;
+    this.mode = 'studio';
+    this.studioSpin = spin;
+    this.studioCenter.set(center.x, 0, center.z);
+  }
+
+  /** Follows the batter when his stance moves (height / build changes). */
+  studioRecenter(center: Vec3): void {
+    this.studioCenter.set(center.x, 0, center.z);
+  }
+
+  /** Height of the batter being shown in the studio (frames giants). */
+  studioHeight = 1.85;
+  private studioSpin = 0;
+  private viewOffsetKey = '';
+  private readonly studioCenter = new THREE.Vector3(0.9, 0, 0.1);
+
   /** Begin following a batted ball. */
   follow(kind: 'fly' | 'ground' | 'foul'): void {
     this.mode = 'follow';
@@ -142,6 +170,30 @@ export class CameraDirector {
         this.look.copy(this.desiredLook);
         break;
       }
+      case 'overview': {
+        if (!ball) break;
+        const r = Math.hypot(ball.x, ball.z);
+        this.desired.set(ball.x * 0.55, 13 + r * 0.14, ball.z * 0.55 - 15 - r * 0.06);
+        this.desiredLook.set(ball.x, 0.5, ball.z);
+        const first = this.t < dt * 1.5;
+        this.pos.lerp(this.desired, first ? 1 : damp(2.2, dt));
+        this.look.lerp(this.desiredLook, first ? 1 : damp(3.2, dt));
+        this.fov += (48 - this.fov) * damp(3, dt);
+        break;
+      }
+      case 'studio': {
+        // Batter stands at ~(±0.9, 0, 0.1); orbit around him at his own scale.
+        const hgt = Math.max(1.2, Math.min(8, this.studioHeight));
+        const dist = 3.4 + hgt * 1.25;
+        const a = this.studioSpin + Math.sin(this.t * 0.25) * 0.06;
+        const c = this.studioCenter;
+        this.desired.set(c.x + Math.sin(a) * dist, 0.35 + hgt * 0.5, c.z + Math.cos(a) * dist);
+        this.desiredLook.set(c.x, hgt * 0.48, c.z);
+        this.pos.lerp(this.desired, damp(5, dt));
+        this.look.lerp(this.desiredLook, damp(6, dt));
+        this.fov += (34 - this.fov) * damp(4, dt);
+        break;
+      }
       case 'follow': {
         if (!ball) break;
         const early = this.t < 0.22;
@@ -174,11 +226,20 @@ export class CameraDirector {
     cam.lookAt(this.look);
     // Portrait screens: widen the vertical FOV so a minimum horizontal FOV is kept
     // (otherwise the batter falls off-screen on phones).
-    const minH = (this.mode === 'batting' ? 40 : this.mode === 'follow' || this.mode === 'shot' ? 54 : 62) * (Math.PI / 180);
+    const minH = (this.mode === 'batting' ? 40 : this.mode === 'follow' || this.mode === 'shot' || this.mode === 'overview' ? 54 : this.mode === 'studio' ? 30 : 62) * (Math.PI / 180);
     const fromH = (2 * Math.atan(Math.tan(minH / 2) / Math.max(0.2, cam.aspect)) * 180) / Math.PI;
     const fov = Math.max(this.fov, fromH);
-    if (Math.abs(cam.fov - fov) > 0.01) {
+    // Studio: push the batter beside the creator panel (right on wide screens, bottom sheet on phones).
+    const off = this.mode === 'studio' ? (cam.aspect > 1.05 ? [0.2, 0] : [0, 0.3]) : null;
+    const offKey = off ? `${off[0]},${off[1]},${cam.aspect.toFixed(3)}` : '';
+    if (Math.abs(cam.fov - fov) > 0.01 || offKey !== this.viewOffsetKey) {
       cam.fov = fov;
+      this.viewOffsetKey = offKey;
+      if (off) {
+        const H = 1000;
+        const W = H * cam.aspect;
+        cam.setViewOffset(W, H, W * off[0]!, H * off[1]!, W, H);
+      } else cam.clearViewOffset();
       cam.updateProjectionMatrix();
     }
   }

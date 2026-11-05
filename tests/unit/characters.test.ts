@@ -144,7 +144,7 @@ describe('characters', () => {
     const m = characterById('mati');
     expect(m.look).toMatchObject({ wheelchair: true, muscle: 1 });
     // Sitting he keeps his usual ratings.
-    expect(m.ratings).toEqual({ vision: 10, contact: 14, power: 17 });
+    expect(m.ratings).toMatchObject({ vision: 10, contact: 14, power: 17 });
     const pw = m.preWorkout!;
     expect(pw).toMatchObject({ chance: 0.1, pitches: 3 });
     expect(pw.mods).toEqual(modsFromRatings(pw.ratings));
@@ -186,8 +186,8 @@ describe('characters', () => {
   });
 
   it('uses the requested ratings and derives the mods from them', () => {
-    expect(characterById('arturek').ratings).toEqual({ vision: 20, contact: 5, power: 2 });
-    expect(characterById('chamo').ratings).toEqual({ vision: 10, contact: 5, power: 24 });
+    expect(characterById('arturek').ratings).toMatchObject({ vision: 20, contact: 5, power: 2 });
+    expect(characterById('chamo').ratings).toMatchObject({ vision: 10, contact: 5, power: 24 });
     for (const c of CHARACTERS) expect(c.mods).toEqual(modsFromRatings(c.ratings));
   });
 

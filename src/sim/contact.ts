@@ -147,7 +147,7 @@ export function evaluateSwing(plan: PitchPlan, swing: SwingInput, ctx: ContactCo
 }
 
 /** Flies a batted ball from `at` and classifies it (shared by every swing model). */
-function launchBall(at: { x: number; y: number; z: number }, ev: number, la: number, spray: number, ctx: ContactContext): BattedBall {
+export function launchBall(at: { x: number; y: number; z: number }, ev: number, la: number, spray: number, ctx: ContactContext): BattedBall {
   const evMph = ev / MPH;
   const spinRpm = la >= 0 ? Math.min(3000, 500 + 50 * la) : Math.max(-1800, -300 + 40 * la);
   const quality = classifyQuality(evMph, la);

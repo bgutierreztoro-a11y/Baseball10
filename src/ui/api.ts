@@ -4,7 +4,7 @@
  * already-localized dynamic text; the UI owns only its static chrome strings
  * (buttons, headings, settings labels) in src/ui/strings.ts.
  */
-import type { BatterLook, CharacterId, Hand, Lang, PitchTypeId, Settings, StadiumId, TimeOfDay } from '../contracts';
+import type { BatterLook, CharacterId, CustomCharacter, Hand, Lang, PitchTypeId, Settings, StadiumId, TimeOfDay, TraitId } from '../contracts';
 
 export interface StatVM {
   label: string;
@@ -19,6 +19,8 @@ export interface TitleVM {
   continueLabel: string | null;
   /** Currently selected batter, e.g. "El Mati". */
   characterName: string;
+  coins: number;
+  daily: { label: string; done: boolean; streak: number };
 }
 
 export interface TitleHandlers {
@@ -29,6 +31,10 @@ export interface TitleHandlers {
   onSettings(): void;
   /** Opens the batter select screen. */
   onCharacters(): void;
+  onGame(): void;
+  onDaily(): void;
+  /** Character creator (new player). */
+  onStudio(): void;
 }
 
 /** One stat bar on a character card; value is 0..1 relative to the roster. */
@@ -54,10 +60,70 @@ export interface CharacterCardVM {
   stats: CharacterStatVM[];
   ability: { name: string; description: string } | null;
   selected: boolean;
+  /** Made in the creator (can be edited / deleted). */
+  custom?: boolean;
 }
 
 export interface CharactersVM {
   items: CharacterCardVM[];
+  /** A free slot for a new created player. */
+  canCreate: boolean;
+}
+
+export interface CharactersHandlers {
+  onSelect(id: CharacterId): void;
+  onBack(): void;
+  onCreate(): void;
+  onEdit(id: CharacterId): void;
+  onDelete(id: CharacterId): void;
+}
+
+export interface GameSetupVM {
+  rivals: { id: string; name: string; short: string; difficulty: 'easy' | 'normal' | 'hard'; taunt: string; jersey: string; trim: string }[];
+  stadiums: { id: StadiumId; name: string; locked: boolean }[];
+  innings: number[];
+  initial: { stadium: StadiumId; rival: string; innings: number };
+  rules: string;
+}
+
+export interface CreatorVM {
+  draft: CustomCharacter;
+  isNew: boolean;
+  coins: number;
+  owned: string[];
+  /** Price and name of every part that costs chips. */
+  parts: Record<string, { price: number; name: string }>;
+  traits: { id: TraitId; name: string; description: string; part: string | null }[];
+  bats: { id: string; name: string; part: string | null }[];
+  presets: { id: string; name: string }[];
+  stadiums: { id: StadiumId; name: string }[];
+  skins: string[];
+  hairs: (string | null)[];
+  colors: string[];
+  budget: number;
+  ratingMin: number;
+  ratingMax: number;
+  height: { min: number; maxHuman: number; giantFrom: number; max: number };
+  head: { min: number; max: number; bobbleFrom: number };
+  nameMax: number;
+  nickMax: number;
+}
+
+export interface CreatorHandlers {
+  /** Live 3D preview of the draft. */
+  onChange(draft: CustomCharacter): void;
+  onRandom(): CustomCharacter;
+  onPreset(id: string, draft: CustomCharacter): CustomCharacter;
+  /** Buys parts; returns the new balance and owned list, or null if not affordable. */
+  onBuy(parts: string[]): { coins: number; owned: string[] } | null;
+  onSave(draft: CustomCharacter): void;
+  onSpin(delta: number): void;
+  onBack(): void;
+  /** Rules helpers (single source of truth in config/creator.ts). */
+  check(draft: CustomCharacter): { missing: string[]; cost: number };
+  rate(draft: CustomCharacter, key: 'vision' | 'contact' | 'power' | 'speed', value: number): CustomCharacter;
+  withBat(draft: CustomCharacter, bat: string): CustomCharacter;
+  withBody(draft: CustomCharacter, body: 'human' | 'monkey' | 'skeleton'): CustomCharacter;
 }
 
 export interface StageNodeVM {
@@ -158,8 +224,39 @@ export interface DerbySetupVM {
   rules: string;
 }
 
+/** Broadcast scorebug of the quick game (top-right). */
+export interface ScorebugVM {
+  away: string;
+  home: string;
+  awayRuns: number;
+  homeRuns: number;
+  /** "▼3" */
+  inning: string;
+  balls: number;
+  strikes: number;
+  outs: number;
+  bases: [boolean, boolean, boolean];
+}
+
+/** Base-running controls and the third-base coach's sign. */
+export interface RunPanelVM {
+  coach: 'go' | 'risky' | 'hold' | null;
+  coachText: string;
+  coachWho: string;
+  /** "¡CORRE!" or "¡BÁRRETE!" while a throw is coming to the bag. */
+  primary: string;
+  slide: boolean;
+  /** Retreat label, or null when he cannot go back. */
+  back: string | null;
+  hint: string;
+}
+
 export interface HudVM {
-  mode: 'campaign' | 'practice' | 'derby';
+  mode: 'campaign' | 'practice' | 'derby' | 'game' | 'daily';
+  /** Quick game only. */
+  scorebug?: ScorebugVM | null;
+  /** While running the bases. */
+  run?: RunPanelVM | null;
   /** "1-3 · Al centro" — the part before " · " renders as a tag. */
   stageLabel: string;
   /** "Jonrones|2/5" — label and value separated by "|". */
@@ -193,6 +290,9 @@ export interface HudHandlers {
   onPowerToggle(on: boolean): void;
   /** Activates the batter's special ability (touch/click on the HUD button). */
   onAbility(): void;
+  /** Base running: send him on (or slide) / send him back. */
+  onRunAdvance(): void;
+  onRunBack(): void;
 }
 
 export type HitResultKind = 'homeRun' | 'hit' | 'out' | 'foul' | 'whiff' | 'calledStrike' | 'ball';
@@ -219,7 +319,7 @@ export interface PauseHandlers {
 }
 
 export interface ResultsVM {
-  mode: 'campaign' | 'practice' | 'derby';
+  mode: 'campaign' | 'practice' | 'derby' | 'game' | 'daily';
   success: boolean;
   title: string;
   subtitle: string;
@@ -232,6 +332,10 @@ export interface ResultsVM {
   unlocks: string[];
   canNext: boolean;
   shareText: string;
+  /** Fichas earned this match. */
+  coins?: { lines: { label: string; amount: number }[]; total: number; balance: number; canDouble: boolean; doubled: boolean } | null;
+  /** Quick game line score. */
+  linescore?: { away: string; home: string; awayLine: (number | null)[]; homeLine: (number | null)[]; awayTotal: number; homeTotal: number } | null;
 }
 
 export interface ResultsHandlers {
@@ -239,6 +343,8 @@ export interface ResultsHandlers {
   onNext(): void;
   onMenu(): void;
   onShare(): void;
+  /** Rewarded ad: double the chips of this match. */
+  onDoubleCoins?(): void;
 }
 
 export interface SettingsHandlers {
@@ -272,7 +378,12 @@ export interface UI {
   /** Settings open as an overlay (also above the pause menu); close with closeOverlay(). */
   showSettings(settings: Settings, h: SettingsHandlers): void;
   /** Batter select: roster cards with portrait, stats and ability. */
-  showCharacters(vm: CharactersVM, h: { onSelect(id: CharacterId): void; onBack(): void }): void;
+  showCharacters(vm: CharactersVM, h: CharactersHandlers): void;
+  showGameSetup(vm: GameSetupVM, h: { onStart(cfg: GameSetupVM['initial']): void; onBack(): void }): void;
+  /** Character creator: the 3D batter stays visible beside the panel. */
+  showCreator(vm: CreatorVM, h: CreatorHandlers): void;
+  /** Modal yes/no question (e.g. a rewarded continue). */
+  showConfirm(opts: { title: string; body: string; yes: string; no: string; tag?: string }): Promise<boolean>;
   closeOverlay(): void;
   showCalibration(h: CalibrationHandlers): void;
   showHUD(vm: HudVM, h: HudHandlers): void;

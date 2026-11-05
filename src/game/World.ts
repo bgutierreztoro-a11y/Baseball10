@@ -1,5 +1,7 @@
 import * as THREE from 'three';
-import type { CharacterDef, CharacterId, CharacterLook, Hand, QualitySettings, StadiumDef, Vec3 } from '../contracts';
+import type { BatterLook, CharacterDef, CharacterId, CharacterLook, Hand, QualitySettings, StadiumDef, Vec3 } from '../contracts';
+import { FieldersView, RunnerRig } from '../render/characters/fielders';
+import { FIELDER_IDS, fielderHome } from '../sim/baserunning';
 import { MOUND, RUBBER_Z } from '../config/constants';
 import { characterById, DEFAULT_CHARACTER } from '../config/characters';
 import type { BallView, BatterRig, CatcherRig, Effects, PitcherRig, StadiumView, UmpireRig } from '../render/api';
@@ -30,6 +32,7 @@ export class World {
   private batterRig: BatterRig;
   private characterId: CharacterId = DEFAULT_CHARACTER;
   private batColors: [string, string] | null = null;
+  private lookOf: BatterLook = characterById(DEFAULT_CHARACTER).look;
   /** Look the pitcher has without the batter's `pitcherKit` (re-dressed whenever the batter changes). */
   private pitcherBase: { look: CharacterLook; hand: Hand } = { look: DEFAULT_PITCHER_LOOK, hand: 'R' };
   private playersVisible = true;
@@ -42,6 +45,11 @@ export class World {
   private readonly thief: HomeRunThief;
   /** Arturek's curse: the firecracker blast and the park on fire. */
   private readonly inferno: Inferno;
+  /** Quick game: the rival defence, the batter running the bases and his teammates on base. */
+  readonly fielders: FieldersView;
+  private runnerRig: RunnerRig | null = null;
+  private ghostRigs: RunnerRig[] = [];
+  private teamLook: BatterLook | null = null;
   /** Seconds since the batter was knocked down by the blast (−1 = standing), and his original colours. */
   private batterDown = -1;
   private charred: { m: THREE.MeshStandardMaterial; color: THREE.Color }[] = [];
@@ -67,8 +75,9 @@ export class World {
     this.kippah = new KippahUfo(this.quality);
     this.thief = new HomeRunThief(this.quality);
     this.inferno = new Inferno(this.quality);
+    this.fielders = new FieldersView(this.quality);
     this.pitcherBadge.setAnchor(0, MOUND.height, RUBBER_Z);
-    this.group.add(this.penny.root, this.kippah.root, this.thief.root, this.inferno.root, this.pitcherBadge.root, this.batter.root, this.pitcher.root, this.catcher.root, this.umpire.root, this.ball.root, this.fx.root, this.zone.group);
+    this.group.add(this.fielders.root, this.penny.root, this.kippah.root, this.thief.root, this.inferno.root, this.pitcherBadge.root, this.batter.root, this.pitcher.root, this.catcher.root, this.umpire.root, this.ball.root, this.fx.root, this.zone.group);
     scene.add(this.group);
     this.setHandedness('R');
     this.ball.setVisible(false);
@@ -88,8 +97,8 @@ export class World {
    * builds the new one with the same handedness and bat colours. The peak aura
    * starts off. No-op if that character is already at the plate.
    */
-  setCharacter(def: CharacterDef): void {
-    if (def.id === this.characterId) return;
+  setCharacter(def: CharacterDef, force = false): void {
+    if (def.id === this.characterId && !force) return;
     this.reviveBatter();
     this.characterId = def.id;
     this.dressPitcher();
@@ -98,6 +107,8 @@ export class World {
     old.dispose();
     const rig = this.adopt(characters.createBatter(this.quality, def.look));
     this.batterRig = rig;
+    this.lookOf = def.look;
+    this.disposeRunner();
     rig.root.visible = this.playersVisible;
     this.group.add(rig.root);
     if (this.batColors) rig.setBatColors(this.batColors[0], this.batColors[1]);
@@ -228,6 +239,62 @@ export class World {
     return this.kippah.playing;
   }
 
+  // ── Quick game: defence and base runners ──
+
+  /**
+   * Quick-game mode on (rival kit for the defence, team look for teammates on
+   * base) or off (null): the batting-only modes show no fielders.
+   */
+  setGameMode(rival: CharacterLook | null, team: BatterLook | null): void {
+    // The pitcher and catcher rigs already exist: the other seven take the field.
+    if (rival) this.fielders.setTeam(rival, new Map(FIELDER_IDS.filter((id) => id !== 'P').map((id) => [id, fielderHome(id, this.def)])));
+    this.fielders.setVisible(!!rival);
+    if (team && (!this.teamLook || this.teamLook.jersey !== team.jersey || this.teamLook.trim !== team.trim)) {
+      this.ghostRigs.forEach((g) => g.dispose());
+      this.teamLook = team;
+      this.ghostRigs = [0, 1, 2].map(() => {
+        const g = new RunnerRig(this.quality, team);
+        this.group.add(g.root);
+        return g;
+      });
+    }
+    if (!rival) {
+      this.ghostRigs.forEach((g) => g.setVisible(false));
+      this.runnerRig?.setVisible(false);
+    }
+  }
+
+  /** The batter as a base runner (same look; built on first use). */
+  get runner(): RunnerRig {
+    if (!this.runnerRig) {
+      this.runnerRig = new RunnerRig(this.quality, this.lookOf);
+      this.group.add(this.runnerRig.root);
+    }
+    return this.runnerRig;
+  }
+
+  /** Teammates on base (up to three). */
+  get ghosts(): readonly RunnerRig[] {
+    return this.ghostRigs;
+  }
+
+  private disposeRunner(): void {
+    this.runnerRig?.dispose();
+    this.runnerRig = null;
+  }
+
+  /** Character creator: only the batter on the field (the others step away). */
+  setStudio(on: boolean): void {
+    for (const o of [this.pitcher.root, this.catcher.root, this.umpire.root]) o.visible = !on && this.playersVisible;
+    this.batter.root.visible = this.playersVisible;
+    this.pitcherBadge.setVisible(false);
+  }
+
+  /** Hides the batting rig while he runs the bases (and shows it back). */
+  setBatterVisible(v: boolean): void {
+    this.batter.root.visible = v && this.playersVisible;
+  }
+
   /** Height of the ground (the outfield stands / hill surface beyond the wall) at a point. */
   groundAt(x: number, z: number): number {
     return standHeight(this.def, sprayOf(x, z), Math.hypot(x, z));
@@ -332,6 +399,9 @@ export class World {
     this.kippah.update(dt);
     this.thief.update(dt);
     this.inferno.update(dt);
+    this.fielders.update(dt);
+    this.runnerRig?.update(dt);
+    for (const g of this.ghostRigs) g.update(dt);
   }
 
   dispose(): void {
@@ -343,6 +413,9 @@ export class World {
     this.kippah.dispose();
     this.thief.dispose();
     this.inferno.dispose();
+    this.fielders.dispose();
+    this.disposeRunner();
+    this.ghostRigs.forEach((g) => g.dispose());
     this.group.traverse((o) => {
       if (o instanceof THREE.Mesh || o instanceof THREE.Points || o instanceof THREE.Sprite) {
         o.geometry?.dispose();

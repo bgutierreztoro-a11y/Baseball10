@@ -23,10 +23,10 @@ Batear un jonrón es el momento más emocionante del béisbol, pero los juegos q
 
 | No-objetivo | Por qué |
 |---|---|
-| Fildeo, corrido de bases, partidos completos | Es la premisa: solo bateo |
+| Fildeo controlado por el jugador y partidos de 9 entradas | La campaña sigue siendo solo bateo. *v0.2: el Partido rápido añade corrido de bases (ADR-010).* |
 | PvP y rankings online | Requieren backend, anti-trampas y moderación. Primero validamos el core loop (P2) |
 | Licencias de MLB, ligas o jugadores reales | Coste legal; la identidad propia es una ventaja |
-| Monetización | Primero retención; nunca pay-to-win (decisión de principio) |
+| Monetización agresiva | Nunca pay-to-win. *v0.2: anuncios opcionales con recompensa e intersticiales con tope (ADR-009); plan en `07-plan-maestro.md`.* |
 | App nativa | La web es la ventaja de distribución (ADR-001) |
 
 ## 4. Usuarios

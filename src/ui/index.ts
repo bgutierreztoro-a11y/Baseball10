@@ -1,6 +1,10 @@
 import './styles.css';
 import type { CharacterId, Lang, PitchTypeId, Settings, StadiumId } from '../contracts';
 import type {
+  CharactersHandlers,
+  CreatorHandlers,
+  CreatorVM,
+  GameSetupVM,
   CalibrationHandlers,
   CalloutStyle,
   CampaignHandlers,
@@ -25,6 +29,7 @@ import type {
 } from './api';
 import { STRINGS, fmt, type StringKey } from './strings';
 import { batterPortrait } from './portrait';
+import { creatorScreen } from './creator';
 
 /**
  * DOM overlay UI (vanilla TS). Every node is built with textContent — no
@@ -32,47 +37,7 @@ import { batterPortrait } from './portrait';
  * screen-reader users get the whole game.
  */
 
-type Child = Node | string | null | undefined | false;
-type Attrs = Record<string, string | number | boolean | EventListener | undefined>;
-
-function h<K extends keyof HTMLElementTagNameMap>(tag: K, attrs: Attrs | null = null, ...children: Child[]): HTMLElementTagNameMap[K] {
-  const el = document.createElement(tag);
-  if (attrs) {
-    for (const [k, v] of Object.entries(attrs)) {
-      if (v === undefined || v === false) continue;
-      if (k.startsWith('on') && typeof v === 'function') el.addEventListener(k.slice(2).toLowerCase(), v as EventListener);
-      else if (k === 'class') el.className = String(v);
-      else if (k === 'style') el.setAttribute('style', String(v));
-      else if (v === true) el.setAttribute(k, '');
-      else el.setAttribute(k, String(v));
-    }
-  }
-  for (const c of children) {
-    if (c === null || c === undefined || c === false) continue;
-    el.append(typeof c === 'string' ? document.createTextNode(c) : c);
-  }
-  return el;
-}
-
-const SVG_NS = 'http://www.w3.org/2000/svg';
-function svg(viewBox: string, cls: string, paths: { d: string; fill?: string; stroke?: string; sw?: number }[]): SVGSVGElement {
-  const s = document.createElementNS(SVG_NS, 'svg');
-  s.setAttribute('viewBox', viewBox);
-  s.setAttribute('class', cls);
-  s.setAttribute('aria-hidden', 'true');
-  for (const p of paths) {
-    const e = document.createElementNS(SVG_NS, 'path');
-    e.setAttribute('d', p.d);
-    e.setAttribute('fill', p.fill ?? 'currentColor');
-    if (p.stroke) {
-      e.setAttribute('stroke', p.stroke);
-      e.setAttribute('stroke-width', String(p.sw ?? 2));
-      e.setAttribute('stroke-linecap', 'round');
-    }
-    s.append(e);
-  }
-  return s;
-}
+import { h, svg, SVG_NS } from './dom';
 
 const starIcon = (on: boolean, extra = ''): SVGSVGElement =>
   svg('0 0 24 24', `star ${on ? 'on' : ''} ${extra}`, [{ d: 'M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3l-5.9 3.3 1.3-6.6L2.5 9.4l6.6-.8z' }]);
@@ -85,6 +50,8 @@ const checkIcon = (): SVGSVGElement => svg('0 0 24 24', 'ico', [{ d: 'M5 12.5l4.
 /** Lightning bolt: special ability. */
 const boltIcon = (cls = 'ico'): SVGSVGElement => svg('0 0 24 24', cls, [{ d: 'M13.5 2L4 13.5h6.5L9 22l10-12.5h-6.6z' }]);
 /** Batting helmet: the batter / roster. */
+const coinIcon = (): SVGSVGElement => svg('0 0 24 24', 'ico coin-ico', [{ d: 'M12 2a10 10 0 110 20 10 10 0 010-20zm0 3.5a6.5 6.5 0 100 13 6.5 6.5 0 000-13zm-1 2.5h2v8h-2z' }]);
+const plusIcon = (): SVGSVGElement => svg('0 0 24 24', 'ico', [{ d: 'M12 5v14M5 12h14', fill: 'none', stroke: 'currentColor', sw: 3 }]);
 const helmetIcon = (): SVGSVGElement => svg('0 0 24 24', 'ico', [{ d: 'M3 15.5C3 9.7 7 5.5 12.3 5.5c4.6 0 8.2 3.3 8.7 8H23v2.5H13.8v3.5H9.5C5.9 19.5 3 17.9 3 15.5zm9.5-.5a2.3 2.3 0 100-4.6 2.3 2.3 0 000 4.6z' }]);
 
 /** Baseball icon with red stitches (brand mark). */
@@ -138,6 +105,8 @@ class DomUI implements UI {
     ability: HTMLButtonElement;
     onPause: () => void;
     last: HudVM | null;
+    runPanel: HTMLElement;
+    hd: HudHandlers;
   } | null = null;
   private hitCard: HTMLElement | null = null;
   private tipEl: HTMLElement | null = null;
@@ -227,20 +196,27 @@ class DomUI implements UI {
     }
     menu.append(
       h('button', { class: `btn btn-lg ${vm.continueLabel ? '' : 'btn-primary'}`, onclick: this.click(hd.onCampaign) }, h('span', null, this.t('campaign')), h('small', null, this.t('campaignDesc'))),
-      h('button', { class: 'btn', onclick: this.click(hd.onPractice) }, h('span', null, this.t('practice')), h('small', null, this.t('practiceDesc'))),
-      h('button', { class: 'btn', onclick: this.click(hd.onDerby) }, h('span', null, this.t('derby')), h('small', null, this.t('derbyDesc'))),
+      h('button', { class: 'btn btn-game', onclick: this.click(hd.onGame) }, h('span', null, this.t('quickGame'), h('em', { class: 'new-tag' }, 'NEW')), h('small', null, this.t('quickGameDesc'))),
+      h(
+        'button',
+        { class: `btn btn-daily ${vm.daily.done ? 'done' : ''}`, onclick: this.click(hd.onDaily) },
+        h('span', null, this.t('daily')),
+        h('small', null, vm.daily.done ? this.t('dailyDone') : vm.daily.label, vm.daily.streak > 1 ? ` · 🔥 ${this.t('streakDays', { n: vm.daily.streak })}` : ''),
+      ),
+      h('div', { class: 'menu-row' }, h('button', { class: 'btn', onclick: this.click(hd.onPractice) }, h('span', null, this.t('practice')), h('small', null, this.t('practiceDesc'))), h('button', { class: 'btn', onclick: this.click(hd.onDerby) }, h('span', null, this.t('derby')), h('small', null, this.t('derbyDesc')))),
       h(
         'button',
         { class: 'btn btn-batters', onclick: this.click(hd.onCharacters) },
         h('span', null, this.t('batters')),
         h('small', { class: 'batter-now' }, helmetIcon(), h('span', { class: 'sr-only' }, `${this.t('currentBatter')}: `), vm.characterName),
       ),
-      h('button', { class: 'btn btn-ghost', onclick: this.click(hd.onSettings) }, h('span', null, this.t('settings'))),
+      h('div', { class: 'menu-row' }, h('button', { class: 'btn btn-studio', onclick: this.click(hd.onStudio) }, h('span', null, this.t('studio')), h('small', null, this.t('studioDesc'))), h('button', { class: 'btn btn-ghost', onclick: this.click(hd.onSettings) }, h('span', null, this.t('settings')))),
     );
     const meta = h(
       'div',
       { class: 'title-meta' },
       h('span', null, starIcon(true), ' ', h('b', { class: 'num' }, `${vm.totalStars}`), ` / ${vm.maxStars}`),
+      h('span', { class: 'coins-meta', 'aria-label': this.t('coinsAria', { n: vm.coins }) }, coinIcon(), ' ', h('b', { class: 'num' }, String(vm.coins)), ` ${this.t('coins')}`),
       vm.derbyBest ? h('span', null, `${this.t('derbyBest')}: `, h('b', { class: 'num' }, vm.derbyBest)) : null,
     );
     const word = h('h1', null, 'JONR', h('span', { class: 'acc' }, 'Ó'), 'N');
@@ -338,7 +314,7 @@ class DomUI implements UI {
   // Master–detail: a strip of small tiles (preview) and one big panel with the
   // previewed batter's full card. Previewing never changes the pick; only the
   // "Elegir" button does.
-  showCharacters(vm: CharactersVM, hd: { onSelect(id: CharacterId): void; onBack(): void }): void {
+  showCharacters(vm: CharactersVM, hd: CharactersHandlers): void {
     // The game re-calls this after onSelect: keep the previewed batter and focus.
     const prevRoster = this.screenLayer.querySelector<HTMLElement>('.roster');
     const prevScroll = prevRoster ? prevRoster.scrollLeft : null;
@@ -373,6 +349,14 @@ class DomUI implements UI {
       tiles.set(c.id, tile);
       roster.append(tile);
     }
+    roster.append(
+      h(
+        'button',
+        { class: 'bpreview bcreate', title: vm.canCreate ? this.t('createDesc') : this.t('slotsFull'), onclick: this.click(hd.onCreate) },
+        h('span', { class: 'bpreview-art', 'aria-hidden': 'true' }, plusIcon()),
+        h('span', { class: 'bpreview-name' }, this.t('createPlayer')),
+      ),
+    );
 
     const renderPanel = (c: CharacterCardVM, i: number): void => {
       const nameId = `bcard-${c.id}-name`;
@@ -416,7 +400,7 @@ class DomUI implements UI {
           'div',
           // Scrollable when space is short: browsers make it a tab stop, so give it a name.
           { class: 'bpanel-info', role: 'group', 'aria-labelledby': nameId },
-          h('header', { class: 'bcard-head' }, h('h3', { id: nameId }, c.name), h('p', null, c.title)),
+          h('header', { class: 'bcard-head' }, h('h3', { id: nameId }, c.name), h('p', null, c.title), c.custom ? h('span', { class: 'chip custom-chip' }, this.t('custom')) : null),
           h('span', { class: 'sr-only' }, `${this.t('rosterPos', { i: i + 1, n })}. ${this.t('height')}: ${c.height}`),
           stats,
           c.ability
@@ -429,7 +413,7 @@ class DomUI implements UI {
             : null,
           h('p', { class: 'bcard-bio' }, c.bio),
         ),
-        h('div', { class: 'bpanel-foot' }, btn),
+        h('div', { class: 'bpanel-foot' }, c.custom ? h('button', { class: 'btn btn-ghost', onclick: this.click(() => hd.onEdit(c.id)) }, this.t('edit')) : null, c.custom ? this.deleteButton(() => hd.onDelete(c.id)) : null, btn),
       );
     };
 
@@ -487,6 +471,95 @@ class DomUI implements UI {
     else if (!this.touch) window.setTimeout(() => tiles.get(viewId)?.focus({ preventScroll: true }), 60);
     this.pickedId = picked?.id ?? null;
     if (picked && prevPicked && prevRoster && prevPicked !== picked.id) this.announce(this.t('batterPicked', { name: picked.name }));
+  }
+
+  /** Two-tap delete (first tap asks, second confirms). */
+  private deleteButton(onDelete: () => void): HTMLButtonElement {
+    const b = h('button', { class: 'btn btn-ghost danger' }, this.t('delete'));
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (b.dataset.confirm) onDelete();
+      else {
+        b.dataset.confirm = '1';
+        b.textContent = this.t('deleteYes');
+      }
+    });
+    return b;
+  }
+
+  // ── Quick game setup ──
+  showGameSetup(vm: GameSetupVM, hd: { onStart(cfg: GameSetupVM['initial']): void; onBack(): void }): void {
+    this.clear();
+    const cfg = { ...vm.initial };
+    const diff = (d: 'easy' | 'normal' | 'hard'): string => (d === 'easy' ? this.t('diffEasy') : d === 'normal' ? this.t('diffNormal') : this.t('diffHard'));
+    const rivals = h('div', { class: 'rivals', role: 'radiogroup', 'aria-label': this.t('rival') });
+    const renderRivals = (): void => {
+      rivals.replaceChildren(
+        ...vm.rivals.map((r) =>
+          h(
+            'button',
+            { class: `rival-card diff-${r.difficulty}`, role: 'radio', 'aria-checked': r.id === cfg.rival ? 'true' : 'false', style: `--jersey:${r.jersey};--trim:${r.trim}`, onclick: this.click(() => { cfg.rival = r.id; renderRivals(); }) },
+            h('span', { class: 'rival-badge', 'aria-hidden': 'true' }, r.short),
+            h('span', { class: 'rival-text' }, h('b', null, r.name), h('small', null, r.taunt)),
+            h('span', { class: 'chip diff' }, diff(r.difficulty)),
+          ),
+        ),
+      );
+    };
+    renderRivals();
+    const seg = <T extends string | number>(options: { v: T; label: string; disabled?: boolean }[], get: () => T, set: (v: T) => void): HTMLElement => {
+      const el = h('div', { class: 'seg seg-wrap', role: 'group' });
+      const render = (): void => {
+        el.replaceChildren(...options.map((o) => h('button', { 'aria-pressed': get() === o.v ? 'true' : 'false', disabled: o.disabled, onclick: this.click(() => { set(o.v); render(); }) }, o.label)));
+      };
+      render();
+      return el;
+    };
+    const modal = h(
+      'div',
+      { class: 'modal panel', role: 'dialog', 'aria-modal': 'true', style: 'width:min(980px,100%)' },
+      h('h2', null, this.t('gameTitle')),
+      h('div', { class: 'tip' }, whistleIcon(), h('div', null, h('div', { class: 'eyebrow', style: 'color:var(--c-info)' }, this.t('rules')), vm.rules || this.t('gameRules'))),
+      h('div', { class: 'eyebrow' }, this.t('rival')),
+      rivals,
+      h(
+        'div',
+        { class: 'row' },
+        h('div', { class: 'field' }, h('span', { class: 'label' }, this.t('stadium')), seg(vm.stadiums.map((st) => ({ v: st.id, label: st.name, disabled: st.locked })), () => cfg.stadium, (v) => (cfg.stadium = v))),
+        h('div', { class: 'field' }, h('span', { class: 'label' }, this.t('innings')), seg(vm.innings.map((n) => ({ v: n, label: String(n) })), () => cfg.innings, (v) => (cfg.innings = v))),
+      ),
+      h('div', { class: 'actions' }, h('button', { class: 'btn btn-ghost', onclick: this.click(hd.onBack) }, this.t('back')), h('button', { class: 'btn btn-primary btn-lg', onclick: this.click(() => hd.onStart(cfg)), 'data-autofocus': true }, this.t('playBall'))),
+    );
+    this.setScreen(h('section', { class: 'screen scrim center' }, modal), hd.onBack);
+  }
+
+  // ── Player Studio ──
+  showCreator(vm: CreatorVM, hd: CreatorHandlers): void {
+    this.clear();
+    const { el, esc } = creatorScreen(vm, hd, (k, v) => this.t(k, v), this.lang);
+    this.setScreen(el, esc);
+  }
+
+  showConfirm(opts: { title: string; body: string; yes: string; no: string; tag?: string }): Promise<boolean> {
+    return new Promise((resolve) => {
+      const prevEsc = this.escHandler;
+      const done = (v: boolean): void => {
+        this.overlayLayer.replaceChildren();
+        this.escHandler = prevEsc;
+        resolve(v);
+      };
+      const modal = h(
+        'div',
+        { class: 'modal panel confirm', role: 'alertdialog', 'aria-modal': 'true', style: 'width:min(440px,100%)' },
+        opts.tag ? h('div', { class: 'eyebrow ad-tag' }, opts.tag) : null,
+        h('h2', null, opts.title),
+        h('p', { class: 'sub' }, opts.body),
+        h('div', { class: 'actions' }, h('button', { class: 'btn btn-ghost', onclick: this.click(() => done(false)) }, opts.no), h('button', { class: 'btn btn-primary btn-lg', onclick: this.click(() => done(true)), 'data-autofocus': true }, opts.yes)),
+      );
+      this.overlayLayer.replaceChildren(h('section', { class: 'screen scrim center', style: 'pointer-events:auto' }, modal));
+      this.escHandler = () => done(false);
+      window.setTimeout(() => modal.querySelector<HTMLElement>('[data-autofocus]')?.focus({ preventScroll: true }), 50);
+    });
   }
 
   // ── Stage intro ──
@@ -727,6 +800,8 @@ class DomUI implements UI {
           toggle(this.t('showPitchType'), () => s.showPitchType, (v) => commit({ ...s, showPitchType: v })),
           toggle(this.t('pitchHint'), () => s.pitchHint, (v) => commit({ ...s, pitchHint: v })),
           toggle(this.t('aimAssist'), () => s.aimAssist, (v) => commit({ ...s, aimAssist: v })),
+          toggle(this.t('runCoach'), () => s.runCoach, (v) => commit({ ...s, runCoach: v })),
+          toggle(this.t('haptics'), () => s.haptics, (v) => commit({ ...s, haptics: v })),
         ),
         h(
           'section',
@@ -869,12 +944,13 @@ class DomUI implements UI {
     const right = h('div', { class: 'hud-tr' });
     const hint = h('div', { class: 'hint' }, '');
     const pitch = h('div', { class: 'pitch-label', hidden: true }, '');
+    const runPanel = h('div', { class: 'run-panel', hidden: true });
     const hud = h(
       'div',
       { class: `hud ${this.touch ? 'is-touch' : ''}` },
       h('div', { class: 'hud-tl' }, h('div', { class: 'hud-chip' }, chipTag, chipText), h('div', { class: 'hud-goal' }, h('div', { class: 'txt' }, goal, goalNum), h('div', { class: 'bar' }, barFill))),
       right,
-      h('div', { class: 'hud-bottom' }, pitch, hint),
+      h('div', { class: 'hud-bottom' }, runPanel, pitch, hint),
     );
     const ability = this.abilityButton(hd);
     let power: HTMLButtonElement | null = null;
@@ -898,7 +974,7 @@ class DomUI implements UI {
       hud.querySelector('.hud-tl')!.append(ability);
     }
     this.hudLayer.append(hud);
-    this.hud = { chipTag, chipText, goal, goalNum, bar: barFill, right, hint, pitch, power, ability, onPause: hd.onPause, last: null };
+    this.hud = { chipTag, chipText, goal, goalNum, bar: barFill, right, hint, pitch, power, ability, onPause: hd.onPause, last: null, runPanel, hd };
     this.updateHUD(vm);
     window.clearTimeout(this.hintTimer);
     this.hintTimer = window.setTimeout(() => hint.classList.add('hide'), 6000);
@@ -909,7 +985,9 @@ class DomUI implements UI {
     if (!hud) return;
     const prev = hud.last;
     if (prev && JSON.stringify(prev) === JSON.stringify(vm)) return;
-    hud.last = { ...vm, outs: vm.outs ? { ...vm.outs } : null, ability: vm.ability ? { ...vm.ability } : null };
+    hud.last = { ...vm, outs: vm.outs ? { ...vm.outs } : null, ability: vm.ability ? { ...vm.ability } : null, scorebug: vm.scorebug ? { ...vm.scorebug, bases: [...vm.scorebug.bases] } : null, run: vm.run ? { ...vm.run } : null };
+    this.updateRunPanel(hud.runPanel, vm.run ?? null, prev?.run ?? null, hud.hd);
+    this.hudLayer.classList.toggle('is-running', !!vm.run);
     this.updateAbility(hud.ability, vm.ability, prev?.ability ?? null);
     const [tag, ...rest] = vm.stageLabel.split(' · ');
     hud.chipTag.textContent = tag ?? '';
@@ -926,6 +1004,7 @@ class DomUI implements UI {
     this.hudLayer.classList.toggle('power-on', vm.powerOn);
 
     const right: Node[] = [];
+    if (vm.scorebug) right.push(this.scorebug(vm.scorebug));
     if (vm.streak !== null && vm.streak > 0) {
       right.push(h('div', { class: 'hud-box streak', 'aria-label': this.t('streakAria', { n: vm.streak }) }, h('span', { class: 'lbl' }, this.t('streak')), h('span', { class: 'val' }, `🔥${vm.streak}`)));
     }
@@ -942,6 +1021,54 @@ class DomUI implements UI {
     }
     right.push(h('button', { class: 'btn btn-icon hud-pause', 'aria-label': this.t('pause'), onclick: this.click(hud.onPause) }, pauseIcon()));
     hud.right.replaceChildren(...right);
+  }
+
+  /** TV-style scorebug: teams and runs, inning, bases diamond, count and outs. */
+  private scorebug(b: NonNullable<HudVM['scorebug']>): HTMLElement {
+    const dots = (n: number, of: number, cls: string): HTMLElement => {
+      const el = h('span', { class: `sb-dots ${cls}` });
+      for (let i = 0; i < of; i++) el.append(h('i', { class: i < n ? 'on' : '' }));
+      return el;
+    };
+    const diamond = h('span', { class: 'sb-diamond', 'aria-hidden': 'true' });
+    // 2B top, 3B left, 1B right (as seen from home plate).
+    (['b2', 'b3', 'b1'] as const).forEach((cls) => diamond.append(h('i', { class: `${cls} ${b.bases[cls === 'b1' ? 0 : cls === 'b2' ? 1 : 2] ? 'on' : ''}` })));
+    const bases = b.bases.map((on, i) => (on ? `${i + 1}ª` : '')).filter(Boolean).join(' ');
+    return h(
+      'div',
+      { class: 'hud-box scorebug', role: 'group', 'aria-label': `${b.away} ${b.awayRuns}, ${b.home} ${b.homeRuns}. ${b.inning}. ${b.balls}-${b.strikes}, ${b.outs} outs. ${bases}` },
+      h('div', { class: 'sb-teams' }, h('div', null, h('span', null, b.away), h('b', { class: 'num' }, String(b.awayRuns))), h('div', null, h('span', null, b.home), h('b', { class: 'num' }, String(b.homeRuns)))),
+      h('div', { class: 'sb-mid' }, h('span', { class: 'sb-inning num' }, b.inning), diamond),
+      h('div', { class: 'sb-count' }, h('div', null, h('span', null, 'B'), dots(b.balls, 3, 'balls')), h('div', null, h('span', null, 'S'), dots(b.strikes, 2, 'strikes')), h('div', null, h('span', null, 'O'), dots(b.outs, 2, 'outs'))),
+    );
+  }
+
+  /** Base-running coach light + RUN / BACK buttons. */
+  private updateRunPanel(el: HTMLElement, run: HudVM['run'], prev: HudVM['run'], hd: HudHandlers): void {
+    el.hidden = !run;
+    if (!run) {
+      el.replaceChildren();
+      return;
+    }
+    if (prev && prev.coach === run.coach && prev.primary === run.primary && prev.back === run.back && el.childElementCount) return;
+    const go = h('button', { class: `run-btn primary ${run.slide ? 'slide' : ''}`, type: 'button' }, run.primary);
+    go.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      hd.onRunAdvance();
+    });
+    const back = run.back ? h('button', { class: 'run-btn back', type: 'button' }, run.back) : null;
+    back?.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      hd.onRunBack();
+    });
+    el.replaceChildren(
+      run.coach ? h('div', { class: `coach-sign ${run.coach}`, role: 'status' }, h('span', { class: 'light', 'aria-hidden': 'true' }), h('span', null, h('small', null, run.coachWho), h('b', null, run.coachText))) : h('span'),
+      h('div', { class: 'run-btns' }, back, go),
+      h('div', { class: 'run-hint' }, run.hint),
+    );
+    if (!prev || prev.coach !== run.coach) if (run.coach) this.announce(run.coachText);
   }
 
   /** Special-ability button: gold pill under the goal (desktop) or above POWER (touch). */
@@ -1082,19 +1209,21 @@ class DomUI implements UI {
       big.append(st);
     }
     const list = h('ul', { class: 'starlist' });
-    if (vm.mode === 'campaign') vm.starTexts.forEach((s, i) => list.append(h('li', { class: vm.starsMet[i] ? 'met' : '' }, starIcon(vm.starsMet[i]), s)));
+    if (vm.mode === 'campaign' || vm.mode === 'daily') vm.starTexts.forEach((s, i) => list.append(h('li', { class: vm.starsMet[i] ? 'met' : '' }, starIcon(vm.starsMet[i]), s)));
     const stats = h('div', { class: 'stats' });
     for (const s of vm.stats) stats.append(h('div', { class: 'stat' }, h('div', { class: 'k' }, s.label), h('div', { class: 'v' }, s.value)));
     const modal = h(
       'div',
       { class: 'modal panel results', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'res-title' },
-      vm.mode === 'campaign' ? big : null,
+      vm.mode === 'campaign' || vm.mode === 'daily' ? big : null,
       h('h2', { id: 'res-title', style: vm.success ? 'color:var(--c-gold)' : '' }, vm.title),
       h('div', { class: 'sub' }, vm.subtitle),
-      vm.mode === 'campaign' ? list : null,
+      vm.mode === 'campaign' || vm.mode === 'daily' ? list : null,
+      vm.linescore ? this.linescore(vm.linescore) : null,
       h('div', { class: 'eyebrow' }, this.t('summary')),
       stats,
       ...vm.unlocks.map((u) => h('div', { class: 'unlock' }, starIcon(true), `${this.t('unlocked')}: ${u}`)),
+      vm.coins ? this.coinsBox(vm.coins, hd) : null,
       h(
         'div',
         { class: 'actions' },
@@ -1106,6 +1235,30 @@ class DomUI implements UI {
     );
     this.setScreen(h('section', { class: 'screen scrim center' }, modal), hd.onMenu);
     this.announce(`${vm.title}. ${vm.subtitle}`);
+  }
+
+  private linescore(l: NonNullable<ResultsVM['linescore']>): HTMLElement {
+    const n = Math.max(l.awayLine.length, l.homeLine.length);
+    const row = (name: string, line: (number | null)[], total: number): HTMLElement =>
+      h('tr', null, h('th', { scope: 'row' }, name), ...Array.from({ length: n }, (_, i) => h('td', { class: 'num' }, line[i] === null || line[i] === undefined ? (i < line.length ? 'X' : '') : String(line[i]))), h('td', { class: 'num total' }, String(total)));
+    return h(
+      'table',
+      { class: 'linescore', 'aria-label': this.t('linescore') },
+      h('thead', null, h('tr', null, h('th', null, ''), ...Array.from({ length: n }, (_, i) => h('th', { class: 'num' }, String(i + 1))), h('th', null, 'R'))),
+      h('tbody', null, row(l.away, l.awayLine, l.awayTotal), row(l.home, l.homeLine, l.homeTotal)),
+    );
+  }
+
+  private coinsBox(c: NonNullable<ResultsVM['coins']>, hd: ResultsHandlers): HTMLElement {
+    const list = h('ul', { class: 'coin-lines' }, ...c.lines.map((l) => h('li', null, h('span', null, l.label), h('b', { class: 'num' }, `+${l.amount}`))));
+    const dbl = c.canDouble && hd.onDoubleCoins ? h('button', { class: 'btn btn-ad', onclick: this.click(() => hd.onDoubleCoins!()) }, h('span', { class: 'ad-pill' }, 'AD'), this.t('doubleCoins')) : null;
+    return h(
+      'section',
+      { class: `coins-box ${c.doubled ? 'doubled' : ''}`, 'aria-label': this.t('coins') },
+      h('div', { class: 'coins-head' }, h('span', null, coinIcon(), ` ${this.t('earned')}`), h('b', { class: 'num' }, `+${c.total}`), c.doubled ? h('span', { class: 'chip' }, this.t('doubled')) : null),
+      list,
+      h('div', { class: 'coins-foot' }, h('span', { class: 'dim' }, `${this.t('coins')}: `), h('b', { class: 'num' }, String(c.balance)), dbl),
+    );
   }
 
   toast(text: string): void {
